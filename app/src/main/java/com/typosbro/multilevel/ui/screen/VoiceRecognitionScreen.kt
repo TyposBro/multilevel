@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.typosbro.multilevel.ui.component.ChatMessage
 import com.typosbro.multilevel.ui.component.ChatMessageBubble
 import com.typosbro.multilevel.ui.component.RecognitionControls
+import com.typosbro.multilevel.ui.component.TimerModal
 
 @Composable
 fun VoiceRecognitionScreen(
@@ -22,7 +23,7 @@ fun VoiceRecognitionScreen(
     isRecording: Boolean
 ) {
     val listState = rememberLazyListState()
-
+    var showTimerModal by remember { mutableStateOf(false) }
 
     // Scroll to top when new messages are added
     LaunchedEffect(messageList.size, partialText) {
@@ -30,7 +31,6 @@ fun VoiceRecognitionScreen(
             listState.animateScrollToItem(0)
         }
     }
-
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -77,12 +77,29 @@ fun VoiceRecognitionScreen(
             }
         }
 
-
         RecognitionControls(
             isRecording = isRecording,
-            onStartRecording = onStartMicRecognition,
+            onStartRecording = { showTimerModal = true },
             onStopRecording = onStopRecognition,
             modifier = Modifier.fillMaxWidth()
         )
+
+        if (showTimerModal) {
+            TimerModal(
+                timer1Duration = 5,  // Adjust durations as needed.
+                timer2Duration = 10,
+                onFinish = {
+                    // When timer 2 finishes, call stop recording and hide the modal.
+                    onStopRecognition()
+                    showTimerModal = false
+                },
+                callback = onStartMicRecognition,
+                onCancel = {
+                    // Allow user to cancel the timer early.
+                    onStopRecognition()
+                    showTimerModal = false
+                }
+            )
+        }
     }
 }
