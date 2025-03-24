@@ -1,0 +1,20 @@
+{
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "openai": "^4.89.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9",
+    "@types/bun": "latest"
+  },
+  "name": "api",
+  "module": "index.js",
+  "type": "module",
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "start": "nodemon ./src/index.js"
+  }
+}
