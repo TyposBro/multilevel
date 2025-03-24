@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.typosbro.multilevel"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.typosbro.multilevel"
@@ -56,4 +56,18 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+    // Material Icons Extended
+    implementation("androidx.compose.material:material-icons-extended:1.7.8")
+
+
+    // Navigation Compose
+    implementation("androidx.navigation:navigation-compose:2.8.9")
+
+    // Vosk dependencies
+    implementation ("com.alphacephei:vosk-android:0.3.47")
+    implementation ("org.apache.commons:commons-compress:1.24.0")
+
+    // Models
+    implementation(project(":models"))
 }

@@ -1,47 +1,175 @@
 package com.typosbro.multilevel
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.*
+import androidx.core.content.ContextCompat
+import androidx.navigation.compose.rememberNavController
+import com.typosbro.multilevel.features.vosk.VoskRecognitionManager
 import com.typosbro.multilevel.ui.theme.MultilevelTheme
+import org.json.JSONObject
+import org.vosk.Model
+import org.vosk.android.RecognitionListener
+import org.vosk.android.StorageService
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        const val PERMISSIONS_REQUEST_RECORD_AUDIO = 1
+    }
+
+    private var voskManager: VoskRecognitionManager? = null
+    private var model by mutableStateOf<Model?>(null)
+    private var recognitionResults by mutableStateOf("")
+    private var partialResults by mutableStateOf("")
+    private var isPaused by mutableStateOf(false)
+
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            initModel()
+        } else {
+            Toast.makeText(this, "Permission denied", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Check for audio recording permission
+        checkPermissionAndInitModel()
+
         setContent {
             MultilevelTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
-                }
+                val navController = rememberNavController()
+
+                AppScaffold(
+                    navController = navController,
+                    model = model,
+                    recognitionResults = recognitionResults,
+                    partialResults = partialResults,
+                    onResultsUpdate = { recognitionResults = it },
+                    onPartialResultsUpdate = { partialResults = it },
+                    onStartMicRecognition = ::startMicRecognition,
+                    onStartFileRecognition = ::startFileRecognition,
+                    onStopRecognition = ::stopRecognition,
+                    onPauseStateChange = ::setPause,
+                    isPaused = isPaused,
+                )
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+    private fun checkPermissionAndInitModel() {
+        when {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED -> {
+                initModel()
+            }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    MultilevelTheme {
-        Greeting("Android")
+            else -> {
+                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    private fun initModel() {
+        StorageService.unpack(this, "model-en-us", "model",
+            { unpackedModel ->
+                model = unpackedModel
+                // Create the Vosk manager when model is ready
+                voskManager = VoskRecognitionManager(this, unpackedModel, recognitionListener)
+            },
+            { exception ->
+                Toast.makeText(
+                    this,
+                    "Failed to unpack the model: ${exception.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        )
+    }
+
+    private fun startMicRecognition() {
+        // Clear previous results when starting a new recognition session
+        recognitionResults = ""
+        partialResults = ""
+        isPaused = true
+        voskManager?.startMicrophoneRecognition()
+    }
+
+    private fun startFileRecognition() {
+        // Clear previous results when starting a new recognition session
+        recognitionResults = ""
+        partialResults = ""
+        voskManager?.startFileRecognition()
+    }
+
+    private fun stopRecognition() {
+        voskManager?.stopRecognition()
+    }
+
+    private fun setPause(paused: Boolean) {
+        voskManager?.setPause(paused)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Clean up any speech services
+        stopRecognition()
+    }
+
+    private val recognitionListener = object : RecognitionListener {
+        override fun onPartialResult(hypothesis: String) {
+            try {
+                val json = JSONObject(hypothesis)
+                partialResults = json.optString("partial", "")
+                Log.d("VoskDebug", "Partial text: $partialResults")
+            } catch (e: Exception) {
+                Log.e("VoskDebug", "Partial parse error", e)
+                partialResults = ""
+            }
+        }
+
+        override fun onResult(hypothesis: String) {
+            try {
+                val json = JSONObject(hypothesis)
+                val fullText = json.optString("text", "")
+                if (fullText.isNotEmpty()) {
+                    recognitionResults += "$fullText\n"
+                }
+            } catch (e: Exception) {
+                Log.e("VoskDebug", "Result parse error", e)
+            }
+            partialResults = ""
+        }
+
+        override fun onFinalResult(hypothesis: String) {
+            // The final result gets added to the total results
+            recognitionResults += "$hypothesis\n"
+            partialResults = ""
+        }
+
+        override fun onError(e: Exception) {
+            recognitionResults += "Error: ${e.message}\n"
+            partialResults = ""
+        }
+
+        override fun onTimeout() {
+            recognitionResults += "Recognition timeout\n"
+            partialResults = ""
+        }
     }
 }

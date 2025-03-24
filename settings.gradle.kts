@@ -21,3 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "multilevel"
 include(":app")
+include (":models")
