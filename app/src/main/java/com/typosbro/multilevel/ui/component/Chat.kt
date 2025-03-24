@@ -1,7 +1,6 @@
 package com.typosbro.multilevel.ui.component
 
 
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -14,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
@@ -77,34 +75,14 @@ fun ChatMessageBubble(
  */
 @Composable
 fun RecognitionControls(
-    isRecognizing: Boolean,
-    isPaused: Boolean,
-    onStartRecognition: () -> Unit,
-    onStopRecognition: () -> Unit,
+    isRecording: Boolean,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Animation for the recording indicator pulse effect
-    val infiniteTransition = rememberInfiniteTransition(label = "recording-pulse")
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "scale"
-    )
 
-    // Animation for the recording indicator color pulse
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.6f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse-alpha"
-    )
+
+
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -118,44 +96,20 @@ fun RecognitionControls(
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Recording indicator
-            if (isRecognizing) {
-                Box(
-                    modifier = Modifier
-                        .padding(end = 16.dp)
-                        .size(16.dp)
-                        .scale(scale)
-                        .clip(CircleShape)
-                        .background(Color.Red.copy(alpha = pulseAlpha))
-                )
-
-                Text(
-                    text = "Recording...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(end = 16.dp)
-                )
-            }
 
             IconButton(
-                onClick = {
-                    if (isPaused) {
-                        onStopRecognition()
-                    } else {
-                        onStartRecognition()
-                    }
-                },
+                onClick = if (isRecording) onStopRecording else onStartRecording,
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
                     .background(
-                        color = if (isPaused) Color.Red
+                        color = if (isRecording) Color.Red
                         else MaterialTheme.colorScheme.primary
                     )
             ) {
                 Icon(
-                    imageVector = if (isPaused) Icons.Default.MicOff else Icons.Default.Mic,
-                    contentDescription = if (isPaused) "Stop Recording" else "Start Recording",
+                    imageVector = if (isRecording) Icons.Default.MicOff else Icons.Default.Mic,
+                    contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
                     tint = Color.White,
                     modifier = Modifier.size(28.dp)
                 )

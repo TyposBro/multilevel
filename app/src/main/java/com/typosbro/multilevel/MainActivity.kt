@@ -11,8 +11,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.typosbro.multilevel.features.vosk.VoskRecognitionManager
@@ -25,14 +25,15 @@ import org.vosk.android.StorageService
 class MainActivity : ComponentActivity() {
 
 
-
     private var voskManager: VoskRecognitionManager? = null
     private var model by mutableStateOf<Model?>(null)
     private var recognitionResults by mutableStateOf("")
-    private var partialResults by mutableStateOf("")
-    private var isPaused by mutableStateOf(false)
+    private var partialText by mutableStateOf("")
+    private var isRecording by mutableStateOf(false)
+    var displayedText by mutableStateOf("")
+
     // Keep track of completed messages
-    private var completedMessages = mutableStateListOf<String>()
+    private var messageList = mutableStateListOf<String>()
 
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -58,11 +59,11 @@ class MainActivity : ComponentActivity() {
 
                 AppScaffold(
                     navController = navController,
-                    partialResults = partialResults,
+                    partialText = displayedText,
                     onStartMicRecognition = ::startMicRecognition,
                     onStopRecognition = ::stopRecognition,
-                    isPaused = isPaused,
-                    completedMessages = completedMessages
+                    isRecording = isRecording,
+                    messageList = messageList
                 )
             }
         }
@@ -103,24 +104,22 @@ class MainActivity : ComponentActivity() {
     private fun startMicRecognition() {
         // Clear previous results when starting a new recognition session
         recognitionResults = ""
-        partialResults = ""
-        isPaused = true
+        partialText = ""
+        isRecording = true
         voskManager?.startMicrophoneRecognition()
     }
 
     private fun stopRecognition() {
-        if (recognitionResults.isNotEmpty() && partialResults.isEmpty()) {
-            // Only add if it's not already in the list and is not empty
-            Log.d("VoiceRecognitionScreen", "Adding completed message: $recognitionResults")
-            val trimmedResults = recognitionResults.trim()
-            if (trimmedResults.isNotEmpty()) {
-                completedMessages.add(0, trimmedResults)
-            }
+        // Capture final partial results
+        if (partialText.isNotEmpty()) {
+            recognitionResults += partialText
         }
-        isPaused = false
-        recognitionResults = ""
-        partialResults = ""
+
+        if (recognitionResults.isNotEmpty()) {
+            messageList.add(0, recognitionResults.trim())
+        }
         voskManager?.stopRecognition()
+        resetStates()
     }
 
     override fun onDestroy() {
@@ -133,45 +132,52 @@ class MainActivity : ComponentActivity() {
         override fun onPartialResult(hypothesis: String) {
             try {
                 val json = JSONObject(hypothesis)
-                partialResults = json.optString("partial", "")
-                Log.d("VoskDebug", "Partial text: $partialResults")
+                partialText = json.optString("partial", "") + " "  // Add trailing space
+                updateDisplayText()
             } catch (e: Exception) {
                 Log.e("VoskDebug", "Partial parse error", e)
-                partialResults = ""
             }
         }
 
         override fun onResult(hypothesis: String) {
-            try {
-                val json = JSONObject(hypothesis)
-                val fullText = json.optString("text", "")
-                if (fullText.isNotEmpty()) {
-                    recognitionResults += "$fullText\n"
-                }
-            } catch (e: Exception) {
-                Log.e("VoskDebug", "Result parse error", e)
+            val fullText = JSONObject(hypothesis).optString("text", "")
+            if (fullText.isNotEmpty()) {
+                recognitionResults += "$fullText "
+                partialText = ""
+                updateDisplayText()
             }
-            partialResults = ""
         }
 
         override fun onFinalResult(hypothesis: String) {
-            // The final result gets added to the total results
-            val json = JSONObject(hypothesis)
-            val fullText = json.optString("text", "")
-            if (fullText.isNotEmpty()) {
-                recognitionResults += "$fullText\n"
-            }
-            partialResults = ""
+//            // The final result gets added to the total results
+//            val json = JSONObject(hypothesis)
+//            val fullText = json.optString("text", "")
+//            if (fullText.isNotEmpty()) {
+//                recognitionResults += "$fullText\n"
+//            }
+////            partialResults = ""
         }
 
         override fun onError(e: Exception) {
             recognitionResults += "Error: ${e.message}\n"
-            partialResults = ""
+            partialText = ""
         }
 
         override fun onTimeout() {
             recognitionResults += "Recognition timeout\n"
-            partialResults = ""
+            partialText = ""
         }
+    }
+
+    private fun updateDisplayText() {
+        displayedText = "$recognitionResults$partialText".trim()
+        // Update UI here through mutable state
+    }
+
+    private fun resetStates() {
+        recognitionResults = ""
+        partialText = ""
+        displayedText = ""
+        isRecording = false
     }
 }

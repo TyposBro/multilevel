@@ -15,50 +15,22 @@ import com.typosbro.multilevel.ui.component.RecognitionControls
 
 @Composable
 fun VoiceRecognitionScreen(
-    completedMessages: List<String>,
-    partialResults: String,
+    messageList: List<String>,
+    partialText: String,
     onStartMicRecognition: () -> Unit,
     onStopRecognition: () -> Unit,
-    isPaused: Boolean
+    isRecording: Boolean
 ) {
     val listState = rememberLazyListState()
 
 
     // Scroll to top when new messages are added
-    LaunchedEffect(completedMessages.size, partialResults) {
-        if (completedMessages.isNotEmpty() || partialResults.isNotEmpty()) {
+    LaunchedEffect(messageList.size, partialText) {
+        if (messageList.isNotEmpty() || partialText.isNotEmpty()) {
             listState.animateScrollToItem(0)
         }
     }
 
-//// Keep track of completed messages
-//    val completedMessages = remember { mutableStateListOf<String>() }
-//
-//    // Add current recognition results to completed messages when recording stops
-//    LaunchedEffect(recognitionResults) {
-//        if (recognitionResults.isNotEmpty() && partialResults.isEmpty()) {
-//            // Only add if it's not already in the list and is not empty
-//            val trimmedResults = recognitionResults.trim()
-//            if (trimmedResults.isNotEmpty() && !completedMessages.contains(trimmedResults)) {
-//                completedMessages.add(0, trimmedResults)
-//            }
-//        }
-//    }
-//
-//    // When recording stops (and we have partial results), add the partial as a completed message
-//    val isRecording = partialResults.isNotEmpty()
-//    var wasRecording by remember { mutableStateOf(false) }
-//
-//    LaunchedEffect(isRecording) {
-//        if (!isRecording && wasRecording && partialResults.isNotEmpty()) {
-//            // Recording just stopped, save the current partial results
-//            val trimmedPartial = partialResults.trim()
-//            if (trimmedPartial.isNotEmpty() && !completedMessages.contains(trimmedPartial)) {
-//                completedMessages.add(0, trimmedPartial)
-//            }
-//        }
-//        wasRecording = isRecording
-//    }
 
     Column(
         modifier = Modifier.fillMaxSize()
@@ -69,29 +41,29 @@ fun VoiceRecognitionScreen(
             reverseLayout = true
         ) {
             // Show current partial results at the top if any
-            if (partialResults.isNotEmpty()) {
+            if (partialText.isNotEmpty()) {
                 item {
                     ChatMessageBubble(
                         message = ChatMessage(
-                            text = partialResults,
-                            isUser = false
+                            text = partialText,
+                            isUser = true
                         )
                     )
                 }
             }
 
             // Show all completed messages
-            items(completedMessages) { message ->
+            items(messageList) { message ->
                 ChatMessageBubble(
                     message = ChatMessage(
                         text = message,
-                        isUser = false
+                        isUser = true
                     )
                 )
             }
 
             // If there's nothing to show, display an instruction
-            if (completedMessages.isEmpty() && partialResults.isEmpty()) {
+            if (messageList.isEmpty() && partialText.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -107,10 +79,9 @@ fun VoiceRecognitionScreen(
 
 
         RecognitionControls(
-            isRecognizing = partialResults.isNotEmpty(),
-            isPaused = isPaused,
-            onStartRecognition = onStartMicRecognition,
-            onStopRecognition = onStopRecognition,
+            isRecording = isRecording,
+            onStartRecording = onStartMicRecognition,
+            onStopRecording = onStopRecognition,
             modifier = Modifier.fillMaxWidth()
         )
     }

@@ -14,16 +14,15 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.typosbro.multilevel.ui.screen.SecondScreen
 import com.typosbro.multilevel.ui.screen.ThirdScreen
 import com.typosbro.multilevel.ui.screen.VoiceRecognitionScreen
-import org.vosk.Model
 
 @Composable
 fun AppScaffold(
     navController: NavHostController,
-    partialResults: String,
+    partialText: String,
     onStartMicRecognition: () -> Unit,
     onStopRecognition: () -> Unit,
-    completedMessages: List<String>,
-    isPaused: Boolean
+    messageList: List<String>,
+    isRecording: Boolean
 ) {
     Scaffold(
         bottomBar = {
@@ -57,11 +56,11 @@ fun AppScaffold(
         ) {
             composable(Screen.VoiceRecognition.route) {
                 VoiceRecognitionScreen(
-                    partialResults = partialResults,
+                    partialText = partialText,
                     onStartMicRecognition = onStartMicRecognition,
                     onStopRecognition = onStopRecognition,
-                    isPaused = isPaused,
-                    completedMessages = completedMessages
+                    isRecording = isRecording,
+                    messageList = messageList
                 )
             }
             composable(Screen.SecondScreen.route) {
