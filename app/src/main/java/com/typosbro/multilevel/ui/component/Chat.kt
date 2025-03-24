@@ -81,7 +81,6 @@ fun RecognitionControls(
     isPaused: Boolean,
     onStartRecognition: () -> Unit,
     onStopRecognition: () -> Unit,
-    onPauseStateChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Animation for the recording indicator pulse effect

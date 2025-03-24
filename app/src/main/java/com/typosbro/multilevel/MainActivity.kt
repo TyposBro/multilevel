@@ -10,6 +10,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.core.content.ContextCompat
 import androidx.navigation.compose.rememberNavController
 import com.typosbro.multilevel.features.vosk.VoskRecognitionManager
@@ -21,15 +24,15 @@ import org.vosk.android.StorageService
 
 class MainActivity : ComponentActivity() {
 
-    companion object {
-        const val PERMISSIONS_REQUEST_RECORD_AUDIO = 1
-    }
+
 
     private var voskManager: VoskRecognitionManager? = null
     private var model by mutableStateOf<Model?>(null)
     private var recognitionResults by mutableStateOf("")
     private var partialResults by mutableStateOf("")
     private var isPaused by mutableStateOf(false)
+    // Keep track of completed messages
+    private var completedMessages = mutableStateListOf<String>()
 
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -55,16 +58,11 @@ class MainActivity : ComponentActivity() {
 
                 AppScaffold(
                     navController = navController,
-                    model = model,
-                    recognitionResults = recognitionResults,
                     partialResults = partialResults,
-                    onResultsUpdate = { recognitionResults = it },
-                    onPartialResultsUpdate = { partialResults = it },
                     onStartMicRecognition = ::startMicRecognition,
-                    onStartFileRecognition = ::startFileRecognition,
                     onStopRecognition = ::stopRecognition,
-                    onPauseStateChange = ::setPause,
                     isPaused = isPaused,
+                    completedMessages = completedMessages
                 )
             }
         }
@@ -110,19 +108,19 @@ class MainActivity : ComponentActivity() {
         voskManager?.startMicrophoneRecognition()
     }
 
-    private fun startFileRecognition() {
-        // Clear previous results when starting a new recognition session
+    private fun stopRecognition() {
+        if (recognitionResults.isNotEmpty() && partialResults.isEmpty()) {
+            // Only add if it's not already in the list and is not empty
+            Log.d("VoiceRecognitionScreen", "Adding completed message: $recognitionResults")
+            val trimmedResults = recognitionResults.trim()
+            if (trimmedResults.isNotEmpty()) {
+                completedMessages.add(0, trimmedResults)
+            }
+        }
+        isPaused = false
         recognitionResults = ""
         partialResults = ""
-        voskManager?.startFileRecognition()
-    }
-
-    private fun stopRecognition() {
         voskManager?.stopRecognition()
-    }
-
-    private fun setPause(paused: Boolean) {
-        voskManager?.setPause(paused)
     }
 
     override fun onDestroy() {
@@ -158,7 +156,11 @@ class MainActivity : ComponentActivity() {
 
         override fun onFinalResult(hypothesis: String) {
             // The final result gets added to the total results
-            recognitionResults += "$hypothesis\n"
+            val json = JSONObject(hypothesis)
+            val fullText = json.optString("text", "")
+            if (fullText.isNotEmpty()) {
+                recognitionResults += "$fullText\n"
+            }
             partialResults = ""
         }
 

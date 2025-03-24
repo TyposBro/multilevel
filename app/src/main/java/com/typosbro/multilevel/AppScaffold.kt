@@ -19,15 +19,10 @@ import org.vosk.Model
 @Composable
 fun AppScaffold(
     navController: NavHostController,
-    model: Model?,
-    recognitionResults: String,
     partialResults: String,
-    onResultsUpdate: (String) -> Unit,
-    onPartialResultsUpdate: (String) -> Unit,
     onStartMicRecognition: () -> Unit,
-    onStartFileRecognition: () -> Unit,
     onStopRecognition: () -> Unit,
-    onPauseStateChange: (Boolean) -> Unit,
+    completedMessages: List<String>,
     isPaused: Boolean
 ) {
     Scaffold(
@@ -62,14 +57,11 @@ fun AppScaffold(
         ) {
             composable(Screen.VoiceRecognition.route) {
                 VoiceRecognitionScreen(
-                    model = model,
-                    recognitionResults = recognitionResults,
                     partialResults = partialResults,
                     onStartMicRecognition = onStartMicRecognition,
-                    onStartFileRecognition = onStartFileRecognition,
                     onStopRecognition = onStopRecognition,
-                    onPauseStateChange = onPauseStateChange,
-                    isPaused = isPaused
+                    isPaused = isPaused,
+                    completedMessages = completedMessages
                 )
             }
             composable(Screen.SecondScreen.route) {
