@@ -1,0 +1,16 @@
+-- Merging decision tree log ---
+manifest
+ADDED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml:2:13-83
+INJECTED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml:2:13-83
+	package
+		INJECTED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml
+	xmlns:android
+		ADDED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml:2:23-81
+uses-sdk
+INJECTED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml reason: use-sdk injection requested
+INJECTED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml
+INJECTED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml
+	android:targetSdkVersion
+		INJECTED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml
+	android:minSdkVersion
+		INJECTED from /Users/typosbro/Documents/private/android/samples/vosk-android-demo/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest2091954455390575324.xml
