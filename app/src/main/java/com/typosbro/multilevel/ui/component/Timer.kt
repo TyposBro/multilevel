@@ -5,14 +5,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
+import com.typosbro.multilevel.features.timer.TimerSoundPlayer
 import kotlinx.coroutines.delay
 
 /**
  * TimerModal shows two sequential timers.
  * - The first timer is a popup modal.
- * - The second timer is displayed inline (as a Card) so it doesn't obscure the chat.
+ * - The second timer is displayed inline (as a Card).
  *
  * @param timer1Duration Duration (in seconds) for the first timer.
  * @param timer2Duration Duration (in seconds) for the second timer.
@@ -28,6 +29,10 @@ fun TimerModal(
     onCancel: () -> Unit,
     callback: () -> Unit
 ) {
+    // Obtain context and create the sound player.
+    val context = LocalContext.current
+    val soundPlayer = remember { TimerSoundPlayer(context) }
+
     // currentTimer holds the remaining seconds for the active timer.
     var currentTimer by remember { mutableStateOf(timer1Duration) }
     // currentStage: 1 = popup modal timer, 2 = inline timer.
@@ -38,9 +43,12 @@ fun TimerModal(
         while (currentTimer > 0) {
             delay(1000L)
             currentTimer--
+            // Play the tick sound on each second.
+            soundPlayer.playTick()
         }
         if (currentStage == 1) {
-            // Timer 1 finished: switch to stage 2.
+            // Timer 1 finished: play beep and switch to stage 2.
+            soundPlayer.playBeep()
             currentStage = 2
             currentTimer = timer2Duration
             callback()
@@ -64,10 +72,9 @@ fun TimerModal(
         )
     } else {
         // Inline UI for Timer 2.
-        // This Card will be rendered within the screen layout.
         Card(
             modifier = Modifier
-                .wrapContentWidth()
+                .fillMaxWidth()
                 .padding(8.dp),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
         ) {
