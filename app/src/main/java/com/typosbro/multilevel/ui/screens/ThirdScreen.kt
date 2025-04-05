@@ -1,4 +1,5 @@
-package com.typosbro.multilevel.ui.screen
+package com.typosbro.multilevel.ui.screens
+
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -12,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun SecondScreen() {
+fun ThirdScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -21,11 +22,11 @@ fun SecondScreen() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Second Screen",
+            text = "Third Screen",
             style = MaterialTheme.typography.headlineMedium
         )
         Text(
-            text = "This is the second screen of the application.",
+            text = "This is the third screen of the application.",
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(top = 16.dp)
         )

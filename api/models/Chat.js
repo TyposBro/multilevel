@@ -1,4 +1,3 @@
-// ---
 // models/Chat.js
 const mongoose = require('mongoose');
 
@@ -6,7 +5,7 @@ const mongoose = require('mongoose');
 const messageSchema = new mongoose.Schema({
   role: {
     type: String,
-    enum: ['user', 'model'], // Or 'function' if you use function calling
+    enum: ['user', 'model'],
     required: true,
   },
   parts: [{
@@ -15,21 +14,24 @@ const messageSchema = new mongoose.Schema({
       required: true,
     }
   }],
-}, { _id: false }); // Don't create separate _id for each message part
+}, { _id: false });
 
 const chatSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
-    index: true, // Index for faster lookups by user
+    index: true,
   },
-  // Store conversation history directly
-  history: [messageSchema],
-  // Could add a title, summary, etc. later if needed
-  // title: String,
+  // Add a title for the chat session
+  title: {
+    type: String,
+    trim: true,
+    default: 'New Chat', // Provide a default title
+  },
+  history: [messageSchema], // History specific to this chat document
 }, {
-  timestamps: true, // Adds createdAt and updatedAt automatically
+  timestamps: true, // Adds createdAt and updatedAt
 });
 
 module.exports = mongoose.model('Chat', chatSchema);

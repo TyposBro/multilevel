@@ -49,6 +49,36 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // Material Icons Extended
+    implementation(libs.androidx.material.icons.core)
+    implementation(libs.androidx.material.icons.extended)
+
+
+    // Navigation Compose
+    implementation(libs.androidx.navigation.compose)
+
+    // Vosk dependencies
+    implementation (libs.vosk.android)
+    implementation (libs.commons.compress)
+
+    // Models
+    implementation(project(":models"))
+
+    // ViewModel
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+
+    // Networking (Retrofit & OkHttp)
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.logging.interceptor)
+
+    // Secure Storage (Jetpack Security)
+    implementation(libs.androidx.security.crypto)
+
+    // Testing (Optional but recommended)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -56,18 +86,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
-    // Material Icons Extended
-    implementation("androidx.compose.material:material-icons-extended:1.7.8")
-
-
-    // Navigation Compose
-    implementation("androidx.navigation:navigation-compose:2.8.9")
-
-    // Vosk dependencies
-    implementation ("com.alphacephei:vosk-android:0.3.47")
-    implementation ("org.apache.commons:commons-compress:1.24.0")
-
-    // Models
-    implementation(project(":models"))
 }

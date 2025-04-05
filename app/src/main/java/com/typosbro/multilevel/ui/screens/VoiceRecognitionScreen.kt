@@ -1,4 +1,4 @@
-package com.typosbro.multilevel.ui.screen
+package com.typosbro.multilevel.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn

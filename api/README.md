@@ -1,15 +1,9 @@
-# api
+# .env
+PORT=3000 <!-- or any port you want -->
+MONGO_URI=your-mongo-db-uri
+JWT_SECRET=your-jwt-secrete
+JWT_EXPIRES_IN=1d # Token expiration time (e.g., 1d, 7d, 1h)
 
-To install dependencies:
+GEMINI_API_KEY=your-gemini-api
+GOOGLE_APPLICATION_CREDENTIALS=your-google-cloud-project-secrete-key
 
-```bash
-bun install
-```
-
-To run:
-
-```bash
-bun run index.js
-```
-
-This project was created using `bun init` in bun v1.1.33. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
