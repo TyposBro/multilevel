@@ -58,8 +58,8 @@ def synthesize_speech():
         # Check if language code needs pipeline re-init (simple approach)
         # NOTE: A more robust approach might involve multiple pipeline instances or dynamic loading.
         # For now, we assume the default language or expect lang_code to match the initial one.
-        if lang_code != pipeline.default_lang_code:
-             logger.warning(f"Requested lang_code '{lang_code}' differs from pipeline default '{pipeline.default_lang_code}'. Synthesis might fail or use default.")
+        # if lang_code != pipeline.default_lang_code:
+        #      logger.warning(f"Requested lang_code '{lang_code}' differs from pipeline default '{pipeline.default_lang_code}'. Synthesis might fail or use default.")
              # Ideally, you'd re-initialize or have multiple pipelines if supporting multiple languages frequently.
 
         # Use Kokoro pipeline to generate audio
@@ -95,7 +95,7 @@ def synthesize_speech():
         # --- Return Audio ---
         # Use soundfile to write WAV data to an in-memory buffer
         buffer = io.BytesIO()
-        sf.write(buffer, final_audio_np, pipeline.sr, format='WAV', subtype='PCM_16')
+        sf.write(buffer, final_audio_np, 24000, format='WAV', subtype='PCM_16')
         buffer.seek(0) # Reset buffer position to the beginning
 
         logger.info("Synthesis successful. Returning WAV audio.")
