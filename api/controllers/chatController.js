@@ -1,6 +1,7 @@
 // controllers/chatController.js
 const Chat = require('../models/Chat');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const axios = require('axios');
 require('dotenv').config();
 
 // --- Gemini Setup --- (Keep as is)
@@ -8,6 +9,10 @@ if (!process.env.GEMINI_API_KEY) { /* ... */ }
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash"});
 
+// --- Kokoro TTS Service URL ---
+// Use the internal IP/hostname if running in the same network/cloud env
+// Use localhost if running both on the same machine for testing
+const KOKORO_TTS_URL = process.env.KOKORO_TTS_SERVICE_URL || 'http://localhost:5005/synthesize';
 
 // @desc    Create a new empty chat session for the user
 // @route   POST /api/chat/
@@ -62,64 +67,86 @@ const listUserChats = async (req, res) => {
 // @route   POST /api/chat/:chatId/message
 // @access  Private
 const sendMessage = async (req, res) => {
-  const { prompt } = req.body;
-  const { chatId } = req.params; // Get chatId from URL parameters
-  const userId = req.user._id;
+    const { prompt } = req.body;
+    const { chatId } = req.params;
+    const userId = req.user._id;
 
-  if (!prompt) {
-    return res.status(400).json({ message: 'Prompt is required' });
-  }
-  if (!chatId) {
-    return res.status(400).json({ message: 'Chat ID is required' });
-  }
+    if (!prompt) return res.status(400).json({ message: 'Prompt is required' });
+    if (!chatId) return res.status(400).json({ message: 'Chat ID is required' });
 
-  try {
-    // 1. Find the specific chat AND verify ownership
-    const chat = await Chat.findOne({ _id: chatId, userId: userId });
+    try {
+        // 1. Find Chat & Verify Ownership
+        const chat = await Chat.findOne({ _id: chatId, userId: userId });
+        if (!chat) return res.status(404).json({ message: 'Chat not found or permission denied.' });
 
-    if (!chat) {
-      return res.status(404).json({ message: 'Chat session not found or you do not have permission to access it.' });
+        // 2. Prepare History for Gemini
+        const geminiHistory = chat.history.map(msg => ({ /* ... */ }));
+
+        // 3. Call Gemini
+        console.log("Calling Gemini API...");
+        const chatSession = model.startChat({ history: geminiHistory });
+        const result = await chatSession.sendMessage(prompt);
+        const response = await result.response;
+        const modelResponseText = response.text();
+        console.log("Received response from Gemini.");
+
+        // 4. Update Chat History in DB
+        chat.history.push({ role: 'user', parts: [{ text: prompt }] });
+        chat.history.push({ role: 'model', parts: [{ text: modelResponseText }] });
+        await chat.save();
+        console.log("Chat history saved to DB.");
+
+        // --- 5. Call Kokoro TTS Service ---
+        let audioBase64Content = null; // Store base64 audio
+        let ttsError = null;
+
+        if (modelResponseText && modelResponseText.trim().length > 0) {
+            try {
+                console.log(`Sending text to Kokoro TTS: "${modelResponseText.substring(0, 50)}..."`);
+                const ttsResponse = await axios.post(
+                    KOKORO_TTS_URL,
+                    { text: modelResponseText },
+                    // Expect JSON response now
+                    { responseType: 'json' }
+                );
+
+                // Check if the response has the expected audio content
+                if (ttsResponse.data && ttsResponse.data.audioContent) {
+                    audioBase64Content = ttsResponse.data.audioContent;
+                    console.log(`Received Base64 audio data (length: ${audioBase64Content.length}) from Kokoro TTS.`);
+                } else {
+                    ttsError = 'Kokoro TTS response missing audioContent.';
+                    console.error(ttsError, 'Response data:', ttsResponse.data);
+                }
+
+            } catch (error) {
+                ttsError = `Failed to call Kokoro TTS service: ${error.message}`;
+                console.error(ttsError, error.response?.data || '');
+            }
+        } else {
+             console.log("No text content from model to synthesize.");
+             ttsError = "No text content from model to synthesize.";
+        }
+
+        // --- 6. Send JSON Response to Client (always JSON now) ---
+        console.log("Sending JSON response to client.");
+        res.status(200).json({
+            message: modelResponseText, // The original text response
+            chatId: chat._id,
+            audioContent: audioBase64Content, // Base64 audio string (null if TTS failed)
+            ttsError: ttsError // Any error message from TTS process
+        });
+
+    } catch (error) {
+        // ... (Existing Gemini/DB error handling) ...
+         console.error('Error during Gemini call or DB save:', error);
+        if (error.message?.includes('SAFETY')) { /* ... */ }
+        if (error.message?.includes('API key not valid')) { /* ... */ }
+        if (error.name === 'CastError') { /* ... */ }
+        res.status(500).json({ message: 'Failed to process chat message' });
     }
-
-    // 2. Prepare history for Gemini API (using the format from our schema)
-    const geminiHistory = chat.history.map(msg => ({
-        role: msg.role,
-        parts: msg.parts.map(p => ({ text: p.text })),
-    }));
-
-    // 3. Start chat session with Gemini using the specific chat's history
-    const chatSession = model.startChat({ history: geminiHistory });
-
-    // 4. Send the new user prompt to Gemini
-    const result = await chatSession.sendMessage(prompt);
-    const response = await result.response;
-    const modelResponseText = response.text();
-
-    // 5. Update *this specific chat's* history in MongoDB
-    chat.history.push({ role: 'user', parts: [{ text: prompt }] });
-    chat.history.push({ role: 'model', parts: [{ text: modelResponseText }] });
-
-    // Mongoose automatically updates 'updatedAt' timestamp on save
-    await chat.save();
-
-    // 6. Send response back to client
-    res.json({
-        message: modelResponseText,
-        chatId: chat._id, // Include chatId in response for clarity
-        // Optionally send updated history if needed: fullHistory: chat.history
-    });
-
-  } catch (error) {
-    console.error('Gemini API or DB Error in specific chat:', error);
-    if (error.message.includes('SAFETY')) { /* ... */ }
-    if (error.message.includes('API key not valid')) { /* ... */ }
-    // Handle CastError if chatId format is invalid
-    if (error.name === 'CastError') {
-         return res.status(400).json({ message: 'Invalid Chat ID format.' });
-    }
-    res.status(500).json({ message: 'Failed to get response from AI or save chat' });
-  }
 };
+
 
 
 // @desc    Get chat history for a specific chat session
