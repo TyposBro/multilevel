@@ -20,7 +20,9 @@ import com.typosbro.multilevel.data.repositories.Result
 import com.typosbro.multilevel.ui.component.ChatMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive // Import isActive
+import kotlinx.coroutines.isActive
+import com.typosbro.multilevel.data.repositories.SendMessageResult
+import com.typosbro.multilevel.utils.AudioPlayer
 
 class ChatDetailViewModel(
     application: Application,
@@ -124,7 +126,6 @@ class ChatDetailViewModel(
         Log.v("VoskSilence", "Silence timer started/reset.")
     }
 
-    // MODIFIED: startMaxDurationTimer - Now includes countdown logic
     private fun startMaxDurationTimer() {
         maxRecordingJob?.cancel()
         if (!uiState.value.isRecording) return // Safety check
@@ -167,7 +168,6 @@ class ChatDetailViewModel(
         }
     }
 
-    // MODIFIED: cancelAllTimers - Explicitly clear remaining time display
     private fun cancelAllTimers() {
         silenceDetectionJob?.cancel()
         maxRecordingJob?.cancel() // This will trigger the isActive check in the loop
@@ -181,7 +181,6 @@ class ChatDetailViewModel(
     }
 
     // --- Processing Logic ---
-    // MODIFIED: processCurrentBufferAndSend - Clear timer display on final send
     private fun processCurrentBufferAndSend(isFinalSend: Boolean) {
         // Prevent processing if not recording (unless final) or already loading
         if ((!uiState.value.isRecording && !isFinalSend) || uiState.value.isLoading) {
@@ -258,70 +257,54 @@ class ChatDetailViewModel(
     }
 
 
-    override fun onCleared() {
-        super.onCleared()
-        Log.d("VoskRec", "ViewModel cleared, shutting down Vosk and cancelling timers.")
-        cancelAllTimers() // Ensures timer display is cleared
-        voskManager?.stopRecognition() // Ensure Vosk is stopped
-    }
-
-
-    // --- Recognition Listener ---
     private val recognitionListener = object : RecognitionListener {
         override fun onPartialResult(hypothesis: String) {
             try {
                 val partial = JSONObject(hypothesis).optString("partial", "")
-                // Update internal and UI state only if the partial text changes
                 if (partial != currentPartialText) {
-                    currentPartialText = partial // Update internal tracking
-                    _uiState.update { it.copy(partialText = partial) } // Update UI display
-                    // Reset silence timer whenever there's new partial activity (blank or not)
+                    currentPartialText = partial
+                    _uiState.update { it.copy(partialText = partial) }
                     startSilenceTimer()
                     Log.v("VoskRec", "Partial: '$partial' - Silence Timer Reset")
                 }
             } catch (e: Exception) { Log.e("VoskRec", "Partial parse error", e) }
         }
-
         override fun onResult(hypothesis: String) {
             try {
                 val text = JSONObject(hypothesis).optString("text", "")
                 if (text.isNotEmpty()) {
-                    // Append the confirmed text to the buffer
                     recognitionResultsBuffer += "$text "
-                    // Clear the internal partial text tracker since we got a confirmed result
                     currentPartialText = ""
-                    // Don't clear the UI partial immediately
-
-                    startSilenceTimer() // Reset SILENCE timer on confirmed speech segment
+                    startSilenceTimer()
                     Log.d("VoskRec", "Result segment: '$text' - Buffer: '$recognitionResultsBuffer' - Silence Timer Reset")
                 }
             } catch (e: Exception) { Log.e("VoskRec", "Result parse error", e) }
         }
-
-        override fun onFinalResult(hypothesis: String) {
-            Log.d("VoskRec", "Final Result (usually empty): '$hypothesis'")
-        }
-
-        // MODIFIED: onError, onTimeout - Ensure timer display cleared
+        override fun onFinalResult(hypothesis: String) { Log.d("VoskRec", "Final Result (usually empty): '$hypothesis'") }
         override fun onError(e: Exception) {
             Log.e("VoskRec", "Recognition Error", e)
-            cancelAllTimers() // This now clears the timer display
-            resetTranscriptionState(clearUiToo = true) // Also clear internal buffers and UI partial
-            _uiState.update { it.copy(error = "Recognition error: ${e.message}", isRecording = false) } // isRecording=false, remainingTime=null set by cancelAllTimers
+            cancelAllTimers()
+            resetTranscriptionState(clearUiToo = true)
+            _uiState.update { it.copy(error = "Recognition error: ${e.message}", isRecording = false) }
         }
-
-        override fun onTimeout() { // Vosk internal timeout
+        override fun onTimeout() {
             Log.w("VoskRec", "Vosk Recognition Internal Timeout")
-            cancelAllTimers() // This now clears the timer display
+            cancelAllTimers()
             _uiState.update { it.copy(error = "Recognition stopped due to timeout") }
-            // Treat timeout as a final send event
-            processCurrentBufferAndSend(isFinalSend = true) // This clears remaining time state too
-            // Ensure isRecording is set to false after processing, although processCurrentBuffer handles it
-            if(uiState.value.isRecording) {
-                _uiState.update { it.copy(isRecording = false) }
-            }
+            processCurrentBufferAndSend(isFinalSend = true)
+            if(uiState.value.isRecording) { _uiState.update { it.copy(isRecording = false) } }
         }
     }
+
+    // Make sure AudioPlayer is released when ViewModel is cleared
+    override fun onCleared() {
+        super.onCleared()
+        Log.d("ChatDetailViewModel", "ViewModel cleared, shutting down Vosk, timers, and AudioPlayer.")
+        cancelAllTimers()
+        voskManager?.stopRecognition()
+        AudioPlayer.release() // Release MediaPlayer resources
+    }
+
 
     // --- Chat Data Methods ---
     private fun loadChatHistory() {
@@ -336,14 +319,12 @@ class ChatDetailViewModel(
                             text = apiMsg.parts.firstOrNull()?.text ?: "",
                             isUser = apiMsg.role == "user"
                         )
-                    }//.reversed() // Assuming LazyColumn reverseLayout = true
-
+                    }
                     _uiState.update {
                         it.copy(
                             chatTitle = result.data.title,
                             messageList = mutableStateListOf<ChatMessage>().apply { addAll(messages) },
-                            isLoading = false,
-                            error = null
+                            isLoading = false, error = null
                         )
                     }
                 }
@@ -355,47 +336,79 @@ class ChatDetailViewModel(
         }
     }
 
+    // --- MODIFIED: sendMessageToBackend ---
     private fun sendMessageToBackend(prompt: String) {
         Log.d("ChatDetailViewModel", "Sending message to backend: '$prompt'")
         if (uiState.value.isLoading) {
-            Log.w("ChatDetailViewModel", "Already sending a message, skipping new request for '$prompt'")
+            Log.w("ChatDetailViewModel", "Already processing a message, skipping new request for '$prompt'")
             return
         }
 
         _uiState.update { it.copy(isLoading = true) }
+
         viewModelScope.launch {
+            // Use standard Result wrapper now
             when (val result = chatRepository.sendMessage(chatId, prompt)) {
                 is Result.Success -> {
-                    Log.d("ChatDetailViewModel", "Received response from backend: '${result.data.message}'")
-                    val modelMessage = ChatMessage(result.data.message, false)
-                    _uiState.value.messageList.add(0, modelMessage) // Add model response
-                    // Set loading false AFTER adding the message
-                    _uiState.update { it.copy(isLoading = false, error = null) }
+                    val responseData = result.data // This is SendMessageApiResponse
+                    Log.d("ChatDetailViewModel", "Received response from backend. TTS Error: ${responseData.ttsError}")
+
+                    // --- Play Audio if available ---
+                    responseData.audioContent?.let { base64Audio ->
+                        if (base64Audio.isNotEmpty()) {
+                            Log.d("ChatDetailViewModel", "Attempting to play Base64 audio.")
+                            AudioPlayer.playAudioFromBase64(getApplication(), base64Audio) {
+                                Log.d("ChatDetailViewModel", "Audio playback finished.")
+                            }
+                        } else {
+                            Log.w("ChatDetailViewModel", "Received empty audioContent string.")
+                        }
+                    } ?: run {
+                        // Audio content was null
+                        Log.w("ChatDetailViewModel", "No audio content received. TTS Error: ${responseData.ttsError}")
+                        // Optionally show the TTS error to the user if it exists
+                        if (responseData.ttsError != null) {
+                            _uiState.update { it.copy(error = "TTS failed: ${responseData.ttsError}") }
+                        }
+                    }
+
+                    // --- Add/Confirm Text Message ---
+                    // The text (`responseData.message`) is always present in a successful response.
+                    // Add it to the list if it's not already there from optimistic update.
+                    val modelMessage = ChatMessage(responseData.message, false)
+                    if (_uiState.value.messageList.none { it.text == responseData.message && !it.isUser }) {
+                        Log.d("ChatDetailViewModel", "Adding model text message to UI.")
+                        _uiState.value.messageList.add(0, modelMessage)
+                    } else {
+                        Log.d("ChatDetailViewModel", "Model text message already present optimistically.")
+                    }
+
+                    // Clear loading state AFTER processing response
+                    _uiState.update { it.copy(isLoading = false) }
+                    // Clear specific TTS error shown above if needed after a delay, or let next error override
                 }
                 is Result.Error -> {
-                    Log.e("ChatDetailViewModel", "Error sending message: ${result.message}")
-                    // Set loading false even on error
-                    _uiState.update { it.copy(isLoading = false, error = "Failed to get response: ${result.message}") }
-                    // Optional: Revert optimistic user message add here if desired
+                    // Handle API call error (network, server error 5xx, etc.)
+                    Log.e("ChatDetailViewModel", "API Error sending message: ${result.message}")
+                    _uiState.update { it.copy(isLoading = false, error = "API Error: ${result.message}") }
+                    // Consider reverting optimistic user message add here
                 }
             }
         }
     }
 
-
-    fun clearError() {
-        _uiState.update { it.copy(error = null) }
-    }
+    fun clearError() { _uiState.update { it.copy(error = null) } }
 }
 
-// --- UI State Data Class ---
+
+// --- UI State Data Class (Keep as is) ---
 data class ChatDetailUiState(
-    val isLoading: Boolean = false, // Represents network loading state primarily
+    val isLoading: Boolean = false,
     val error: String? = null,
     val chatTitle: String = "Chat",
     val messageList: MutableList<ChatMessage> = mutableStateListOf(),
-    val isRecording: Boolean = false, // Represents Vosk listener state
+    val isRecording: Boolean = false,
     val isModelReady: Boolean = false,
-    val partialText: String = "", // Represents the text to show in the temporary partial bubble
-    val remainingRecordingTime: Int? = null // Holds remaining time in seconds
+    val partialText: String = "",
+    val remainingRecordingTime: Int? = null
 )
