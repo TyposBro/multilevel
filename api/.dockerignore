@@ -1,0 +1,10 @@
+# {PATH_TO_PROJECT}/api/.dockerignore
+
+node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+.git
+.gitignore
+*.env 
+# Add any other files/folders you don't want in the image

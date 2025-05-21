@@ -1,11 +1,11 @@
-// server.js
-const express = require('express');
-const dotenv = require('dotenv');
-const cors = require('cors');
-const connectDB = require('./config/db');
-const authRoutes = require('./routes/authRoutes');
-const chatRoutes = require('./routes/chatRoutes');
-const { notFound, errorHandler } = require('./middleware/errorMiddleware');
+// {PATH_TO_PROJECT}/api/server.js
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const connectDB = require("./config/db");
+const authRoutes = require("./routes/authRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 // Load environment variables
 dotenv.config();
@@ -21,12 +21,13 @@ app.use(express.json()); // Parse JSON request bodies
 app.use(express.urlencoded({ extended: false })); // Parse URL-encoded bodies
 
 // --- API Routes ---
-app.get('/', (req, res) => { // Basic test route
-  res.send('API is running...');
+app.get("/", (req, res) => {
+  // Basic test route
+  res.send("API is running...");
 });
 
-app.use('/api/auth', authRoutes);
-app.use('/api/chat', chatRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/chat", chatRoutes);
 
 // --- Error Handling Middleware ---
 // Add AFTER your routes

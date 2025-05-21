@@ -1,3 +1,4 @@
+# {PATH_TO_PROJECT}/tts/app.py
 # In app.py (Flask service for Kokoro)
 import os
 import io

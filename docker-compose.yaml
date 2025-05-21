@@ -1,0 +1,37 @@
+services:
+  api:
+    build:
+      context: ./api # Path to your Express app directory
+      dockerfile: Dockerfile
+    container_name: backend_api
+    ports:
+      - "3000:3000" # Host:Container
+     # Use env_file to load variables from a .env file
+    # The path is relative to the docker-compose.yml file
+    # Or relative to the service's build context if specified there.
+    # For clarity, often placed relative to docker-compose.yml
+    env_file:
+      - ./api/env
+    environment:
+      PORT: "3000" # PORT BACKEND WILL LISTEN ON
+      KOKORO_TTS_SERVICE_URL: "http://tts_service:5005/synthesize" # URL for TTS service
+    depends_on:
+      - tts_service # Make API wait for TTS service to start (basic check)
+    networks:
+      - app_network
+
+  tts_service:
+    build:
+      context: ./tts # Path to your Kokoro Flask app
+      dockerfile: Dockerfile
+    container_name: tts_service
+    environment:
+      PORT: "5005" # PORT TTS SERVICE WILL LISTEN ON
+    networks:
+      - app_network
+    # Add restart policy
+    restart: unless-stopped
+
+networks:
+  app_network:
+    driver: bridge
