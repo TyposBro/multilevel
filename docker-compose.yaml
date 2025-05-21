@@ -11,7 +11,7 @@ services:
     # Or relative to the service's build context if specified there.
     # For clarity, often placed relative to docker-compose.yml
     env_file:
-      - ./api/env
+      - ./api/.env
     environment:
       PORT: "3000" # PORT BACKEND WILL LISTEN ON
       KOKORO_TTS_SERVICE_URL: "http://tts_service:5005/synthesize" # URL for TTS service

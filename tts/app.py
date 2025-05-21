@@ -94,13 +94,18 @@ def synthesize_speech():
         logger.error(f"Error during synthesis: {e}", exc_info=True)
         return jsonify({"error": "Internal server error during TTS synthesis"}), 500
 
-# ... (health check and app run remain the same) ...
 @app.route('/health', methods=['GET'])
 def health_check():
-    status = {"status": "ok", "pipeline_ready": pipeline is not None}
-    status_code = 200 if pipeline else 503
-    return jsonify(status), status_code
+    """Basic health check to verify the service is running and the pipeline loaded."""
+    pipeline_ok = pipeline is not None # Checks if your Kokoro pipeline object is loaded
+    status_payload = {"status": "ok" if pipeline_ok else "degraded", "pipeline_ready": pipeline_ok}
+    # Return 200 OK if pipeline is ready, otherwise 503 Service Unavailable
+    http_status_code = 200 if pipeline_ok else 503
 
+    # If pipeline_ok is False, the curl -f will fail because 503 is not a 2xx code.
+    # This is the desired behavior: if the pipeline isn't ready, the service is not healthy.
+    return jsonify(status_payload), http_status_code
+    
 if __name__ == '__main__':
     logger.info(f"Starting Kokoro TTS service on port {PORT}")
     app.run(host='0.0.0.0', port=PORT, debug=False)
