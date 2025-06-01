@@ -1,36 +1,53 @@
+# {PATH_TO_PROJECT}/docker-compose.yaml
+version: "3.8"
+
 services:
   api:
     build:
-      context: ./api # Path to your Express app directory
+      context: ./api # Path to Express app directory
       dockerfile: Dockerfile
     container_name: backend_api
     ports:
       - "3000:3000" # Host:Container
-     # Use env_file to load variables from a .env file
-    # The path is relative to the docker-compose.yml file
-    # Or relative to the service's build context if specified there.
-    # For clarity, often placed relative to docker-compose.yml
     env_file:
-      - ./api/.env
+      - ./api/.env # Ensure this file does not override KOKORO_TTS_BASE_URL with the old value
     environment:
       PORT: "3000" # PORT BACKEND WILL LISTEN ON
-      KOKORO_TTS_SERVICE_URL: "http://tts_service:5005/synthesize" # URL for TTS service
+      # IMPORTANT: Update this URL to point to FastKoko's OpenAI-compatible endpoint
+      # The service name is 'tts_service' and FastKoko listens on port 8880 internally.
+      # The OpenAI-compatible base path is /v1
+      KOKORO_TTS_BASE_URL: "http://tts_service:8880/v1"
     depends_on:
-      - tts_service # Make API wait for TTS service to start (basic check)
+      - tts_service # API will wait for tts_service to be "healthy" if healthchecks are defined, or just started
     networks:
       - app_network
 
-  tts_service:
-    build:
-      context: ./tts # Path to your Kokoro Flask app
-      dockerfile: Dockerfile
-    container_name: tts_service
-    environment:
-      PORT: "5005" # PORT TTS SERVICE WILL LISTEN ON
+  tts_service: # This service will now run the FastKoko image
+    # --- CHOOSE ONE ---
+    # OPTION 1: GPU Version (Recommended if you have an NVIDIA GPU & NVIDIA Container Toolkit)
+    # image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+    # deploy: # Required for NVIDIA GPU access
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all # or specify specific GPU IDs e.g., "device=0"
+    #           capabilities: [gpu]
+    # --- OR ---
+    # OPTION 2: CPU Version (If no GPU or for non-NVIDIA GPUs like Apple Silicon Macs)
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    # --- END CHOOSE ONE ---
+
+    container_name: fastkoko_tts_service # Changed name for clarity, but service name for discovery is still 'tts_service'
+    ports: # Optional: Expose FastKoko's port 8880 to the host for direct testing/UI access
+      - "8880:8880" # Host:Container (FastKoko runs on 8880 internally)
     networks:
       - app_network
-    # Add restart policy
     restart: unless-stopped
+    # Optional: Add volumes if you need to persist custom voicepacks or models downloaded/created by FastKoko
+    # volumes:
+    #   - ./fastkoko_models:/app/api/src/models # Path inside FastKoko container for models
+    #   - ./fastkoko_voicepacks:/app/api/src/data/voice_exports # Path for voice exports
 
 networks:
   app_network:
