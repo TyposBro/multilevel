@@ -2,7 +2,7 @@
 version: "3.8"
 
 services:
-  api:
+  api: # Your existing Express.js backend
     build:
       context: ./api # Path to Express app directory
       dockerfile: Dockerfile
@@ -12,43 +12,61 @@ services:
     env_file:
       - ./api/.env # Ensure this file does not override KOKORO_TTS_BASE_URL with the old value
     environment:
-      PORT: "3000" # PORT BACKEND WILL LISTEN ON
-      # IMPORTANT: Update this URL to point to FastKoko's OpenAI-compatible endpoint
-      # The service name is 'tts_service' and FastKoko listens on port 8880 internally.
-      # The OpenAI-compatible base path is /v1
+      PORT: "3000"
+      # KOKORO_TTS_BASE_URL points to the FastKoko TTS service
       KOKORO_TTS_BASE_URL: "http://tts_service:8880/v1"
+      # Add a new environment variable if your Express app needs to call our new preprocessing service
+      KOKORO_PREPROCESS_URL: "http://kokoro_preprocessor:8000/preprocess" # Service name 'kokoro_preprocessor', port 8000
     depends_on:
-      - tts_service # API will wait for tts_service to be "healthy" if healthchecks are defined, or just started
+      - tts_service # Existing dependency
+      - kokoro_preprocessor # New dependency: wait for our preprocessing service
     networks:
       - app_network
 
-  tts_service: # This service will now run the FastKoko image
-    # --- CHOOSE ONE ---
-    # OPTION 1: GPU Version (Recommended if you have an NVIDIA GPU & NVIDIA Container Toolkit)
+  tts_service: # This is the FastKoko TTS service (as in your original file)
     # image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
-    # deploy: # Required for NVIDIA GPU access
+    # deploy:
     #   resources:
     #     reservations:
     #       devices:
     #         - driver: nvidia
-    #           count: all # or specify specific GPU IDs e.g., "device=0"
+    #           count: all
     #           capabilities: [gpu]
-    # --- OR ---
-    # OPTION 2: CPU Version (If no GPU or for non-NVIDIA GPUs like Apple Silicon Macs)
     image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
-    # --- END CHOOSE ONE ---
-
-    container_name: fastkoko_tts_service # Changed name for clarity, but service name for discovery is still 'tts_service'
-    ports: # Optional: Expose FastKoko's port 8880 to the host for direct testing/UI access
-      - "8880:8880" # Host:Container (FastKoko runs on 8880 internally)
+    container_name: fastkoko_tts_service
+    ports:
+      - "8880:8880" # Host:Container
     networks:
       - app_network
     restart: unless-stopped
-    # Optional: Add volumes if you need to persist custom voicepacks or models downloaded/created by FastKoko
     # volumes:
-    #   - ./fastkoko_models:/app/api/src/models # Path inside FastKoko container for models
-    #   - ./fastkoko_voicepacks:/app/api/src/data/voice_exports # Path for voice exports
+    #   - ./fastkoko_models:/app/api/src/models
+    #   - ./fastkoko_voicepacks:/app/api/src/data/voice_exports
+
+  kokoro_preprocessor: # Our new Python FastAPI service for preprocessing
+    build:
+      context: ./kokoro_preprocess_service # Path to our Python FastAPI app
+      dockerfile: Dockerfile
+    container_name: kokoro_preprocess_api_service
+    # Optional: Expose port to host for direct testing if needed
+    # ports:
+    #   - "8100:8000" # Example: Map container's 8000 to host's 8100
+    networks:
+      - app_network
+    restart: unless-stopped
+    # No HF_HOME volume needed as configs are bundled
+    # No device specific environment variables needed as it's CPU only for preprocessing
+    # If your kokoro.pipeline still has a fallback to hf_hub_download for unbundled configs,
+    # you might want to add a volume for that cache if you anticipate using it.
+    # volumes:
+    #   - kokoro_preprocessor_hf_cache:/app/huggingface_cache # Only if KPipeline has hf_hub_download fallback AND you want to cache those
+    # environment: # Not strictly needed if KPipeline loads bundled configs and has no other env dependencies
+      # - PYTORCH_ENABLE_MPS_FALLBACK=1 # If you were to run torch operations and wanted MPS locally
 
 networks:
   app_network:
     driver: bridge
+
+# Optional volume definition if you re-enable HF cache fallback in kokoro_preprocessor
+# volumes:
+#   kokoro_preprocessor_hf_cache:
