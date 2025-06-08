@@ -1,30 +1,22 @@
-# Use an official Python runtime as a parent image, align with your pyproject.toml's requires-python
+# Dockerfile for kokoro_preprocessor
 FROM python:3.10-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-# The installer puts uv in /root/.local/bin
-ENV PATH="/root/.local/bin:${PATH}"
-
-# Install system dependencies
+# Install system dependencies needed for building Python packages (like pyopenjtalk)
+# and any other system libs your Python code might need.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends espeak-ng git curl && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    # Add any other system libraries your Python packages might depend on
+    # For example, if pyopenjtalk has other specific .so library needs, list them here.
+    # Check pyopenjtalk documentation for its system dependencies if 'build-essential' and 'cmake' aren't enough.
+    && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy the requirements file and install Python dependencies
 COPY requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the FastAPI application and your kokoro module
-# This will include the app/kokoro/configs directory
 COPY ./app /app
 
-# Make port 8000 available
-EXPOSE 8000
-
-# Define the command to run your app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
