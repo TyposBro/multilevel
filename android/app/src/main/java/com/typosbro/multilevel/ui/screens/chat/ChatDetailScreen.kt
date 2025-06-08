@@ -136,8 +136,7 @@ fun ChatDetailScreen(
                     // Render actual messages
                     items(
                         items = uiState.messageList,
-                        // Use a more stable key if possible, e.g., message ID if you add one
-                        key = { message -> message.timestamp } // Using timestamp as key, assumes reasonable uniqueness
+                        key = { message -> message.id }
                     ) { message ->
                         ChatMessageBubble(message = message)
                     }

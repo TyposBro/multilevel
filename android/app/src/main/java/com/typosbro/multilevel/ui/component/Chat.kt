@@ -21,7 +21,7 @@ import java.util.UUID
  * Data class to represent a chat message
  */
 data class ChatMessage(
-//    val id: String = UUID.randomUUID().toString(),
+    val id: String = UUID.randomUUID().toString(),
     val text: String,
     val isUser: Boolean,
     val timestamp: Long = System.currentTimeMillis()
