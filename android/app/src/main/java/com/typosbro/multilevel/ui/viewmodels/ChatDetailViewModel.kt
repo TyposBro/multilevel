@@ -21,8 +21,7 @@ import com.typosbro.multilevel.ui.component.ChatMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import com.typosbro.multilevel.data.repositories.SendMessageResult
-import com.typosbro.multilevel.utils.AudioPlayer
+import com.typosbro.multilevel.util.AudioPlayer
 
 class ChatDetailViewModel(
     application: Application,

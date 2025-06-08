@@ -1,8 +1,11 @@
 package com.typosbro.multilevel
 
+import ai.onnxruntime.OrtSession
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,21 +15,12 @@ import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import com.typosbro.multilevel.navigation.AppNavigation // Import your AppNavigation
 import com.typosbro.multilevel.ui.theme.MultilevelTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
-
-    // Keep permission request logic here if needed globally,
-    // but ChatDetailScreen now handles its own request.
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (!isGranted) {
-            // Show a general message or let the specific screen handle it
-            Toast.makeText(this, "Audio Permission Denied", Toast.LENGTH_SHORT).show()
-        } else {
-            // Permission granted - the screen needing it will react
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,6 +54,5 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Remove all Vosk-related properties and methods (model, listener, start/stop, etc.)
-    // Remove messageList, partialText, isRecording state etc. - they belong in ViewModels.
 }
+

@@ -1,7 +1,11 @@
 package com.typosbro.multilevel.ui.screens.chat
 
+import ai.onnxruntime.OrtSession
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager // Correct import for PackageManager
+import android.util.Log
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -25,7 +29,10 @@ import com.typosbro.multilevel.ui.component.RecognitionControls
 // import com.typosbro.multilevel.ui.component.TimerModal
 import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.ChatDetailViewModel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -77,14 +84,6 @@ fun ChatDetailScreen(
             viewModel.clearError() // Clear error after showing
         }
     }
-
-    // Check permission on screen entry if needed, or rely on check before action
-    // LaunchedEffect(Unit) {
-    //     if (!hasAudioPermission) {
-    //         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-    //     }
-    // }
-
 
     Scaffold(
         topBar = {
@@ -185,34 +184,44 @@ fun ChatDetailScreen(
                     modifier = Modifier.fillMaxWidth() // Let RecognitionControls handle its own padding/surface
                 )
             }
-            // Add padding at the very bottom if the controls don't provide enough
-            // Spacer(modifier = Modifier.height(8.dp))
         }
+    }
+}
 
-        // Optional TimerModal logic if you still want the initial delay timer
-        // Remove if not needed
-        /*
-        var showTimerModal by remember { mutableStateOf(false) }
-        if (showTimerModal) {
-            TimerModal(
-                timer1Duration = 3, // Example delay before starting Vosk
-                timer2Duration = MAX_RECORDING_DURATION_S, // This doesn't fit the new logic well
-                onFinish = {
-                     // This finish might be redundant now
-                     viewModel.stopRecognitionAndSend()
-                     showTimerModal = false
-                },
-                callback = {
-                     // Start Vosk *after* the initial delay
-                     viewModel.startMicRecognition()
-                },
-                onCancel = {
-                     showTimerModal = false
-                     // Don't stop Vosk if it wasn't started
-                }
+private fun generateAudio(
+    session: OrtSession,
+    style: String,
+    speed: Float,
+    context: Context,
+    scope: CoroutineScope,
+    shouldSave: Boolean,
+    onComplete: () -> Unit
+) {
+    scope.launch(Dispatchers.IO) {
+        try {
+            val (audioData, sampleRate) = createAudio(
+                voice = style, speed = speed, context = context,
+                session = session
             )
+
+            playAudio(
+                audioData, scope,
+                onComplete = onComplete
+            )
+
+            if (shouldSave) {
+                saveAudio(audioData, context)
+            }
+
+        } catch (e: Exception) {
+            Log.e("Kokoro", "Error: ${e.message}")
+            withContext(Dispatchers.Main) {
+                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        } finally {
+            withContext(Dispatchers.Main) {
+                onComplete()
+            }
         }
-        // Modify onStartRecording in RecognitionControls to set showTimerModal = true if using this
-        */
     }
 }

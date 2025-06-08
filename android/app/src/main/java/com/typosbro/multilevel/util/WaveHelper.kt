@@ -1,4 +1,4 @@
-package com.typosbro.multilevel.utils
+package com.typosbro.multilevel.util
 
 
 import android.app.Activity

@@ -3,10 +3,23 @@
 package com.typosbro.multilevel.features.inference // Ensure this matches your package structure
 
 import android.content.Context
-import com.example.kokoro82m.names
 import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+
+val names = listOf(
+    "af",
+    "af_bella",
+    "af_nicole",
+    "af_sarah",
+    "af_sky",
+    "am_adam",
+    "am_michael",
+    "bf_emma",
+    "bf_isabella",
+    "bm_george",
+    "bm_lewis"
+)
 
 class StyleLoader(private val context: Context) {
 

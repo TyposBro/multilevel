@@ -1,4 +1,4 @@
-package com.typosbro.multilevel.utils // Or a suitable package
+package com.typosbro.multilevel.util // Or a suitable package
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
@@ -10,7 +10,6 @@ import android.net.Uri
 import android.util.Base64
 import android.util.Log
 import com.typosbro.multilevel.features.inference.StyleLoader
-import com.typosbro.multilevel.features.inference.Tokenizer
 import java.io.File
 import java.io.FileOutputStream
 
