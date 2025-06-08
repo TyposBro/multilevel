@@ -1,5 +1,5 @@
 [versions]
-agp = "8.7.3"
+agp = "8.10.1"
 commonsCompress = "1.24.0"
 converterGson = "2.11.0"
 kotlin = "2.1.10"
