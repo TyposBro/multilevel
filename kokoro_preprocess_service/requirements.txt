@@ -9,5 +9,3 @@ pydantic
 uvicorn[standard]
 click
 typing_extensions
-pyopenjtalk
-ordered-set

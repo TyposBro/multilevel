@@ -12,8 +12,8 @@ from kokoro.model import KModel # For KPipeline.Result type hints if any
 # (lang_code, local_config_alias_or_hf_repo_id)
 PRELOAD_PIPELINES: List[Tuple[str, Optional[str]]] = [
     ("a", "hexgrad/Kokoro-82M"),  # Will look for hexgrad_Kokoro_82M_config.json locally first
-    ("j", "hexgrad/Kokoro-82M"),
-    ("z", "hexgrad/Kokoro-82M-v1.1-zh"), # Will look for hexgrad_Kokoro_82M_v1_1_zh_config.json
+    # ("j", "hexgrad/Kokoro-82M"), # REMOVED
+    # ("z", "hexgrad/Kokoro-82M-v1.1-zh"), # REMOVED
 ]
 # This default is now more of a key for the local config, or a fallback HF ID
 DEFAULT_LOCAL_CONFIG_KEY = "hexgrad/Kokoro-82M"
@@ -58,7 +58,7 @@ async def startup_event():
 # --- Pydantic Models (same as before for preprocessing-only) ---
 class PreprocessRequest(BaseModel):
     text: Union[str, List[str]] = Field(..., description="Text or list of text segments to process.")
-    lang_code: str = Field(..., description=f"Language code. Supported: {list(LANG_CODES.keys())}")
+    lang_code: str = Field(..., description=f"Language code. Supported: {list(LANG_CODES.keys())}") # This will update dynamically
     split_pattern: Optional[str] = Field(r'\n+', description="Regex pattern to split text if a single string is provided.")
     config_key: Optional[str] = Field(None, description=f"Configuration key (e.g., 'hexgrad/Kokoro-82M' or 'hexgrad/Kokoro-82M-v1.1-zh') to use for vocab/context_length. Defaults to '{DEFAULT_LOCAL_CONFIG_KEY}'. KPipeline will look for a bundled config matching this key or fall back to Hugging Face Hub if it's a valid repo ID.")
 
@@ -76,6 +76,7 @@ class PreprocessResponse(BaseModel):
 # --- API Endpoints (mostly same as before) ---
 @app.post("/preprocess", response_model=PreprocessResponse)
 async def preprocess_text_endpoint(request: PreprocessRequest = Body(...)):
+    # LANG_CODES will be imported from kokoro.pipeline, so it will reflect changes there
     if request.lang_code not in LANG_CODES:
         raise HTTPException(status_code=400, detail=f"Unsupported language_code: {request.lang_code}. Supported: {list(LANG_CODES.keys())}")
 
