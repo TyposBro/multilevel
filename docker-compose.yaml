@@ -1,5 +1,4 @@
 # {PATH_TO_PROJECT}/docker-compose.yaml
-version: "3.8"
 
 services:
   api: # Your existing Express.js backend
@@ -61,12 +60,11 @@ services:
     # volumes:
     #   - kokoro_preprocessor_hf_cache:/app/huggingface_cache # Only if KPipeline has hf_hub_download fallback AND you want to cache those
     # environment: # Not strictly needed if KPipeline loads bundled configs and has no other env dependencies
-      # - PYTORCH_ENABLE_MPS_FALLBACK=1 # If you were to run torch operations and wanted MPS locally
+    # - PYTORCH_ENABLE_MPS_FALLBACK=1 # If you were to run torch operations and wanted MPS locally
 
 networks:
   app_network:
     driver: bridge
-
 # Optional volume definition if you re-enable HF cache fallback in kokoro_preprocessor
 # volumes:
 #   kokoro_preprocessor_hf_cache:
