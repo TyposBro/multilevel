@@ -1,7 +1,7 @@
 # {PATH_TO_PROJECT}/docker-compose.yaml
 
 services:
-  api: # Your existing Express.js backend
+  api:
     build:
       context: ./api # Path to Express app directory
       dockerfile: Dockerfile

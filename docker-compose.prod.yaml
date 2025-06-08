@@ -1,0 +1,30 @@
+services:
+  api:
+    image: yourusername/myproject-api:latest # PULL from Docker Hub
+    container_name: backend_api
+    ports:
+      - "3000:3000" # Host:Container
+    env_file:
+      - ./api/.env # Ensure this file exists on the deployment server
+    environment:
+      PORT: "3000"
+      KOKORO_PREPROCESS_URL: "http://kokoro_preprocessor:8000/preprocess"
+    depends_on:
+      - kokoro_preprocessor
+    networks:
+      - app_network
+    restart: unless-stopped
+
+  kokoro_preprocessor:
+    image: yourusername/myproject-kokoro-preprocessor:latest # PULL from Docker Hub
+    container_name: kokoro_preprocess_api_service
+    # Expose port to host for direct testing
+    ports:
+      - "8100:8000"
+    networks:
+      - app_network
+    restart: unless-stopped
+
+networks:
+  app_network:
+    driver: bridge
