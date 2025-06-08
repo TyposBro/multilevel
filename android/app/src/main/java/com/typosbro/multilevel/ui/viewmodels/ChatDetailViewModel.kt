@@ -349,7 +349,7 @@ class ChatDetailViewModel(
                                 val session = getSession()
                                 val currentContext = getApplication<Application>().applicationContext // Use current context
 
-                                val voiceStyle = "bf_emma"
+                                val voiceStyle = "bf_isabella"
                                 val speed = 1.0f
 
                                 Log.d("ChatDetailViewModel", "Calling AudioPlayer.createAudio with ${inputIdsLongArray.size} tokens, voice: $voiceStyle, speed: $speed")

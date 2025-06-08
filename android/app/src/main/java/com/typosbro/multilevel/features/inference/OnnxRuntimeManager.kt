@@ -22,8 +22,8 @@ object OnnxRuntimeManager {
 //    private const val MODEL_FILE_NAME = "model_f16.onnx"
 //    private const val MODEL_FILE_NAME = "model_q4.onnx"
 //    private const val MODEL_FILE_NAME = "model_q4f16.onnx"
-    private const val MODEL_FILE_NAME = "model_q8f16.onnx"
-//    private const val MODEL_FILE_NAME = "model_quantized.onnx"
+//    private const val MODEL_FILE_NAME = "model_q8f16.onnx"
+    private const val MODEL_FILE_NAME = "model_quantized.onnx"
 //    private const val MODEL_FILE_NAME = "model_uint8.onnx"
 //    private const val MODEL_FILE_NAME = "model_uint8f16.onnx"
 
@@ -57,7 +57,7 @@ object OnnxRuntimeManager {
             }
 
             Log.d("OnnxRuntimeManager", "Copying model to cache: ${modelFile.absolutePath}")
-            inputStream = context.resources.openRawResource(R.raw.model_q8f16) // Your model in res/raw
+            inputStream = context.resources.openRawResource(R.raw.model_quantized) // Your model in res/raw
             outputStream = FileOutputStream(modelFile)
             val buffer = ByteArray(4 * 1024) // 4K buffer
             var read: Int
