@@ -78,6 +78,8 @@ dependencies {
     implementation(libs.converter.gson)
     implementation(libs.okhttp)
     implementation(libs.logging.interceptor)
+    // OkHttp SSE
+    implementation(libs.okhttp.sse) // Added this line
 
     // Secure Storage (Jetpack Security)
     implementation(libs.androidx.security.crypto)

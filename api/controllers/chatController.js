@@ -4,37 +4,57 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 require("dotenv").config();
 
-// --- Gemini Setup --- (Keep as is)
+// --- Gemini Setup ---
 if (!process.env.GEMINI_API_KEY) {
   console.error("FATAL ERROR: GEMINI_API_KEY is not set in .env file.");
   process.exit(1);
 }
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }); // Or your preferred streaming model
 
 // --- Kokoro Preprocessing Service URL ---
-// This should point to your Python FastAPI service (e.g., running on port 8000)
 const KOKORO_PREPROCESS_URL =
   process.env.KOKORO_PREPROCESS_URL || "http://localhost:8000/preprocess";
-const DEFAULT_KOKORO_LANG_CODE = process.env.DEFAULT_KOKORO_LANG_CODE || "b"; // Or 'j', 'z', etc.
-const DEFAULT_KOKORO_CONFIG_KEY = process.env.DEFAULT_KOKORO_CONFIG_KEY || "hexgrad/Kokoro-82M"; // Match your Python config
+const DEFAULT_KOKORO_LANG_CODE = process.env.DEFAULT_KOKORO_LANG_CODE || "b";
+const DEFAULT_KOKORO_CONFIG_KEY = process.env.DEFAULT_KOKORO_CONFIG_KEY || "hexgrad/Kokoro-82M";
+
+// Helper to send SSE data
+function sendSseChunk(res, eventName, data) {
+  if (res.writableEnded) {
+    console.warn(
+      `[SSE Helper] Attempted to write to an already ended SSE stream. Event: ${eventName}`
+    );
+    return;
+  }
+  try {
+    res.write(`event: ${eventName}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  } catch (e) {
+    console.error(`[SSE Helper] Error writing to SSE stream: ${e.message}`);
+    // Potentially end the stream if writing fails critically
+    if (!res.writableEnded) {
+      res.end();
+    }
+  }
+}
+
+// Simple sentence tokenizer (customize as needed)
+const sentenceTerminators = /[.!?\n]/; // Include newline as a terminator
 
 // @desc    Create a new empty chat session for the user
 // @route   POST /api/chat/
 // @access  Private
 const createNewChat = async (req, res) => {
   const userId = req.user._id;
-  const { title } = req.body; // Optional title from request body
+  const { title } = req.body;
 
   try {
     const newChat = new Chat({
       userId,
-      history: [], // Start with empty history
-      title: title || `Chat started ${new Date().toLocaleDateString()}`, // Use provided title or generate default
+      history: [],
+      title: title || `Chat started ${new Date().toLocaleDateString()}`,
     });
-
     const savedChat = await newChat.save();
-
     res.status(201).json({
       message: "New chat created successfully.",
       chatId: savedChat._id,
@@ -52,13 +72,10 @@ const createNewChat = async (req, res) => {
 // @access  Private
 const listUserChats = async (req, res) => {
   const userId = req.user._id;
-
   try {
-    // Find chats for the user, select only necessary fields, sort by most recently updated
     const chats = await Chat.find({ userId })
-      .select("_id title createdAt updatedAt") // Only send summary info
-      .sort({ updatedAt: -1 }); // Show most recent first
-
+      .select("_id title createdAt updatedAt")
+      .sort({ updatedAt: -1 });
     res.json({ chats });
   } catch (error) {
     console.error("Error fetching user chats:", error);
@@ -66,129 +83,192 @@ const listUserChats = async (req, res) => {
   }
 };
 
-// @desc    Send a message within a specific chat and update its history
+// @desc    Send a message within a specific chat and stream its response (sentence by sentence for Kokoro)
 // @route   POST /api/chat/:chatId/message
 // @access  Private
 const sendMessage = async (req, res) => {
-  const { prompt, lang_code, config_key } = req.body; // Allow lang_code and config_key from request
+  const { prompt, lang_code, config_key } = req.body;
   const { chatId } = req.params;
-  const userId = req.user._id;
+  const userId = req.user._id; // Assuming protect middleware adds user to req
 
-  if (!prompt) return res.status(400).json({ message: "Prompt is required" });
-  if (!chatId) return res.status(400).json({ message: "Chat ID is required" });
+  console.log(
+    `[${chatId}] sendMessage called with prompt: "${prompt ? prompt.substring(0, 30) : "N/A"}..."`
+  );
 
+  // --- Initial Validations (can send JSON error before SSE setup) ---
+  if (!prompt) {
+    console.error(`[${chatId}] Validation Error: Prompt is required.`);
+    return res.status(400).json({ message: "Prompt is required" });
+  }
+  if (!chatId) {
+    console.error(`[${chatId}] Validation Error: Chat ID is required.`);
+    return res.status(400).json({ message: "Chat ID is required" });
+  }
+
+  let chat;
   try {
-    // 1. Find Chat & Verify Ownership
-    const chat = await Chat.findOne({ _id: chatId, userId: userId });
-    if (!chat) return res.status(404).json({ message: "Chat not found or permission denied." });
+    chat = await Chat.findOne({ _id: chatId, userId: userId });
+    if (!chat) {
+      console.log(`[${chatId}] Chat not found or permission denied for user ${userId}.`);
+      return res.status(404).json({ message: "Chat not found or permission denied." });
+    }
+  } catch (dbError) {
+    console.error(`[${chatId}] Database error finding chat:`, dbError);
+    if (dbError.name === "CastError" && dbError.kind === "ObjectId") {
+      // More specific CastError check
+      return res.status(400).json({ message: "Invalid Chat ID format." });
+    }
+    return res.status(500).json({ message: "Error accessing chat data." });
+  }
 
-    // 2. Prepare History for Gemini (if your Chat model stores it in Gemini format directly)
-    // If not, you'll need a mapping like:
-    // const geminiHistory = chat.history.map(msg => ({
-    //    role: msg.role,
-    //    parts: [{ text: msg.parts[0].text }] // Assuming simple text parts
-    // }));
-    const geminiHistory = chat.history; // Assuming chat.history is already in {role, parts} format
+  // --- If chat is found, THEN set up SSE ---
+  console.log(`[${chatId}] Chat found for user ${userId}. Setting up SSE response.`);
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  // res.flushHeaders(); // Option 1: Flush immediately
+  res.write(": SSE connection initiated\n\n"); // Option 2: Write a comment to flush
 
-    // 3. Call Gemini
-    console.log("Calling Gemini API...");
-    const chatSession = model.startChat({ history: geminiHistory });
-    const result = await chatSession.sendMessage(prompt);
-    const response = await result.response;
-    const modelResponseText = response.text();
-    console.log("Received response from Gemini.");
+  let fullModelResponseText = "";
+  let sentenceBuffer = "";
 
-    // 4. Update Chat History in DB
-    chat.history.push({ role: "user", parts: [{ text: prompt }] });
-    chat.history.push({ role: "model", parts: [{ text: modelResponseText }] });
-    await chat.save();
-    console.log("Chat history saved to DB.");
+  const processSentenceBuffer = async (textToProcess) => {
+    if (res.writableEnded || !textToProcess || textToProcess.trim().length === 0) {
+      return;
+    }
+    console.log(
+      `[${chatId}] Processing sentence for Kokoro: "${textToProcess.substring(0, 50)}..."`
+    );
+    try {
+      const preprocessResponse = await axios.post(
+        KOKORO_PREPROCESS_URL,
+        {
+          text: textToProcess,
+          lang_code: lang_code || DEFAULT_KOKORO_LANG_CODE,
+          config_key: config_key || DEFAULT_KOKORO_CONFIG_KEY,
+        },
+        { responseType: "json", timeout: 7000 }
+      );
 
-    // --- 5. Call Kokoro Preprocessing Service ---
-    let preprocessedData = null;
-    let preprocessingError = null;
-    const kokoroLangCodeToUse = lang_code || DEFAULT_KOKORO_LANG_CODE;
-    const kokoroConfigKeyToUse = config_key || DEFAULT_KOKORO_CONFIG_KEY;
-
-    if (modelResponseText && modelResponseText.trim().length > 0) {
-      try {
+      if (
+        preprocessResponse.data &&
+        preprocessResponse.data.results &&
+        preprocessResponse.data.results.length > 0 &&
+        preprocessResponse.data.results[0].input_ids
+      ) {
+        const preprocessedData = preprocessResponse.data.results[0];
+        sendSseChunk(res, "input_ids_chunk", {
+          sentence: textToProcess,
+          input_ids: preprocessedData.input_ids[0], // Assuming input_ids is [[...]]
+        });
         console.log(
-          `Sending text to Kokoro Preprocess (lang: ${kokoroLangCodeToUse}, config: ${kokoroConfigKeyToUse}): "${modelResponseText.substring(
+          `[${chatId}] Kokoro preprocessed sentence, input_ids length: ${preprocessedData.input_ids[0]?.length}`
+        );
+      } else {
+        console.warn(
+          `[${chatId}] Kokoro did not return valid input_ids for sentence: "${textToProcess.substring(
             0,
             50
-          )}..."`
+          )}..."`,
+          preprocessResponse.data
         );
-        const preprocessResponse = await axios.post(
-          KOKORO_PREPROCESS_URL,
-          {
-            text: modelResponseText,
-            lang_code: kokoroLangCodeToUse,
-            config_key: kokoroConfigKeyToUse,
-            // split_pattern: "\\n+" // Optional: if you want specific splitting
-          },
-          { responseType: "json" }
-        );
-
-        if (
-          preprocessResponse.data &&
-          preprocessResponse.data.results &&
-          preprocessResponse.data.results.length > 0
-        ) {
-          // Assuming we are interested in the first result if multiple are returned (e.g. due to splitting)
-          // Or you might want to concatenate phonemes/input_ids if that makes sense for your use case
-          preprocessedData = {
-            phonemes: preprocessResponse.data.results[0].phonemes,
-            input_ids: preprocessResponse.data.results[0].input_ids,
-            graphemes: preprocessResponse.data.results[0].graphemes,
-            lang_code_used: preprocessResponse.data.lang_code_used,
-            config_key_used: preprocessResponse.data.config_key_used,
-          };
-          console.log(
-            `Received preprocessed data from Kokoro: Phonemes length ${preprocessedData.phonemes?.length}, Input IDs count ${preprocessedData.input_ids?.[0]?.length}`
-          );
-        } else {
-          preprocessingError =
-            "Kokoro Preprocess response missing results or results array is empty.";
-          console.error(preprocessingError, "Response data:", preprocessResponse.data);
-        }
-      } catch (error) {
-        preprocessingError = `Failed to call Kokoro Preprocess service: ${error.message}`;
-        console.error(
-          preprocessingError,
-          error.response?.data || (error.isAxiosError ? error.toJSON() : "")
-        );
+        sendSseChunk(res, "preprocess_warning", {
+          message: "Sentence may not have TTS.",
+          sentenceText: textToProcess.substring(0, 50),
+        });
       }
+    } catch (kokoroError) {
+      console.error(
+        `[${chatId}] Error calling Kokoro for sentence "${textToProcess.substring(0, 50)}...": ${
+          kokoroError.message
+        }`
+      );
+      sendSseChunk(res, "preprocess_error", {
+        message: `TTS preprocessing failed for a sentence: ${kokoroError.message}`,
+        sentenceText: textToProcess.substring(0, 50),
+      });
+    }
+  };
+
+  try {
+    const geminiHistory = chat.history;
+    const chatSession = model.startChat({ history: geminiHistory });
+
+    console.log(
+      `[${chatId}] Calling Gemini API for streaming with prompt: "${prompt.substring(0, 50)}..."`
+    );
+    const resultStream = await chatSession.sendMessageStream(prompt);
+
+    for await (const chunk of resultStream.stream) {
+      if (res.writableEnded) {
+        console.log(`[${chatId}] Client disconnected during Gemini stream. Stopping.`);
+        break;
+      }
+      if (chunk && chunk.candidates && chunk.candidates[0]) {
+        const contentPart = chunk.candidates[0].content;
+        if (contentPart && contentPart.parts && contentPart.parts[0]) {
+          const textChunk = contentPart.parts[0].text;
+          if (textChunk) {
+            fullModelResponseText += textChunk;
+            sendSseChunk(res, "text_chunk", { text: textChunk });
+
+            sentenceBuffer += textChunk;
+            let match;
+            while ((match = sentenceTerminators.exec(sentenceBuffer)) !== null) {
+              if (res.writableEnded) break;
+              const sentence = sentenceBuffer.substring(0, match.index + 1).trim();
+              sentenceBuffer = sentenceBuffer.substring(match.index + 1);
+              if (sentence) {
+                await processSentenceBuffer(sentence);
+              }
+            }
+          }
+        }
+      }
+    }
+    if (res.writableEnded) {
+      console.log(`[${chatId}] Stream ended due to client disconnection before Gemini completion.`);
+      // No further processing if client disconnected
     } else {
-      console.log("No text content from model to preprocess.");
-      preprocessingError = "No text content from model to preprocess.";
-    }
+      console.log(`[${chatId}] Gemini stream finished.`);
+      // Process any remaining text in the buffer
+      if (sentenceBuffer.trim()) {
+        console.log(
+          `[${chatId}] Processing remaining buffer: "${sentenceBuffer.substring(0, 50)}..."`
+        );
+        await processSentenceBuffer(sentenceBuffer.trim());
+      }
 
-    // --- 6. Send JSON Response to Client ---
-    console.log("Sending JSON response to client.");
-    res.status(200).json({
-      message: modelResponseText, // The original text response from Gemini
-      chatId: chat._id,
-      preprocessed: preprocessedData, // Contains phonemes, input_ids, etc.
-      preprocessingError: preprocessingError, // Any error message from preprocessing
-    });
+      // Save full history to DB only if stream was not prematurely ended by client
+      if (fullModelResponseText.trim().length > 0) {
+        chat.history.push({ role: "user", parts: [{ text: prompt }] });
+        chat.history.push({ role: "model", parts: [{ text: fullModelResponseText }] });
+        await chat.save();
+        console.log(`[${chatId}] Full chat history saved to DB.`);
+      }
+      sendSseChunk(res, "stream_end", {
+        chatId: chat._id,
+        message: "Stream completed successfully.",
+      });
+    }
   } catch (error) {
-    console.error("Error during Gemini call, DB save, or other processing:", error);
-    let errorMessage = "Failed to process chat message";
-    let statusCode = 500;
-
+    // This catch is for errors *after* SSE setup has begun
+    console.error(`[${chatId}] Error during Gemini streaming/Kokoro/DB save (SSE phase):`, error);
+    let errorMessage = "Stream processing error";
     if (error.message?.includes("SAFETY")) {
-      errorMessage = "Response blocked due to safety concerns from the generative model.";
-      statusCode = 400; // Or a more specific code if available
-    } else if (error.message?.includes("API key not valid")) {
-      errorMessage = "Generative model API key is invalid or missing.";
-      statusCode = 500; // Internal server configuration issue
-    } else if (error.name === "CastError" && error.kind === "ObjectId") {
-      errorMessage = "Invalid Chat ID format.";
-      statusCode = 400;
+      errorMessage = "Response stream blocked due to safety concerns.";
     }
-    // Add more specific error handling if needed
-
-    res.status(statusCode).json({ message: errorMessage, details: error.message });
+    // Only send SSE error if stream hasn't already ended
+    if (!res.writableEnded) {
+      sendSseChunk(res, "error", { message: errorMessage, details: error.message });
+    }
+  } finally {
+    if (!res.writableEnded) {
+      console.log(`[${chatId}] Ending SSE response stream in finally block.`);
+      res.end();
+    } else {
+      console.log(`[${chatId}] SSE response stream already ended (writableEnded is true).`);
+    }
   }
 };
 
@@ -196,23 +276,17 @@ const sendMessage = async (req, res) => {
 // @route   GET /api/chat/:chatId/history
 // @access  Private
 const getChatHistory = async (req, res) => {
-  const { chatId } = req.params; // Get chatId from URL parameters
+  const { chatId } = req.params;
   const userId = req.user._id;
 
   if (!chatId) {
     return res.status(400).json({ message: "Chat ID is required" });
   }
-
   try {
-    // Find the specific chat AND verify ownership
     const chat = await Chat.findOne({ _id: chatId, userId: userId });
-
     if (!chat) {
-      return res
-        .status(404)
-        .json({ message: "Chat session not found or you do not have permission to access it." });
+      return res.status(404).json({ message: "Chat not found or permission denied." });
     }
-
     res.json({
       chatId: chat._id,
       title: chat.title,
@@ -221,8 +295,8 @@ const getChatHistory = async (req, res) => {
       updatedAt: chat.updatedAt,
     });
   } catch (error) {
-    console.error("Error fetching specific chat history:", error);
-    if (error.name === "CastError") {
+    console.error(`[${chatId}] Error fetching chat history:`, error);
+    if (error.name === "CastError" && error.kind === "ObjectId") {
       return res.status(400).json({ message: "Invalid Chat ID format." });
     }
     res.status(500).json({ message: "Failed to retrieve chat history" });
@@ -239,25 +313,16 @@ const deleteChat = async (req, res) => {
   if (!chatId) {
     return res.status(400).json({ message: "Chat ID is required" });
   }
-
   try {
-    // Find the chat to ensure it exists and belongs to the user before deleting
     const chat = await Chat.findOne({ _id: chatId, userId: userId });
-
     if (!chat) {
-      // Use 404 even if the chat exists but belongs to another user for security
-      return res
-        .status(404)
-        .json({ message: "Chat session not found or you do not have permission." });
+      return res.status(404).json({ message: "Chat not found or permission denied." });
     }
-
-    // Perform the deletion
-    await Chat.deleteOne({ _id: chatId, userId: userId }); // Redundant userId check, but safe
-
+    await Chat.deleteOne({ _id: chatId, userId: userId });
     res.json({ message: "Chat session deleted successfully.", chatId: chatId });
   } catch (error) {
-    console.error("Error deleting chat session:", error);
-    if (error.name === "CastError") {
+    console.error(`[${chatId}] Error deleting chat:`, error);
+    if (error.name === "CastError" && error.kind === "ObjectId") {
       return res.status(400).json({ message: "Invalid Chat ID format." });
     }
     res.status(500).json({ message: "Failed to delete chat session" });
@@ -269,7 +334,7 @@ const deleteChat = async (req, res) => {
 // @access  Private
 const updateChatTitle = async (req, res) => {
   const { chatId } = req.params;
-  const { title } = req.body; // Get the new title from the request body
+  const { title } = req.body;
   const userId = req.user._id;
 
   if (!chatId) {
@@ -278,21 +343,13 @@ const updateChatTitle = async (req, res) => {
   if (!title || typeof title !== "string" || title.trim() === "") {
     return res.status(400).json({ message: "A valid title is required" });
   }
-
   try {
-    // Find the chat, ensuring it belongs to the logged-in user
     const chat = await Chat.findOne({ _id: chatId, userId: userId });
-
     if (!chat) {
-      return res
-        .status(404)
-        .json({ message: "Chat session not found or you do not have permission." });
+      return res.status(404).json({ message: "Chat not found or permission denied." });
     }
-
-    // Update the title
     chat.title = title.trim();
-    const updatedChat = await chat.save(); // Save the changes (also updates 'updatedAt')
-
+    const updatedChat = await chat.save();
     res.json({
       message: "Chat title updated successfully.",
       chatId: updatedChat._id,
@@ -300,19 +357,17 @@ const updateChatTitle = async (req, res) => {
       updatedAt: updatedChat.updatedAt,
     });
   } catch (error) {
-    console.error("Error updating chat title:", error);
-    if (error.name === "CastError") {
+    console.error(`[${chatId}] Error updating chat title:`, error);
+    if (error.name === "CastError" && error.kind === "ObjectId") {
       return res.status(400).json({ message: "Invalid Chat ID format." });
     }
     if (error.name === "ValidationError") {
-      // In case future validation is added to title
       return res.status(400).json({ message: error.message });
     }
     res.status(500).json({ message: "Failed to update chat title" });
   }
 };
 
-// --- Make sure to export all functions ---
 module.exports = {
   createNewChat,
   listUserChats,

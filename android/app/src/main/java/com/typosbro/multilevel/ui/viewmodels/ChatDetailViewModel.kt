@@ -7,33 +7,42 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.data.repositories.ChatRepository
+import com.typosbro.multilevel.data.repositories.ChatStreamEvent
 import com.typosbro.multilevel.features.vosk.VoskRecognitionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.vosk.Model
 import org.vosk.android.RecognitionListener
 import org.vosk.android.StorageService
-import com.typosbro.multilevel.data.repositories.Result
+import com.typosbro.multilevel.data.repositories.Result // For loadChatHistory
 import com.typosbro.multilevel.features.inference.OnnxRuntimeManager
-import com.typosbro.multilevel.ui.component.ChatMessage // Ensure this import points to your ChatMessage with UUID
+import com.typosbro.multilevel.ui.component.ChatMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import com.typosbro.multilevel.util.AudioPlayer
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel // For queuing audio playback requests
+import kotlinx.coroutines.flow.receiveAsFlow // To consume from the channel
 import kotlinx.coroutines.withContext
-// Removed java.util.UUID import as it's handled within ChatMessage.kt
+import java.util.UUID
+import java.util.LinkedList // For a simple queue
+import java.util.Queue
+import kotlinx.coroutines.channels.actor // Might not be needed with simpler channel approach
+import kotlinx.coroutines.flow.consumeAsFlow
 
 class ChatDetailViewModel(
     application: Application,
     savedStateHandle: SavedStateHandle,
     private val chatRepository: ChatRepository
 ) : AndroidViewModel(application) {
-    // Removed: private val context = getApplication<Application>().applicationContext
-    // Use getApplication<Application>().applicationContext directly where needed or pass 'application'
 
     val chatId: String = savedStateHandle["chatId"] ?: error("Chat ID not found in navigation args")
 
@@ -45,27 +54,35 @@ class ChatDetailViewModel(
     private var voskModel: Model? = null
     private var recognitionResultsBuffer = ""
     private var currentPartialText = ""
-
-    // Timers
     private var silenceDetectionJob: Job? = null
     private var maxRecordingJob: Job? = null
     private val SILENCE_DELAY_MS = 10000L
     private val MAX_RECORDING_DURATION_S = 30
     private val MAX_RECORDING_DURATION_MS = MAX_RECORDING_DURATION_S * 1000L
 
+    // State for streaming bot response
+    private var currentBotMessageId: String? = null
+    private var accumulatedTextForStream: String = ""
+
+    private val ttsSynthesisRequestChannel = Channel<List<Long>>(Channel.UNLIMITED)
+
+    // Audio Playback Queueing
+    private val audioPlaybackQueue: Queue<ByteArray> = LinkedList()
+    private var isCurrentlyPlayingAudio = false
+    private val audioPlaybackDataChannel = Channel<ByteArray>(Channel.UNLIMITED)
 
     init {
         Log.d("ChatDetailViewModel", "Initializing for chatId: $chatId")
         loadChatHistory()
         initVoskModel()
-        // Initialize ONNX Runtime. Consider if this is better done once application-wide
-        // e.g., in MainViewModel or Application class, if not already.
         viewModelScope.launch {
             OnnxRuntimeManager.initialize(getApplication<Application>().applicationContext)
         }
+        // Launch a coroutine to process the audio playback queue
+        observeAudioPlaybackRequests() // Renamed for clarity
+        observeTTSSynthesisRequests()
     }
-
-    // --- Vosk Methods ---
+    // --- Vosk Methods (Transcription Input) ---
     private fun initVoskModel() {
         viewModelScope.launch {
             StorageService.unpack(getApplication(), "model-en-us", "model",
@@ -82,22 +99,23 @@ class ChatDetailViewModel(
                 },
                 { exception ->
                     Log.e("VoskInit", "Failed to unpack the model", exception)
-                    _uiState.update { state -> state.copy(error = "Failed to unpack recognition model: ${exception.message}") }
+                    _uiState.update { state -> state.copy(error = "Failed to unpack model: ${exception.message}") }
                 }
             )
         }
     }
-
-    fun getSession() = OnnxRuntimeManager.getSession()
 
     fun startMicRecognition() {
         if (!uiState.value.isModelReady || voskManager == null) {
             _uiState.update { it.copy(error = "Recognition service not ready.") }
             return
         }
-        if (uiState.value.isRecording) return
+        if (uiState.value.isRecording || uiState.value.isStreamingMessage) { // Don't record if already recording or streaming
+            Log.w("ChatDetailViewModel", "Start mic skipped. Recording: ${uiState.value.isRecording}, Streaming: ${uiState.value.isStreamingMessage}")
+            return
+        }
 
-        Log.d("VoskRec", "Starting Mic Recognition (Max Duration: ${MAX_RECORDING_DURATION_MS}ms, Silence: ${SILENCE_DELAY_MS}ms)")
+        Log.d("VoskRec", "Starting Mic Recognition (Max: ${MAX_RECORDING_DURATION_MS}ms, Silence: ${SILENCE_DELAY_MS}ms)")
         resetTranscriptionState(clearUiToo = true)
         _uiState.update { it.copy(isRecording = true, remainingRecordingTime = MAX_RECORDING_DURATION_S) }
         voskManager?.startMicrophoneRecognition()
@@ -107,75 +125,55 @@ class ChatDetailViewModel(
 
     fun stopRecognitionAndSend() {
         if (!uiState.value.isRecording) return
-
         Log.d("VoskRec", "Manual Stop Initiated")
         cancelAllTimers()
         voskManager?.stopRecognition()
-        processCurrentBufferAndSend(isFinalSend = true)
+        processVoskBufferAndSendMessage(isFinalSend = true)
     }
 
-    private fun startSilenceTimer() {
+    private fun startSilenceTimer() { /* ... (same as before) ... */
         silenceDetectionJob?.cancel()
         if (!uiState.value.isRecording) return
-
         silenceDetectionJob = viewModelScope.launch {
             delay(SILENCE_DELAY_MS)
             Log.d("VoskSilence", "Silence detected.")
-            if (uiState.value.isRecording) {
-                processCurrentBufferAndSend(isFinalSend = false)
-            }
+            if (uiState.value.isRecording) { processVoskBufferAndSendMessage(isFinalSend = false) }
         }
         Log.v("VoskSilence", "Silence timer started/reset.")
     }
 
-    private fun startMaxDurationTimer() {
+    private fun startMaxDurationTimer() { /* ... (same as before) ... */
         maxRecordingJob?.cancel()
         if (!uiState.value.isRecording) return
-
         _uiState.update { it.copy(remainingRecordingTime = MAX_RECORDING_DURATION_S) }
-
         maxRecordingJob = viewModelScope.launch {
-            Log.v("VoskMaxTime", "Max duration timer started (Countdown).")
+            Log.v("VoskMaxTime", "Max duration timer started.")
             for (remainingSeconds in MAX_RECORDING_DURATION_S downTo 1) {
-                if (!isActive) {
-                    Log.d("VoskMaxTime", "Countdown loop cancelled.")
-                    if (uiState.value.remainingRecordingTime != null) {
-                        _uiState.update { it.copy(remainingRecordingTime = null) }
-                    }
-                    return@launch
-                }
+                if (!isActive) { Log.d("VoskMaxTime", "Countdown cancelled."); return@launch }
                 _uiState.update { it.copy(remainingRecordingTime = remainingSeconds) }
-                Log.v("VoskMaxTime", "Time remaining: $remainingSeconds s")
                 delay(1000L)
             }
-
-            Log.d("VoskMaxTime", "Maximum recording duration (${MAX_RECORDING_DURATION_MS}ms) reached.")
+            Log.d("VoskMaxTime", "Max recording duration reached.")
             if (uiState.value.isRecording) {
                 cancelAllTimers()
                 voskManager?.stopRecognition()
-                processCurrentBufferAndSend(isFinalSend = true)
-            } else {
-                if (uiState.value.remainingRecordingTime != null) {
-                    _uiState.update { it.copy(remainingRecordingTime = null) }
-                }
+                processVoskBufferAndSendMessage(isFinalSend = true)
             }
         }
     }
 
-    private fun cancelAllTimers() {
-        silenceDetectionJob?.cancel()
-        maxRecordingJob?.cancel()
-        silenceDetectionJob = null
-        maxRecordingJob = null
+    private fun cancelAllTimers() { /* ... (same as before) ... */
+        silenceDetectionJob?.cancel(); maxRecordingJob?.cancel()
+        silenceDetectionJob = null; maxRecordingJob = null
         if (uiState.value.remainingRecordingTime != null) {
             _uiState.update { it.copy(remainingRecordingTime = null) }
         }
         Log.v("VoskTimer", "All timers cancelled.")
     }
 
-    private fun processCurrentBufferAndSend(isFinalSend: Boolean) {
-        if ((!uiState.value.isRecording && !isFinalSend) || uiState.value.isLoading) {
-            Log.w("VoskProc", "Processing skipped. Recording: ${uiState.value.isRecording}, Loading: ${uiState.value.isLoading}, isFinalSend: $isFinalSend")
+    private fun processVoskBufferAndSendMessage(isFinalSend: Boolean) {
+        if ((!uiState.value.isRecording && !isFinalSend) || uiState.value.isStreamingMessage) {
+            Log.w("VoskProc", "Processing Vosk buffer skipped. Recording: ${uiState.value.isRecording}, Streaming: ${uiState.value.isStreamingMessage}, isFinalSend: $isFinalSend")
             if (isFinalSend && uiState.value.isRecording) {
                 _uiState.update { it.copy(isRecording = false, partialText = "", remainingRecordingTime = null) }
             }
@@ -183,230 +181,321 @@ class ChatDetailViewModel(
         }
 
         val transcription = (recognitionResultsBuffer + currentPartialText).trim()
-        Log.d("VoskProc", "Processing buffer: '$transcription'. isFinalSend: $isFinalSend")
-
+        Log.d("VoskProc", "Processing Vosk buffer: '$transcription'. isFinalSend: $isFinalSend")
         val processedPartial = currentPartialText
         resetTranscriptionState(clearUiToo = false)
 
         if (transcription.isNotEmpty()) {
-            // ChatMessage constructor will auto-generate a unique ID and current timestamp
             val userMessage = ChatMessage(text = transcription, isUser = true)
-            _uiState.value.messageList.add(0, userMessage)
+            _uiState.update {
+                val newList = it.messageList.toMutableList(); newList.add(0, userMessage)
+                it.copy(messageList = newList.toMutableList()) // Ensure new list instance for recomposition
+            }
+            _uiState.update { cs -> if (cs.partialText == processedPartial) cs.copy(partialText = "") else cs }
 
-            _uiState.update { currentState ->
-                if (currentState.partialText == processedPartial) {
-                    currentState.copy(partialText = "")
-                } else {
-                    currentState
-                }
-            }
-            sendMessageToBackend(transcription)
+            // Call the streaming backend method
+            sendStreamMessageToBackend(transcription)
         } else {
-            Log.w("VoskProc", "Processing buffer called, but result was empty.")
-            _uiState.update { currentState ->
-                if (currentState.partialText == processedPartial) {
-                    currentState.copy(partialText = "")
-                } else {
-                    currentState
-                }
-            }
+            Log.w("VoskProc", "Vosk buffer processed, but result was empty.")
+            _uiState.update { cs -> if (cs.partialText == processedPartial) cs.copy(partialText = "") else cs }
         }
 
         if (isFinalSend) {
             _uiState.update { it.copy(isRecording = false, partialText = "", remainingRecordingTime = null) }
-            Log.d("VoskProc", "Final Send processed, setting isRecording=false, timer display cleared.")
+            Log.d("VoskProc", "Final Vosk Send processed, isRecording=false.")
         } else if (uiState.value.isRecording) {
             startSilenceTimer()
         }
     }
 
-    private fun resetTranscriptionState(clearUiToo: Boolean) {
-        recognitionResultsBuffer = ""
-        currentPartialText = ""
-        if (clearUiToo) {
-            _uiState.update { it.copy(partialText = "") }
-        }
+    private fun resetTranscriptionState(clearUiToo: Boolean) { /* ... (same as before) ... */
+        recognitionResultsBuffer = ""; currentPartialText = ""
+        if (clearUiToo) { _uiState.update { it.copy(partialText = "") } }
         Log.v("VoskState", "Transcription state reset. Clear UI: $clearUiToo")
     }
 
-    private val recognitionListener = object : RecognitionListener {
+    private val recognitionListener = object : RecognitionListener { /* ... (same as before) ... */
         override fun onPartialResult(hypothesis: String) {
             try {
                 val partial = JSONObject(hypothesis).optString("partial", "")
-                if (partial != currentPartialText) {
-                    currentPartialText = partial
-                    _uiState.update { it.copy(partialText = partial) }
-                    startSilenceTimer()
-                    Log.v("VoskRec", "Partial: '$partial' - Silence Timer Reset")
-                }
+                if (partial != currentPartialText) { currentPartialText = partial; _uiState.update { it.copy(partialText = partial) }; startSilenceTimer() }
             } catch (e: Exception) { Log.e("VoskRec", "Partial parse error", e) }
         }
         override fun onResult(hypothesis: String) {
             try {
                 val text = JSONObject(hypothesis).optString("text", "")
-                if (text.isNotEmpty()) {
-                    recognitionResultsBuffer += "$text "
-                    currentPartialText = ""
-                    startSilenceTimer()
-                    Log.d("VoskRec", "Result segment: '$text' - Buffer: '$recognitionResultsBuffer' - Silence Timer Reset")
-                }
+                if (text.isNotEmpty()) { recognitionResultsBuffer += "$text "; currentPartialText = ""; startSilenceTimer() }
             } catch (e: Exception) { Log.e("VoskRec", "Result parse error", e) }
         }
-        override fun onFinalResult(hypothesis: String) { Log.d("VoskRec", "Final Result (usually empty): '$hypothesis'") }
-        override fun onError(e: Exception) {
-            Log.e("VoskRec", "Recognition Error", e)
-            cancelAllTimers()
-            resetTranscriptionState(clearUiToo = true)
-            _uiState.update { it.copy(error = "Recognition error: ${e.message}", isRecording = false) }
-        }
-        override fun onTimeout() {
-            Log.w("VoskRec", "Vosk Recognition Internal Timeout")
-            cancelAllTimers()
-            _uiState.update { it.copy(error = "Recognition stopped due to timeout") }
-            processCurrentBufferAndSend(isFinalSend = true)
-            if(uiState.value.isRecording) { _uiState.update { it.copy(isRecording = false) } }
-        }
+        override fun onFinalResult(hypothesis: String) { Log.d("VoskRec", "Final Result (Vosk): '$hypothesis'") }
+        override fun onError(e: Exception) { Log.e("VoskRec", "Vosk Error", e); cancelAllTimers(); resetTranscriptionState(true); _uiState.update { it.copy(error = "Vosk error: ${e.message}", isRecording = false) } }
+        override fun onTimeout() { Log.w("VoskRec", "Vosk Timeout"); cancelAllTimers(); processVoskBufferAndSendMessage(true); if(uiState.value.isRecording) { _uiState.update { it.copy(isRecording = false) } } }
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        Log.d("ChatDetailViewModel", "ViewModel cleared, shutting down Vosk, timers, and AudioPlayer.")
-        cancelAllTimers()
-        voskManager?.stopRecognition()
-        AudioPlayer.release()
-    }
 
-    // --- Chat Data Methods ---
+    // --- Chat Data & Streaming Message Handling ---
     private fun loadChatHistory() {
         Log.d("ChatDetailViewModel", "Loading history for chatId: $chatId")
-        _uiState.update { it.copy(isLoading = true) }
+        _uiState.update { it.copy(isLoading = true) } // isLoading for initial history
         viewModelScope.launch {
             when (val result = chatRepository.getChatHistory(chatId)) {
                 is Result.Success -> {
-                    Log.d("ChatDetailViewModel", "History loaded successfully. ${result.data.history.size} messages.")
                     val messages = result.data.history.map { apiMsg ->
-                        // ChatMessage constructor will auto-generate a unique ID.
-                        // Timestamp will also be auto-generated to System.currentTimeMillis().
-                        // If your API provided a timestamp for historical messages, you'd set it here.
-                        // Since ApiMessage doesn't have a per-message timestamp, this is fine.
                         ChatMessage(
                             text = apiMsg.parts.firstOrNull()?.text ?: "",
                             isUser = apiMsg.role == "user"
-                            // Example if apiMsg had a timestamp:
-                            // timestamp = parseApiTimestamp(apiMsg.createdAt)
                         )
                     }
                     _uiState.update {
                         it.copy(
                             chatTitle = result.data.title,
-                            // Add messages to the mutableStateListOf.
-                            // Ensure they are added in the order expected by your UI (reverseLayout in LazyColumn means newest is at index 0).
-                            // API typically returns oldest first, so if you addAll, then newest is at the end.
-                            // If you want newest message at index 0 of messageList:
                             messageList = mutableStateListOf<ChatMessage>().apply { addAll(messages.reversed()) },
                             isLoading = false, error = null
                         )
                     }
                 }
                 is Result.Error -> {
-                    Log.e("ChatDetailViewModel", "Error loading history: ${result.message}")
-                    _uiState.update { it.copy(isLoading = false, error = "Failed to load history: ${result.message}") }
+                    _uiState.update { it.copy(isLoading = false, error = "History: ${result.message}") }
                 }
             }
         }
     }
 
-    private fun sendMessageToBackend(prompt: String) {
-        Log.d("ChatDetailViewModel", "Sending message to backend: '$prompt'")
-        if (uiState.value.isLoading) {
-            Log.w("ChatDetailViewModel", "Already processing a message, skipping new request for '$prompt'")
+    private fun sendStreamMessageToBackend(prompt: String) {
+        // Clear audio state for new message
+        // No need to clear audioPlaybackQueue here if observeAudioPlaybackRequests handles old data correctly
+        // when a new stream starts. But good to be sure.
+        audioPlaybackQueue.clear()
+        // audioPlaybackDataChannel might have pending items if a previous stream was aborted.
+        // It's tricky to clear a channel directly without closing.
+        // A simpler approach might be to associate data with a stream ID. For now, let's assume it's okay.
+        isCurrentlyPlayingAudio = false
+        AudioPlayer.stopPlayback() // Stop any ongoing playback from previous stream
+
+        if (uiState.value.isStreamingMessage) {
+            Log.w("ChatDetailViewModel", "Already streaming, skipping new request for '$prompt'")
+            return
+        }
+        _uiState.update { it.copy(isStreamingMessage = true, error = null) }
+        accumulatedTextForStream = ""
+        currentBotMessageId = UUID.randomUUID().toString()
+        audioPlaybackQueue.clear() // Clear queue for new message
+        isCurrentlyPlayingAudio = false // Reset playback state
+
+        val initialBotMessage = ChatMessage(id = currentBotMessageId!!, text = "...", isUser = false)
+        _uiState.update {
+            val newList = it.messageList.toMutableList(); newList.add(0, initialBotMessage)
+            it.copy(messageList = newList.toMutableList())
+        }
+
+        val langCodeForTTS: String? = null
+        val configKeyForTTS: String? = null
+
+        chatRepository.sendMessageAndStream(chatId, prompt, langCodeForTTS, configKeyForTTS)
+            .onEach { event ->
+                viewModelScope.ensureActive()
+                when (event) {
+                    is ChatStreamEvent.TextChunk -> {
+                        accumulatedTextForStream += event.text
+                        updateBotMessageContent(currentBotMessageId, accumulatedTextForStream)
+                    }
+                    is ChatStreamEvent.InputIdsChunk -> {
+                        Log.d("ChatStream", "Received input_ids for sentence: \"${event.sentence.take(30)}...\" Count: ${event.ids.size}")
+                        if (event.ids.isNotEmpty()) {
+                            // Synthesize and enqueue for playback
+                            ttsSynthesisRequestChannel.send(event.ids.map { it.toLong() })
+                        }
+                    }
+                    is ChatStreamEvent.PreprocessWarning -> {
+                        Log.w("ChatStream", "Preprocess Warning: ${event.message} for sentence: \"${event.sentenceText?.take(30)}\"")
+                        // Optionally, you could display a small, transient warning in the UI
+                        // or append a note to the current bot message. For now, just logging.
+                    }
+                    is ChatStreamEvent.PreprocessError -> {
+                        Log.e("ChatStream", "Preprocess Error: ${event.message} for sentence: \"${event.sentenceText?.take(30)}\"")
+                        // Display a more noticeable error or append to the bot message
+                        _uiState.update { it.copy(error = "TTS issue for a sentence: ${event.message.take(50)}") }
+                        // You might also want to append something to the currentBotMessageId's text
+                        // updateBotMessageContent(currentBotMessageId, accumulatedTextForStream + "\n[TTS Error for a part]", true)
+                    }
+                    is ChatStreamEvent.StreamEnd -> {
+                        Log.d("ChatStream", "Stream ended: ${event.message}")
+                        updateBotMessageContent(currentBotMessageId, accumulatedTextForStream)
+                        _uiState.update { it.copy(isStreamingMessage = false) }
+                        currentBotMessageId = null
+                        // Signal end of synthesis requests if needed, or let existing ones complete
+                    }
+                    is ChatStreamEvent.StreamError -> { // ... (as before, clear queue potentially) ...
+                        Log.e("ChatStream", "Stream error: ${event.message} ${event.details ?: ""}")
+                        _uiState.update { it.copy(isStreamingMessage = false, error = "Stream Error: ${event.message}") }
+                        updateBotMessageContent(currentBotMessageId, accumulatedTextForStream + "\n[Error in response stream]", true)
+                        currentBotMessageId = null
+                        // Clear TTS synthesis queue too if stream fails hard
+                        // This requires clearing the ttsSynthesisRequestChannel, which is not trivial directly.
+                        // One way is to send a special "cancel" message or close and reopen the channel.
+                        // For now, let's assume synthesis for received items will proceed but playback queue is cleared.
+                        audioPlaybackQueue.clear()
+                        AudioPlayer.stopPlayback()
+                    }
+                }
+            }
+            .catch { e -> // ... (as before, clear queue potentially) ...
+                Log.e("ChatDetailViewModel", "Exception collecting stream", e)
+                _uiState.update { it.copy(isStreamingMessage = false, error = "Stream Collection Error: ${e.message}") }
+                updateBotMessageContent(currentBotMessageId, accumulatedTextForStream + "\n[Error processing stream]", true)
+                currentBotMessageId = null
+                audioPlaybackQueue.clear()
+                AudioPlayer.stopPlayback()
+            }
+            .launchIn(viewModelScope)
+    }
+
+    private fun updateBotMessageContent(messageId: String?, newText: String, isError: Boolean = false) {
+        messageId ?: return
+        _uiState.update { currentState ->
+            val updatedList = currentState.messageList.map { chatMsg ->
+                if (chatMsg.id == messageId) {
+                    chatMsg.copy(text = newText.ifEmpty { if (isError) "[Error]" else "..." })
+                } else {
+                    chatMsg
+                }
+            }.toMutableList() // map returns List, convert back to MutableList if needed by UI state
+            currentState.copy(messageList = updatedList)
+        }
+    }
+
+    private fun synthesizeAndEnqueueAudio(sentenceInputIds: List<Long>) {
+        if (sentenceInputIds.isEmpty()) return
+
+        viewModelScope.launch(Dispatchers.IO) { // Synthesis on IO thread
+            Log.d("TTS_Queue", "Synthesizing audio for enqueuing: ${sentenceInputIds.size} ids.")
+            try {
+                val session = OnnxRuntimeManager.getSession()
+                val appContext = getApplication<Application>().applicationContext
+                val voiceStyle = "bf_emma"
+                val speed = 1.0f
+
+                val (audioFloatArray, sampleRate) = AudioPlayer.createAudio(
+                    tokens = sentenceInputIds.toLongArray(),
+                    voice = voiceStyle, speed = speed, session = session, context = appContext
+                )
+                val audioWavByteArray = AudioPlayer.convertFloatArrayToWavByteArray(audioFloatArray, sampleRate)
+
+                // Send to the channel to be processed by observeAudioRequests
+                audioPlaybackDataChannel.send(audioWavByteArray)
+                Log.d("TTS_Queue", "Enqueued audio data (${audioWavByteArray.size} bytes). Queue size: ${audioPlaybackQueue.size + 1}")
+
+            } catch (e: Exception) {
+                Log.e("TTS_Queue", "Error during TTS synthesis for enqueuing", e)
+                withContext(Dispatchers.Main) {
+                    _uiState.update { it.copy(error = "Sentence TTS Synthesis Error: ${e.message?.take(100)}") }
+                }
+            }
+        }
+    }
+
+
+
+    // New: Coroutine to process TTS synthesis requests sequentially
+    private fun observeTTSSynthesisRequests() {
+        viewModelScope.launch(Dispatchers.IO) { // This actor runs on IO
+            ttsSynthesisRequestChannel.consumeAsFlow().collect { sentenceInputIds ->
+                // This collect block will process one list of IDs at a time, sequentially.
+                if (sentenceInputIds.isEmpty()) return@collect
+
+                Log.d("TTS_Synth_Queue", "Processing synthesis for: ${sentenceInputIds.size} ids.")
+                try {
+                    val session = OnnxRuntimeManager.getSession()
+                    val appContext = getApplication<Application>().applicationContext
+                    val voiceStyle = "bf_emma"
+                    val speed = 1.0f
+
+                    val (audioFloatArray, sampleRate) = AudioPlayer.createAudio(
+                        tokens = sentenceInputIds.toLongArray(),
+                        voice = voiceStyle, speed = speed, session = session, context = appContext
+                    )
+                    val audioWavByteArray = AudioPlayer.convertFloatArrayToWavByteArray(audioFloatArray, sampleRate)
+
+                    // Send synthesized data to the playback data channel
+                    audioPlaybackDataChannel.send(audioWavByteArray)
+                    Log.d("TTS_Synth_Queue", "Synthesized and sent audio data (${audioWavByteArray.size} bytes) to playback channel.")
+
+                } catch (e: Exception) {
+                    Log.e("TTS_Synth_Queue", "Error during TTS synthesis", e)
+                    // Optionally send an error event to another channel to update UI
+                    // or handle it here if it's just for logging.
+                    // For now, we log and the sentence won't have audio.
+                    // Consider sending a "playback_error_marker" to audioPlaybackDataChannel
+                    // if you want the playback queue to know about a failed synthesis.
+                }
+            }
+        }
+    }
+
+    // Renamed from synthesizeAndEnqueueAudio and no longer directly called by onEach
+    // This function is now effectively replaced by the logic within observeTTSSynthesisRequests
+
+    // Renamed from observeAudioRequests
+    private fun observeAudioPlaybackRequests()  {
+        viewModelScope.launch(Dispatchers.Main) { // Observer runs on Main for UI interaction with AudioPlayer
+            audioPlaybackDataChannel.receiveAsFlow().collect { audioData ->
+                audioPlaybackQueue.offer(audioData) // Add to the software queue
+                playNextAudioInQueue() // Attempt to play if not already playing
+            }
+        }
+    }
+
+    private fun playNextAudioInQueue() {
+        // Ensure this is called on the Main thread or where AudioPlayer can be safely interacted with
+        if (isCurrentlyPlayingAudio || audioPlaybackQueue.isEmpty()) {
+            if(isCurrentlyPlayingAudio) Log.d("TTS_Queue", "Already playing audio, new item will wait.")
+            if(audioPlaybackQueue.isEmpty()) Log.d("TTS_Queue", "Audio queue is empty.")
             return
         }
 
-        _uiState.update { it.copy(isLoading = true, error = null) }
+        isCurrentlyPlayingAudio = true
+        val audioDataToPlay = audioPlaybackQueue.poll() // Get and remove from queue
 
-        viewModelScope.launch {
-            when (val result = chatRepository.sendMessage(chatId, prompt)) {
-                is Result.Success -> {
-                    val responseData = result.data
-                    Log.d("ChatDetailViewModel", "Received response from backend. Message: '${responseData.message}', Preprocessed available: ${responseData.preprocessed != null}")
-
-                    // ChatMessage constructor will auto-generate a unique ID and current timestamp
-                    val modelMessage = ChatMessage(text = responseData.message, isUser = false)
-                    if (_uiState.value.messageList.none { it.text == responseData.message && !it.isUser }) {
-                        _uiState.value.messageList.add(0, modelMessage)
-                        Log.d("ChatDetailViewModel", "Added model text message to UI.")
-                    } else {
-                        Log.d("ChatDetailViewModel", "Model text message already present optimistically or from previous attempt.")
-                    }
-
-                    val inputIdsList = responseData.preprocessed?.input_ids?.firstOrNull()
-                    if (inputIdsList != null && inputIdsList.isNotEmpty()) {
-                        Log.d("ChatDetailViewModel", "Attempting TTS with ${inputIdsList.size} input_ids.")
-                        viewModelScope.launch(Dispatchers.IO) {
-                            try {
-                                val inputIdsLongArray = inputIdsList.map { it.toLong() }.toLongArray()
-                                val session = getSession()
-                                val currentContext = getApplication<Application>().applicationContext // Use current context
-
-                                val voiceStyle = "bf_isabella"
-                                val speed = 1.0f
-
-                                Log.d("ChatDetailViewModel", "Calling AudioPlayer.createAudio with ${inputIdsLongArray.size} tokens, voice: $voiceStyle, speed: $speed")
-                                val (audioFloatArray, sampleRate) = AudioPlayer.createAudio(
-                                    tokens = inputIdsLongArray,
-                                    voice = voiceStyle,
-                                    speed = speed,
-                                    session = session,
-                                    context = currentContext
-                                )
-                                Log.d("ChatDetailViewModel", "TTS inference complete. Audio float array size: ${audioFloatArray.size}, Sample rate: $sampleRate")
-
-                                val audioWavByteArray = AudioPlayer.convertFloatArrayToWavByteArray(audioFloatArray, sampleRate)
-                                Log.d("ChatDetailViewModel", "WAV byte array created, size: ${audioWavByteArray.size}")
-
-                                withContext(Dispatchers.Main) {
-                                    AudioPlayer.playAudio(currentContext, audioWavByteArray) {
-                                        Log.d("ChatDetailViewModel", "TTS Audio playback finished.")
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                Log.e("ChatDetailViewModel", "Error during TTS generation or playback", e)
-                                withContext(Dispatchers.Main) {
-                                    _uiState.update { it.copy(error = "TTS Error: ${e.message}") }
-                                }
-                            }
-                        }
-                    } else {
-                        Log.w("ChatDetailViewModel", "No input_ids found or list is empty. Skipping client-side TTS.")
-                        if (responseData.ttsError != null && responseData.ttsError.isNotEmpty()) {
-                            _uiState.update { it.copy(error = "TTS unavailable: ${responseData.ttsError}") }
-                        } else if (responseData.preprocessed?.input_ids == null) {
-                            _uiState.update { it.copy(error = "TTS data not available for this message.") }
-                        }
-                    }
-                    _uiState.update { it.copy(isLoading = false) }
-
-                }
-                is Result.Error -> {
-                    Log.e("ChatDetailViewModel", "API Error sending message: ${result.message}")
-                    _uiState.update { it.copy(isLoading = false, error = "API Error: ${result.message}") }
+        if (audioDataToPlay != null) {
+            Log.d("TTS_Queue", "Playing next audio from queue (${audioDataToPlay.size} bytes). Remaining: ${audioPlaybackQueue.size}")
+            val appContext = getApplication<Application>().applicationContext
+            AudioPlayer.playAudio(appContext, audioDataToPlay) {
+                // This is the onCompletion callback from AudioPlayer
+                Log.d("TTS_Queue", "Audio segment playback finished.")
+                viewModelScope.launch(Dispatchers.Main) { // Ensure next play is also on Main
+                    isCurrentlyPlayingAudio = false
+                    playNextAudioInQueue() // Try to play the next item
                 }
             }
+        } else {
+            isCurrentlyPlayingAudio = false // Should not happen if queue was not empty
+            Log.w("TTS_Queue", "playNextAudioInQueue called but polled null from queue.")
         }
     }
 
     fun clearError() { _uiState.update { it.copy(error = null) } }
+
+    override fun onCleared() {
+        super.onCleared()
+        Log.d("ChatDetailViewModel", "ViewModel cleared. Shutting down resources.")
+        cancelAllTimers()
+        voskManager?.stopRecognition()
+        ttsSynthesisRequestChannel.close() // Close the synthesis request channel
+        audioPlaybackDataChannel.close()   // Close the playback data channel
+        audioPlaybackQueue.clear()
+        AudioPlayer.release()
+        isCurrentlyPlayingAudio = false
+    }
 }
-
-
+// Ensure ChatDetailUiState has the isStreamingMessage flag
 data class ChatDetailUiState(
-    val isLoading: Boolean = false,
+    val isLoading: Boolean = false, // For initial history load
+    val isStreamingMessage: Boolean = false, // True while bot response is streaming
     val error: String? = null,
     val chatTitle: String = "Chat",
     val messageList: MutableList<ChatMessage> = mutableStateListOf(),
-    val isRecording: Boolean = false,
-    val isModelReady: Boolean = false,
-    val partialText: String = "",
-    val remainingRecordingTime: Int? = null
+    val isRecording: Boolean = false, // Vosk recording
+    val isModelReady: Boolean = false, // Vosk model ready
+    val partialText: String = "", // Vosk partial result
+    val remainingRecordingTime: Int? = null // Vosk recording timer
 )

@@ -13,7 +13,22 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
 
     // Replace with your actual backend URL
-    private const val BASE_URL = "http://192.168.25.19:3000/api/" // 10.0.2.2 for Android Emulator accessing localhost
+    const val BASE_URL = "http://192.168.25.19:3000/api/" // 10.0.2.2 for Android Emulator accessing localhost
+
+    fun getOkHttpClient(context: Context): OkHttpClient {
+        val tokenManager = TokenManager(context.applicationContext)
+        val loggingInterceptor = HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC // Or BODY for more detail
+        }
+        return OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(tokenManager))
+            .addInterceptor(loggingInterceptor)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS) // Essential for SSE - no read timeout
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .pingInterval(20, TimeUnit.SECONDS) // Helps keep SSE connection alive
+            .build()
+    }
 
     fun create(context: Context): ApiService {
         val tokenManager = TokenManager(context.applicationContext) // Use application context

@@ -23,7 +23,11 @@ data class ChatHistoryResponse(
 )
 
 // Request to send a message
-data class SendMessageRequest(val prompt: String)
+data class SendMessageRequest(
+    val prompt: String,
+    val lang_code: String? = null,
+    val config_key: String? = null
+)
 
 // Response when sending a message
 data class SendMessageResponse(val message: String, val chatId: String)

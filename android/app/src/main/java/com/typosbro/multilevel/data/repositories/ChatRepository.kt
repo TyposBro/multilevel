@@ -1,50 +1,52 @@
-
 package com.typosbro.multilevel.data.repositories
 
+import android.util.Log
 import com.google.gson.Gson
 import com.typosbro.multilevel.data.remote.ApiService
-import com.typosbro.multilevel.data.remote.SendMessageApiResponse
+import com.typosbro.multilevel.data.remote.RetrofitClient // For BASE_URL_FOR_SSE
 import com.typosbro.multilevel.data.remote.models.ChatHistoryResponse
 import com.typosbro.multilevel.data.remote.models.ChatListResponse
 import com.typosbro.multilevel.data.remote.models.CreateChatRequest
 import com.typosbro.multilevel.data.remote.models.CreateChatResponse
 import com.typosbro.multilevel.data.remote.models.DeleteChatResponse
-import com.typosbro.multilevel.data.remote.models.SendMessageRequest
+import com.typosbro.multilevel.data.remote.models.SendMessageRequest // Ensure this is updated if sending lang_code/config_key
 import com.typosbro.multilevel.data.remote.models.UpdateTitleRequest
 import com.typosbro.multilevel.data.remote.models.UpdateTitleResponse
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.OkHttpClient
+import okhttp3.Request as OkHttpRequest // Aliasing to avoid conflict with API models if any
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response as OkHttpResponse // Aliasing
+import okhttp3.sse.EventSource
+import okhttp3.sse.EventSourceListener
+import okhttp3.sse.EventSources
+import org.json.JSONObject
+import java.io.IOException // OkHttp Callback can throw this
 
-sealed class SendMessageResult {
-    // Success cases
-    data class AudioSuccess(val audioBytes: ByteArray) : SendMessageResult() // Audio received
-    data class TextOnlySuccess(val text: String, val ttsError: String?) : SendMessageResult() // JSON fallback
-
-    // Failure case
-    data class Error(val message: String, val code: Int? = null) : SendMessageResult()
-
-    // Need equals/hashCode for ByteArray comparison if used in Sets/Maps etc.
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        return when(this) {
-            is AudioSuccess -> other is AudioSuccess && audioBytes.contentEquals(other.audioBytes)
-            is TextOnlySuccess -> other is TextOnlySuccess && text == other.text && ttsError == other.ttsError
-            is Error -> other is Error && message == other.message && code == other.code
-        }
-    }
-    override fun hashCode(): Int {
-        return when(this) {
-            is AudioSuccess -> audioBytes.contentHashCode()
-            is TextOnlySuccess -> 31 * text.hashCode() + (ttsError?.hashCode() ?: 0)
-            is Error -> 31 * message.hashCode() + (code ?: 0)
-        }
-    }
+// Sealed class for stream events (ensure this is defined, e.g., in this file or a separate one)
+sealed class ChatStreamEvent {
+    data class TextChunk(val text: String) : ChatStreamEvent()
+    data class InputIdsChunk(val sentence: String, val ids: List<Int>) : ChatStreamEvent()
+    data class PreprocessWarning(val message: String, val sentenceText: String?) : ChatStreamEvent()
+    data class PreprocessError(val message: String, val sentenceText: String?) : ChatStreamEvent()
+    data class StreamError(val message: String, val details: String?) : ChatStreamEvent()
+    data class StreamEnd(val chatId: String?, val message: String?) : ChatStreamEvent()
 }
 
-// --- Chat Repository ---
-class ChatRepository(private val apiService: ApiService) {
+class ChatRepository(
+    private val apiService: ApiService,
+    private val okHttpClient: OkHttpClient, // Injected OkHttpClient
+    private val tokenProvider: suspend () -> String? // Lambda to get the auth token
+) {
+    private val gson = Gson()
+
+    // --- Standard Non-Streaming CRUD operations ---
+
     suspend fun getChatList(): Result<ChatListResponse> = withContext(Dispatchers.IO) {
         safeApiCall { apiService.listChats() }
     }
@@ -65,8 +67,155 @@ class ChatRepository(private val apiService: ApiService) {
         safeApiCall { apiService.getChatHistory(chatId) }
     }
 
-    suspend fun sendMessage(chatId: String, prompt: String): Result<SendMessageApiResponse> = withContext(Dispatchers.IO) {
-        // Use the standard safeApiCall helper
-        safeApiCall { apiService.sendMessage(chatId, SendMessageRequest(prompt)) }
+    // --- Streaming message method ---
+
+    fun sendMessageAndStream(
+        chatId: String,
+        prompt: String,
+        langCode: String? = null,
+        configKey: String? = null
+    ): Flow<ChatStreamEvent> = callbackFlow {
+        // Create the request body for the POST request
+        // Ensure SendMessageRequest can handle these optional parameters
+        val sendMessagePayload = SendMessageRequest(
+            prompt = prompt,
+            lang_code = langCode,
+            config_key = configKey
+        )
+        val requestBodyJson = gson.toJson(sendMessagePayload)
+        val requestBody = requestBodyJson.toRequestBody(MEDIA_TYPE_JSON)
+
+        val currentToken = tokenProvider()
+        if (currentToken == null) {
+            trySend(ChatStreamEvent.StreamError("Authentication token not available.", null))
+            close(IllegalStateException("Auth token missing")) // Close with an exception
+            return@callbackFlow
+        }
+
+        val url = "${RetrofitClient.BASE_URL}chat/${chatId}/message"
+        val request = OkHttpRequest.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $currentToken")
+            .header("Accept", "text/event-stream") // Crucial for SSE
+            .header("Cache-Control", "no-cache")   // Crucial for SSE
+            .post(requestBody)
+            .build()
+
+        Log.d("ChatRepository", "Starting SSE request to: $url")
+
+        val eventSourceListener = object : EventSourceListener() {
+            override fun onOpen(eventSource: EventSource, response: OkHttpResponse) {
+                Log.d("ChatRepositorySSE", "SSE Connection opened. Response: ${response.code}")
+                if (!response.isSuccessful) {
+                    // Handle non-2xx responses that might occur before stream starts
+                    val errorBody = response.body?.string() ?: "Unknown server error"
+                    Log.e("ChatRepositorySSE", "SSE Connection opened with error: ${response.code} - $errorBody")
+                    trySend(ChatStreamEvent.StreamError("Server error on connection: ${response.code}", errorBody))
+                    close(IOException("Server returned error code ${response.code} on SSE open"))
+                }
+            }
+
+            override fun onEvent(eventSource: EventSource, id: String?, type: String?, data: String) {
+                Log.d("ChatRepositorySSE", "SSE Event: type=$type, data=$data")
+                try {
+                    when (type) {
+                        "text_chunk" -> {
+                            val json = JSONObject(data)
+                            trySend(ChatStreamEvent.TextChunk(json.getString("text")))
+                        }
+                        "input_ids_chunk" -> {
+                            val json = JSONObject(data)
+                            val sentenceText = json.getString("sentence")
+                            val idsArray = json.getJSONArray("input_ids")
+                            val idsList = List(idsArray.length()) { i -> idsArray.getInt(i) }
+                            trySend(ChatStreamEvent.InputIdsChunk(sentenceText, idsList))
+                        }
+                        "preprocess_warning" -> {
+                            val json = JSONObject(data)
+                            trySend(ChatStreamEvent.PreprocessWarning(json.getString("message"), json.optString("sentenceText")))
+                        }
+                        "preprocess_error" -> {
+                            val json = JSONObject(data)
+                            trySend(ChatStreamEvent.PreprocessError(json.getString("message"), json.optString("sentenceText")))
+                        }
+                        "stream_end" -> {
+                            val json = JSONObject(data)
+                            trySend(ChatStreamEvent.StreamEnd(json.optString("chatId"), json.optString("message")))
+                            close() // Normal stream completion, close the flow
+                        }
+                        "error" -> { // Backend explicitly sends an error event within the stream
+                            val json = JSONObject(data)
+                            trySend(ChatStreamEvent.StreamError(json.getString("message"), json.optString("details")))
+                            close(IOException("Server sent error event: ${json.getString("message")}")) // Close flow on server-sent error
+                        }
+                        null -> { // This can happen for comment lines or empty keep-alive pings
+                            Log.d("ChatRepositorySSE", "Received event with null type (likely keep-alive or comment)")
+                        }
+                        else -> {
+                            Log.w("ChatRepositorySSE", "Unknown SSE event type: $type")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e("ChatRepositorySSE", "Error parsing SSE data: $data for type: $type", e)
+                    // Don't close the stream for a single bad event, but report it
+                    trySend(ChatStreamEvent.StreamError("Client parsing error for an event.", e.message))
+                }
+            }
+
+            override fun onClosed(eventSource: EventSource) {
+                Log.d("ChatRepositorySSE", "SSE Connection explicitly closed by server")
+                close() // Close the flow
+            }
+
+            override fun onFailure(eventSource: EventSource, t: Throwable?, response: OkHttpResponse?) {
+                val errorMsg = t?.message ?: "Unknown SSE failure"
+                Log.e("ChatRepositorySSE", "SSE Connection failure: $errorMsg. Response code: ${response?.code}", t)
+                trySend(ChatStreamEvent.StreamError("Connection failure: $errorMsg", response?.message))
+                close(t ?: IOException("Unknown SSE failure")) // Close the flow with the error
+            }
+        }
+
+        // Use the OkHttpClient instance passed to the repository
+        // Ensure EventSourceFactory is configured with appropriate read timeouts for SSE
+        val eventSourceFactory = EventSources.createFactory(okHttpClient)
+        val eventSource = eventSourceFactory.newEventSource(request = request, listener = eventSourceListener)
+
+        // Ensure the EventSource is cancelled when the flow is cancelled/collector stops
+        awaitClose {
+            Log.d("ChatRepositorySSE", "SSE Flow closing/collector stopped, cancelling EventSource.")
+            eventSource.cancel()
+        }
+    }
+
+    // --- Helper for standard API calls (SafeApiCall) ---
+    // Keep your existing safeApiCall implementation or use one like this:
+    private suspend fun <T : Any> safeApiCall(call: suspend () -> retrofit2.Response<T>): Result<T> {
+        return try {
+            val response = call.invoke()
+            if (response.isSuccessful) {
+                response.body()?.let {
+                    Result.Success(it)
+                } ?: Result.Error("Response body is null", response.code())
+            } else {
+                val errorBody = response.errorBody()?.string() ?: "Unknown error"
+                Log.e("SafeApiCall", "API Error: ${response.code()} - $errorBody")
+                // Try to parse a structured error if your backend sends one
+                try {
+                    val errorResponse = gson.fromJson(errorBody, com.typosbro.multilevel.data.remote.models.ErrorResponse::class.java)
+                    Result.Error(errorResponse.message, response.code())
+                } catch (e: Exception) {
+                    Result.Error(errorBody, response.code())
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("SafeApiCall", "Network/Conversion Error: ${e.message}", e)
+            Result.Error(e.message ?: "Network error", null)
+        }
+    }
+
+    companion object {
+        // Define common MediaType (consider moving to a constants file)
+        private val MEDIA_TYPE_JSON = "application/json; charset=utf-8".toMediaTypeOrNull()
     }
 }
+
