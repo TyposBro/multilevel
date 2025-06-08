@@ -29,6 +29,8 @@ import com.typosbro.multilevel.ui.component.RecognitionControls
 // import com.typosbro.multilevel.ui.component.TimerModal
 import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.ChatDetailViewModel
+import com.typosbro.multilevel.util.AudioPlayer.createAudio
+import com.typosbro.multilevel.util.AudioPlayer.playAudio
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -188,40 +190,3 @@ fun ChatDetailScreen(
     }
 }
 
-private fun generateAudio(
-    session: OrtSession,
-    style: String,
-    speed: Float,
-    context: Context,
-    scope: CoroutineScope,
-    shouldSave: Boolean,
-    onComplete: () -> Unit
-) {
-    scope.launch(Dispatchers.IO) {
-        try {
-            val (audioData, sampleRate) = createAudio(
-                voice = style, speed = speed, context = context,
-                session = session
-            )
-
-            playAudio(
-                audioData, scope,
-                onComplete = onComplete
-            )
-
-            if (shouldSave) {
-                saveAudio(audioData, context)
-            }
-
-        } catch (e: Exception) {
-            Log.e("Kokoro", "Error: ${e.message}")
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        } finally {
-            withContext(Dispatchers.Main) {
-                onComplete()
-            }
-        }
-    }
-}

@@ -8,7 +8,7 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.OrtSession.SessionOptions
 import android.content.Context
 import android.util.Log
-import com.typosbro.multilevel.features.inference.R // Ensure this is your correct R file import
+import com.typosbro.multilevel.R // Ensure this is your correct R file import
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException

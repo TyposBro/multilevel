@@ -17,17 +17,21 @@ import org.vosk.Model
 import org.vosk.android.RecognitionListener
 import org.vosk.android.StorageService
 import com.typosbro.multilevel.data.repositories.Result
+import com.typosbro.multilevel.features.inference.OnnxRuntimeManager
 import com.typosbro.multilevel.ui.component.ChatMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import com.typosbro.multilevel.util.AudioPlayer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 class ChatDetailViewModel(
     application: Application,
     savedStateHandle: SavedStateHandle,
     private val chatRepository: ChatRepository
 ) : AndroidViewModel(application) {
+    private val context = getApplication<Application>().applicationContext
 
     val chatId: String = savedStateHandle["chatId"] ?: error("Chat ID not found in navigation args")
 
@@ -52,6 +56,9 @@ class ChatDetailViewModel(
         Log.d("ChatDetailViewModel", "Initializing for chatId: $chatId")
         loadChatHistory()
         initVoskModel()
+        viewModelScope.launch {
+            OnnxRuntimeManager.initialize(context)
+        }
     }
 
     // --- Vosk Methods ---
@@ -76,6 +83,9 @@ class ChatDetailViewModel(
             )
         }
     }
+
+
+    fun getSession() = OnnxRuntimeManager.getSession()
 
     fun startMicRecognition() {
         if (!uiState.value.isModelReady || voskManager == null) {
@@ -335,7 +345,6 @@ class ChatDetailViewModel(
         }
     }
 
-    // --- MODIFIED: sendMessageToBackend ---
     private fun sendMessageToBackend(prompt: String) {
         Log.d("ChatDetailViewModel", "Sending message to backend: '$prompt'")
         if (uiState.value.isLoading) {
@@ -343,54 +352,88 @@ class ChatDetailViewModel(
             return
         }
 
-        _uiState.update { it.copy(isLoading = true) }
+        _uiState.update { it.copy(isLoading = true, error = null) } // Set loading, clear previous error
 
         viewModelScope.launch {
-            // Use standard Result wrapper now
             when (val result = chatRepository.sendMessage(chatId, prompt)) {
                 is Result.Success -> {
-                    val responseData = result.data // This is SendMessageApiResponse
-                    Log.d("ChatDetailViewModel", "Received response from backend. TTS Error: ${responseData.ttsError}")
+                    val responseData = result.data // This is the new SendMessageApiResponse
+                    Log.d("ChatDetailViewModel", "Received response from backend. Message: '${responseData.message}', Preprocessed available: ${responseData.preprocessed != null}")
 
-                    // --- Play Audio if available ---
-                    responseData.audioContent?.let { base64Audio ->
-                        if (base64Audio.isNotEmpty()) {
-                            Log.d("ChatDetailViewModel", "Attempting to play Base64 audio.")
-                            AudioPlayer.playAudioFromBase64(getApplication(), base64Audio) {
-                                Log.d("ChatDetailViewModel", "Audio playback finished.")
-                            }
-                        } else {
-                            Log.w("ChatDetailViewModel", "Received empty audioContent string.")
-                        }
-                    } ?: run {
-                        // Audio content was null
-                        Log.w("ChatDetailViewModel", "No audio content received. TTS Error: ${responseData.ttsError}")
-                        // Optionally show the TTS error to the user if it exists
-                        if (responseData.ttsError != null) {
-                            _uiState.update { it.copy(error = "TTS failed: ${responseData.ttsError}") }
-                        }
-                    }
-
-                    // --- Add/Confirm Text Message ---
-                    // The text (`responseData.message`) is always present in a successful response.
-                    // Add it to the list if it's not already there from optimistic update.
+                    // 1. Add Bot's Text Message to UI
                     val modelMessage = ChatMessage(responseData.message, false)
                     if (_uiState.value.messageList.none { it.text == responseData.message && !it.isUser }) {
-                        Log.d("ChatDetailViewModel", "Adding model text message to UI.")
                         _uiState.value.messageList.add(0, modelMessage)
+                        Log.d("ChatDetailViewModel", "Added model text message to UI.")
                     } else {
-                        Log.d("ChatDetailViewModel", "Model text message already present optimistically.")
+                        Log.d("ChatDetailViewModel", "Model text message already present optimistically or from previous attempt.")
                     }
 
-                    // Clear loading state AFTER processing response
+                    // 2. Perform Client-Side TTS if input_ids are available
+                    val inputIdsList = responseData.preprocessed?.input_ids?.firstOrNull()
+                    if (inputIdsList != null && inputIdsList.isNotEmpty()) {
+                        Log.d("ChatDetailViewModel", "Attempting TTS with ${inputIdsList.size} input_ids.")
+                        // Launch TTS generation and playback in a background thread
+                        viewModelScope.launch(Dispatchers.IO) {
+                            try {
+                                val inputIdsLongArray = inputIdsList.map { it.toLong() }.toLongArray()
+                                val session = getSession() // Get initialized session
+                                val context = getApplication<Application>().applicationContext
+
+                                // TODO: Make voiceStyle and speed configurable (e.g., via UI settings)
+                                val voiceStyle = "bf_emma" // Ensure "bf_emma.raw" exists in res/raw
+                                val speed = 1.0f
+
+                                Log.d("ChatDetailViewModel", "Calling AudioPlayer.createAudio with ${inputIdsLongArray.size} tokens, voice: $voiceStyle, speed: $speed")
+                                val (audioFloatArray, sampleRate) = AudioPlayer.createAudio(
+                                    tokens = inputIdsLongArray,
+                                    voice = voiceStyle,
+                                    speed = speed,
+                                    session = session,
+                                    context = context
+                                )
+                                Log.d("ChatDetailViewModel", "TTS inference complete. Audio float array size: ${audioFloatArray.size}, Sample rate: $sampleRate")
+
+                                val audioWavByteArray = AudioPlayer.convertFloatArrayToWavByteArray(audioFloatArray, sampleRate)
+                                Log.d("ChatDetailViewModel", "WAV byte array created, size: ${audioWavByteArray.size}")
+
+                                // Play the generated audio on the Main thread
+                                withContext(Dispatchers.Main) {
+                                    AudioPlayer.playAudio(context, audioWavByteArray) {
+                                        Log.d("ChatDetailViewModel", "TTS Audio playback finished.")
+                                        // Playback completion logic if any
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Log.e("ChatDetailViewModel", "Error during TTS generation or playback", e)
+                                withContext(Dispatchers.Main) {
+                                    // Update UI with TTS specific error
+                                    _uiState.update { it.copy(error = "TTS Error: ${e.message}") }
+                                }
+                            } finally {
+                                // Regardless of TTS success/failure, the main API call was successful.
+                                // isLoading should be managed carefully. If TTS is long,
+                                // you might want a separate "isSpeaking" state.
+                                // For now, let's assume isLoading is for the network + initial processing.
+                                // The TTS happens async.
+                            }
+                        }
+                    } else {
+                        Log.w("ChatDetailViewModel", "No input_ids found or list is empty. Skipping client-side TTS.")
+                        if (responseData.ttsError != null && responseData.ttsError.isNotEmpty()) {
+                            // If backend provided a TTS error (e.g., couldn't generate input_ids)
+                            _uiState.update { it.copy(error = "TTS unavailable: ${responseData.ttsError}") }
+                        } else if (responseData.preprocessed?.input_ids == null) {
+                            _uiState.update { it.copy(error = "TTS data not available for this message.") }
+                        }
+                    }
+                    // Set isLoading to false after handling the primary response. TTS is async.
                     _uiState.update { it.copy(isLoading = false) }
-                    // Clear specific TTS error shown above if needed after a delay, or let next error override
+
                 }
                 is Result.Error -> {
-                    // Handle API call error (network, server error 5xx, etc.)
                     Log.e("ChatDetailViewModel", "API Error sending message: ${result.message}")
                     _uiState.update { it.copy(isLoading = false, error = "API Error: ${result.message}") }
-                    // Consider reverting optimistic user message add here
                 }
             }
         }
@@ -398,6 +441,7 @@ class ChatDetailViewModel(
 
     fun clearError() { _uiState.update { it.copy(error = null) } }
 }
+
 
 
 // --- UI State Data Class (Keep as is) ---

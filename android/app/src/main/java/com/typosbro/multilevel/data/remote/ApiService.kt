@@ -1,17 +1,26 @@
 package com.typosbro.multilevel.data.remote
 
 import com.typosbro.multilevel.data.remote.models.*
-import okhttp3.ResponseBody
-import retrofit2.Response // Use Retrofit Response for better error handling
+import retrofit2.Response
 import retrofit2.http.*
 
+// Define Preprocessed data structure based on your API response
+data class PreprocessedData(
+    val phonemes: String?,
+    val input_ids: List<List<Int>>?, // This is what we need for TTS
+    val graphemes: String?,
+    val lang_code_used: String?,
+    val config_key_used: String?
+)
 
-// Define the new Response Data Class
+// Update SendMessageApiResponse
 data class SendMessageApiResponse(
-    val message: String,
+    val message: String, // The text message from the bot
     val chatId: String,
-    val audioContent: String?, // Nullable Base64 audio string
-    val ttsError: String?     // Nullable TTS error
+    @Deprecated("audioContent is deprecated. TTS is now handled client-side using preprocessed.input_ids.")
+    val audioContent: String?, // Keep for backend compatibility if it's still sent, but mark as deprecated
+    val ttsError: String?,     // Backend might still send this if it had an issue *preparing* data
+    val preprocessed: PreprocessedData? // New field containing input_ids
 )
 
 interface ApiService {
@@ -24,28 +33,28 @@ interface ApiService {
     suspend fun login(@Body request: AuthRequest): Response<AuthResponse>
 
     // --- Chat Management ---
-    @POST("chat") // Create new chat
-    suspend fun createChat(@Body request: CreateChatRequest? = null): Response<CreateChatResponse> // Optional body
+    @POST("chat")
+    suspend fun createChat(@Body request: CreateChatRequest? = null): Response<CreateChatResponse>
 
-    @GET("chat") // List user's chats
+    @GET("chat")
     suspend fun listChats(): Response<ChatListResponse>
 
-    @DELETE("chat/{chatId}") // Delete a chat
+    @DELETE("chat/{chatId}")
     suspend fun deleteChat(@Path("chatId") chatId: String): Response<DeleteChatResponse>
 
-    @PUT("chat/{chatId}/title") // Update chat title
+    @PUT("chat/{chatId}/title")
     suspend fun updateChatTitle(
         @Path("chatId") chatId: String,
         @Body request: UpdateTitleRequest
     ): Response<UpdateTitleResponse>
 
     // --- Chat Interaction ---
-    @GET("chat/{chatId}/history") // Get history for a specific chat
+    @GET("chat/{chatId}/history")
     suspend fun getChatHistory(@Path("chatId") chatId: String): Response<ChatHistoryResponse>
 
     @POST("chat/{chatId}/message")
     suspend fun sendMessage(
         @Path("chatId") chatId: String,
-        @Body request: SendMessageRequest
-    ): Response<SendMessageApiResponse>
+        @Body request: SendMessageRequest // SendMessageRequest contains { "prompt": "..." }
+    ): Response<SendMessageApiResponse> // Ensure this uses the updated SendMessageApiResponse
 }

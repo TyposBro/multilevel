@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
 
     // Replace with your actual backend URL
-    private const val BASE_URL = "http://10.0.2.2:3000/api/" // 10.0.2.2 for Android Emulator accessing localhost
+    private const val BASE_URL = "http://192.168.25.19:3000/api/" // 10.0.2.2 for Android Emulator accessing localhost
 
     fun create(context: Context): ApiService {
         val tokenManager = TokenManager(context.applicationContext) // Use application context
