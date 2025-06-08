@@ -1,13 +1,19 @@
 package com.typosbro.multilevel.utils // Or a suitable package
 
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtSession
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
+import com.typosbro.multilevel.features.inference.StyleLoader
+import com.typosbro.multilevel.features.inference.Tokenizer
 import java.io.File
 import java.io.FileOutputStream
+
 
 object AudioPlayer {
 
@@ -102,4 +108,49 @@ object AudioPlayer {
     fun release() {
         stopPlayback()
     }
+
+
+    fun createAudio(
+        tokens: LongArray,
+        voice: String,
+        speed: Float,
+        session: OrtSession,
+        context: Context,
+    ): Pair<FloatArray, Int> {
+        val MAX_PHONEME_LENGTH = 400
+        val SAMPLE_RATE = 22050
+
+        if (tokens.size > MAX_PHONEME_LENGTH) {
+            throw IllegalArgumentException("Context length is $MAX_PHONEME_LENGTH, but leave room for the pad token 0 at the start & end")
+        }
+
+        val styleLoader = StyleLoader(context)
+        val styleIndex = tokens.size
+        val styleArray = styleLoader.getStyleArray(name = voice, index = styleIndex)
+
+        val tokenTensor = OnnxTensor.createTensor(
+            OrtEnvironment.getEnvironment(),
+            arrayOf(tokens)
+        )
+        val styleTensor = OnnxTensor.createTensor(
+            OrtEnvironment.getEnvironment(),
+            styleArray
+        )
+        val speedTensor = OnnxTensor.createTensor(
+            OrtEnvironment.getEnvironment(),
+            floatArrayOf(speed)
+        )
+
+        val inputs = mapOf(
+            "input_ids" to tokenTensor,
+            "style" to styleTensor,
+            "speed" to speedTensor
+        )
+        val results = session.run(inputs)
+        val audioTensor = (results[0].value as Array<FloatArray>)[0]
+        results.close()
+
+        return Pair(audioTensor, SAMPLE_RATE)
+    }
+
 }

@@ -49,6 +49,8 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+    implementation(libs.material)
+
 
     // Material Icons Extended
     implementation(libs.androidx.material.icons.core)
@@ -68,6 +70,8 @@ dependencies {
     // ViewModel
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+
 
     // Networking (Retrofit & OkHttp)
     implementation(libs.retrofit)
@@ -86,4 +90,16 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
+
+
+
+    // Android Gradle Plugins
+    implementation(libs.onnxruntime.android)
+    implementation(libs.npy)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.ipa.transcribers)
+
+
+
 }
