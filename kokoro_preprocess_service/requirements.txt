@@ -1,0 +1,11 @@
+huggingface_hub
+loguru
+misaki[en]>=0.9.4
+numpy
+torch
+transformers
+fastapi
+pydantic
+uvicorn[standard]
+click
+typing_extensions

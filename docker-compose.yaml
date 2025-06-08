@@ -13,34 +13,34 @@ services:
     environment:
       PORT: "3000"
       # KOKORO_TTS_BASE_URL points to the FastKoko TTS service
-      KOKORO_TTS_BASE_URL: "http://tts_service:8880/v1"
+      # KOKORO_TTS_BASE_URL: "http://tts_service:8880/v1"
       # Add a new environment variable if your Express app needs to call our new preprocessing service
       KOKORO_PREPROCESS_URL: "http://kokoro_preprocessor:8000/preprocess" # Service name 'kokoro_preprocessor', port 8000
     depends_on:
-      - tts_service # Existing dependency
+      # - tts_service # Existing dependency
       - kokoro_preprocessor # New dependency: wait for our preprocessing service
     networks:
       - app_network
 
-  tts_service: # This is the FastKoko TTS service (as in your original file)
-    # image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
-    container_name: fastkoko_tts_service
-    ports:
-      - "8880:8880" # Host:Container
-    networks:
-      - app_network
-    restart: unless-stopped
-    # volumes:
-    #   - ./fastkoko_models:/app/api/src/models
-    #   - ./fastkoko_voicepacks:/app/api/src/data/voice_exports
+  # tts_service: # This is the FastKoko TTS service
+  # image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
+  # deploy:
+  #   resources:
+  #     reservations:
+  #       devices:
+  #         - driver: nvidia
+  #           count: all
+  #           capabilities: [gpu]
+  # image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+  # container_name: fastkoko_tts_service
+  # ports:
+  #   - "8880:8880" # Host:Container
+  # networks:
+  #   - app_network
+  # restart: unless-stopped
+  # volumes:
+  #   - ./fastkoko_models:/app/api/src/models
+  #   - ./fastkoko_voicepacks:/app/api/src/data/voice_exports
 
   kokoro_preprocessor: # Our new Python FastAPI service for preprocessing
     build:

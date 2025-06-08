@@ -15,23 +15,9 @@ RUN apt-get update && \
 # Set the working directory in the container
 WORKDIR /app
 
-# --- Dependency Management with uv and uv.lock ---
-
-# Install uv using its standard script.
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Verify uv is installed and accessible (optional, but good for debugging)
-RUN uv --version
-
-# Copy your dependency definition files
-COPY pyproject.toml uv.lock ./
-
-# CORRECTED COMMAND: Use 'uv pip sync' with the '--system' flag.
-# This explicitly tells uv to install packages into the container's global
-# Python environment, which is standard practice for Docker.
-RUN uv pip sync pyproject.toml --system
-
-# --- End Dependency Management ---
+# Copy the requirements file and install Python dependencies
+COPY requirements.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the FastAPI application and your kokoro module
 # This will include the app/kokoro/configs directory
