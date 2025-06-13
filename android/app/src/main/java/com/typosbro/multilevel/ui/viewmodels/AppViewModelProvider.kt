@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.typosbro.multilevel.data.local.TokenManager
+import com.typosbro.multilevel.data.local.WordDatabase
 import com.typosbro.multilevel.data.remote.RetrofitClient // Keep this
 import com.typosbro.multilevel.data.repositories.AuthRepository
 import com.typosbro.multilevel.data.repositories.ChatRepository
@@ -44,16 +45,25 @@ object AppViewModelProvider {
                     }
                 )
             }
-
+            val wordDao by lazy { WordDatabase.getDatabase(application).wordDao() }
+            val authViewModelInstance by lazy { AuthViewModel(authRepository, tokenManager) }
 
             return when {
                 modelClass.isAssignableFrom(AuthViewModel::class.java) ->
-                    AuthViewModel(authRepository, tokenManager) as T
+                    authViewModelInstance as T // Return the shared instance
                 modelClass.isAssignableFrom(ChatListViewModel::class.java) ->
                     ChatListViewModel(chatRepository) as T
                 modelClass.isAssignableFrom(ChatDetailViewModel::class.java) ->
                     ChatDetailViewModel(application, savedStateHandle, chatRepository) as T
+                modelClass.isAssignableFrom(ExamViewModel::class.java) ->
+                    ExamViewModel(application, chatRepository) as T
+                modelClass.isAssignableFrom(WordBankViewModel::class.java) ->
+                    WordBankViewModel(wordDao) as T
+                modelClass.isAssignableFrom(ProfileViewModel::class.java) ->
+                    ProfileViewModel(tokenManager, authViewModelInstance) as T
 
+                modelClass.isAssignableFrom(ProgressViewModel::class.java) ->
+                    ProgressViewModel(chatRepository) as T
                 // Add other ViewModels here
                 else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
             }

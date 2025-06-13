@@ -1,5 +1,6 @@
 package com.typosbro.multilevel.data.remote
 
+import ExamHistorySummaryResponse
 import com.typosbro.multilevel.data.remote.models.*
 import retrofit2.Response
 import retrofit2.http.*
@@ -31,6 +32,23 @@ interface ApiService {
 
     @POST("auth/login")
     suspend fun login(@Body request: AuthRequest): Response<AuthResponse>
+
+    @POST("exam/start")
+    suspend fun startExam(): ExamStepResponse
+
+    @POST("exam/step")
+    suspend fun postExamStep(@Body request: ExamStepRequest): ExamStepResponse
+
+    @POST("exam/analyze")
+    suspend fun analyzeExam(@Body request: AnalyzeExamRequest): AnalyzeExamResponse
+
+    @GET("exam/result/{resultId}")
+    suspend fun getExamResult(@Path("resultId") resultId: String): ExamResultResponse
+
+    @GET("exam/history")
+    suspend fun getExamHistory(): ExamHistorySummaryResponse
+
+
 
     // --- Chat Management ---
     @POST("chat")

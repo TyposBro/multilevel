@@ -1,15 +1,23 @@
 package com.typosbro.multilevel.data.repositories
 
+import ExamHistorySummaryResponse
+import ExamResultSummary
 import android.util.Log
 import com.google.gson.Gson
 import com.typosbro.multilevel.data.remote.ApiService
 import com.typosbro.multilevel.data.remote.RetrofitClient // For BASE_URL_FOR_SSE
+import com.typosbro.multilevel.data.remote.models.AnalyzeExamRequest
+import com.typosbro.multilevel.data.remote.models.AnalyzeExamResponse
 import com.typosbro.multilevel.data.remote.models.ChatHistoryResponse
 import com.typosbro.multilevel.data.remote.models.ChatListResponse
 import com.typosbro.multilevel.data.remote.models.CreateChatRequest
 import com.typosbro.multilevel.data.remote.models.CreateChatResponse
 import com.typosbro.multilevel.data.remote.models.DeleteChatResponse
+import com.typosbro.multilevel.data.remote.models.ExamResultResponse
+import com.typosbro.multilevel.data.remote.models.ExamStepRequest
+import com.typosbro.multilevel.data.remote.models.ExamStepResponse
 import com.typosbro.multilevel.data.remote.models.SendMessageRequest // Ensure this is updated if sending lang_code/config_key
+import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import com.typosbro.multilevel.data.remote.models.UpdateTitleRequest
 import com.typosbro.multilevel.data.remote.models.UpdateTitleResponse
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +74,42 @@ class ChatRepository(
     suspend fun getChatHistory(chatId: String): Result<ChatHistoryResponse> = withContext(Dispatchers.IO) {
         safeApiCall { apiService.getChatHistory(chatId) }
     }
+    // --- NEW METHOD TO FIX THE ERROR ---
+    suspend fun getExamHistorySummary(): Result<ExamHistorySummaryResponse> {
+        return try {
+            // In a real app, you would uncomment this line:
+            // val response = apiService.getExamHistory()
+            // Result.Success(response)
 
+            // For now, return mock data so the UI can be built and tested.
+            // This is the same mock data from the ProgressViewModel, but it belongs here.
+            val mockHistory = listOf(
+                ExamResultSummary("id_1", System.currentTimeMillis() - 86400000L * 5, 6.0),
+                ExamResultSummary("id_2", System.currentTimeMillis() - 86400000L * 3, 6.5),
+                ExamResultSummary("id_3", System.currentTimeMillis() - 86400000L * 1, 6.5),
+            )
+            val mockResponse = ExamHistorySummaryResponse(history = mockHistory)
+            Result.Success(mockResponse)
+
+        } catch (e: Exception) {
+            Result.Error("Failed to fetch exam history: ${e.message}")
+        }
+    }
+
+    // --- METHOD FOR THE RESULT DETAIL SCREEN ---
+    suspend fun getExamResultDetails(resultId: String): Result<ExamResultResponse> {
+        return try {
+            // In a real app, you would uncomment this line:
+            // val response = apiService.getExamResult(resultId)
+            // Result.Success(response)
+
+            // For now, return mock data.
+            Result.Error("Result details not implemented yet.")
+
+        } catch (e: Exception) {
+            Result.Error("Failed to fetch result details for ID $resultId: ${e.message}")
+        }
+    }
     // --- Streaming message method ---
 
     fun sendMessageAndStream(
@@ -210,6 +253,37 @@ class ChatRepository(
         } catch (e: Exception) {
             Log.e("SafeApiCall", "Network/Conversion Error: ${e.message}", e)
             Result.Error(e.message ?: "Network error", null)
+        }
+    }
+
+    suspend fun getInitialExamQuestion(): Result<ExamStepResponse> {
+        return try {
+            // NOTE: You need to create a new endpoint, e.g., POST /api/exam/start
+            val response = apiService.startExam() // Assuming you create this in ApiService
+            Result.Success(response)
+        } catch (e: Exception) {
+            Result.Error("Failed to start exam: ${e.message}")
+        }
+    }
+
+    suspend fun getNextExamStep(request: ExamStepRequest): Result<ExamStepResponse> {
+        return try {
+            // NOTE: You need to create a new endpoint, e.g., POST /api/exam/step
+            val response = apiService.postExamStep(request) // Assuming you create this in ApiService
+            Result.Success(response)
+        } catch (e: Exception) {
+            Result.Error("Failed to get next exam step: ${e.message}")
+        }
+    }
+
+    suspend fun analyzeFullExam(transcript: List<TranscriptEntry>): Result<AnalyzeExamResponse> {
+        return try {
+            val request = AnalyzeExamRequest(transcript = transcript)
+            // NOTE: You need to create a new endpoint, e.g., POST /api/exam/analyze
+            val response = apiService.analyzeExam(request)
+            Result.Success(response)
+        } catch (e: Exception) {
+            Result.Error("Failed to analyze exam: ${e.message}")
         }
     }
 

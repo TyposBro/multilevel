@@ -9,7 +9,10 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.util.Base64 // Keep for playAudioFromBase64 if still used elsewhere
 import android.util.Log
+import com.typosbro.multilevel.features.inference.OnnxRuntimeManager
 import com.typosbro.multilevel.features.inference.StyleLoader
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
@@ -18,6 +21,20 @@ import java.nio.ByteOrder
 object AudioPlayer {
 
     private var mediaPlayer: MediaPlayer? = null
+
+    suspend fun createAudioAndConvertToWav(inputIds: List<Long>, context: Context): ByteArray {
+        return withContext(Dispatchers.IO) { // Perform heavy work on the IO thread
+            val session = OnnxRuntimeManager.getSession()
+            val (audioFloatArray, sampleRate) = createAudio(
+                tokens = inputIds.toLongArray(),
+                voice = "bf_emma", // or from a config
+                speed = 1.0f,
+                session = session,
+                context = context
+            )
+            convertFloatArrayToWavByteArray(audioFloatArray, sampleRate)
+        }
+    }
 
     // Function to convert FloatArray from model to WAV ByteArray
     fun convertFloatArrayToWavByteArray(audioData: FloatArray, sampleRate: Int): ByteArray {
