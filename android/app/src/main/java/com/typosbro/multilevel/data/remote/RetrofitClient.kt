@@ -13,8 +13,8 @@ import java.util.concurrent.TimeUnit
 object RetrofitClient {
 
     // Replace with your actual backend URL
-//    const val BASE_URL = "http://192.168.25.19:3000/api/" // for Physical device accessing by local network IP
-    const val BASE_URL = "http://10.0.2.2:3000/api/" // for Android Emulator accessing localhost
+    const val BASE_URL = "http://192.168.25.19:3000/api/" // for Physical device accessing by local network IP
+//    const val BASE_URL = "http://10.0.2.2:3000/api/" // for Android Emulator accessing localhost
 
 
     fun getOkHttpClient(context: Context): OkHttpClient {
