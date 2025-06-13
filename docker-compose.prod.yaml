@@ -1,6 +1,6 @@
 services:
   api:
-    image: yourusername/myproject-api:latest # PULL from Docker Hub
+    image: typosbro/myproject-api:latest # PULL from Docker Hub
     container_name: backend_api
     ports:
       - "3000:3000" # Host:Container
@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   kokoro_preprocessor:
-    image: yourusername/myproject-kokoro-preprocessor:latest # PULL from Docker Hub
+    image: typosbro/myproject-kokoro-preprocessor:latest # PULL from Docker Hub
     container_name: kokoro_preprocess_api_service
     # Expose port to host for direct testing
     ports:
