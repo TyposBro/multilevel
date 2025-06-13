@@ -1,29 +1,9 @@
-// controllers/examController.js
+// {PATH_TO_PROJECT}/api/controllers/examController.js
+
 const ExamResult = require("../models/ExamResult");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-require("dotenv").config();
-
-// --- Gemini Setup ---
-if (!process.env.GEMINI_API_KEY) {
-  throw new Error("FATAL ERROR: GEMINI_API_KEY is not set.");
-}
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-// Helper to safely parse JSON from LLM response
-const safeJsonParse = (text) => {
-  try {
-    // LLMs sometimes wrap JSON in ```json ... ```, so we extract it.
-    const match = text.match(/```json\n([\s\S]*?)\n```/);
-    if (match && match[1]) {
-      return JSON.parse(match[1]);
-    }
-    return JSON.parse(text); // Try parsing directly
-  } catch (e) {
-    console.error("Failed to parse JSON from LLM:", text, e);
-    return null;
-  }
-};
+const { generateText, generateTextStream, safeJsonParse } = require("../utils/gemini.js");
+const { getKokoroInputIds } = require("../utils/kokoro.js");
+const { sendSseChunk, sentenceTerminators } = require("../utils/sse");
 
 /**
  * @desc    Start a new mock exam
@@ -32,15 +12,16 @@ const safeJsonParse = (text) => {
  */
 const startExam = async (req, res) => {
   try {
-    const prompt = `You are an IELTS examiner. Begin a new speaking test. Your first two lines should be to state your name and ask for the user's name. Respond ONLY with a valid JSON object with the structure: {"examiner_line": "Your full response here", "next_part": 1, "cue_card": null, "is_final_question": false, "input_ids": []}`;
+    const prompt = `You are an IELTS examiner. Begin a new speaking test. Your first line should be to state your name and ask for the user's name. Respond ONLY with a valid JSON object with the structure: {"examiner_line": "Your full response here", "next_part": 1, "cue_card": null, "is_final_question": false}`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = await result.response.text();
+    const responseText = await generateText(prompt);
     const data = safeJsonParse(responseText);
 
-    if (!data) {
+    if (!data || !data.examiner_line) {
       return res.status(500).json({ message: "AI failed to generate a valid starting question." });
     }
+
+    data.input_ids = await getKokoroInputIds(data.examiner_line);
     res.status(200).json(data);
   } catch (error) {
     console.error("Error starting exam:", error);
@@ -49,41 +30,85 @@ const startExam = async (req, res) => {
 };
 
 /**
- * @desc    Handle the next step in an exam
- * @route   POST /api/exam/step
+ * @desc    Handle the next step in an exam VIA STREAMING
+ * @route   POST /api/exam/step-stream
  * @access  Private
  */
-const handleExamStep = async (req, res) => {
+const handleExamStepStream = async (req, res) => {
   const { part, userInput, transcriptContext } = req.body;
+  console.log("Received exam step request:", { part, userInput, transcriptContext });
+  // --- SSE Setup ---
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.write(": SSE connection initiated\n\n");
+
+  let fullModelResponseText = "";
+  let sentenceBuffer = "";
+  let finalExamState = {};
+
+  const processAndStreamSentence = async (textToProcess) => {
+    if (res.writableEnded || !textToProcess) return;
+    const input_ids = await getKokoroInputIds(textToProcess);
+    sendSseChunk(res, "input_ids_chunk", {
+      sentence: textToProcess,
+      input_ids: input_ids,
+    });
+  };
 
   try {
-    const prompt = `
-      You are an IELTS examiner in a mock speaking test. The full conversation so far is:
-      ---
-      ${transcriptContext}
-      ---
-      The user just said: "${userInput}". We are currently in Part ${part} of the exam. 
-      Based on the rules of IELTS, provide your next line.
+    const streamingPrompt = `You are an IELTS examiner in a mock speaking test. The user just said: "${userInput}". Based on the conversation context, provide ONLY your next spoken line as a natural, continuous stream of text. Do not add any JSON or extra formatting.`;
+    const statePrompt = `You are the logic engine for an IELTS exam. The user is in Part ${part}. The conversation is:\n---\n${transcriptContext}\nUser: ${userInput}\n---\nBased on this, determine the next state of the exam. Respond ONLY with a valid JSON object: {"next_part": <number>, "cue_card": {"topic": "...", "points": ["...", "..."]} or null, "is_final_question": <boolean>}`;
 
-      - If in Part 1, ask another introductory question. Decide if it's time to move to Part 2. If you decide to move to part 2, your examiner_line should be the standard transition line and you must provide a cue_card.
-      - If in Part 2, the user has just finished their 2-minute talk. Ask one brief follow-up question. Your next_part should be 3.
-      - If in Part 3, continue the abstract discussion based on the Part 2 topic. Decide if it is the final question of the exam and set is_final_question accordingly.
+    // Execute in parallel
+    const statePromise = generateText(statePrompt);
+    const textStreamPromise = generateTextStream(streamingPrompt);
+    const [stateResponseText, textStreamResult] = await Promise.all([
+      statePromise,
+      textStreamPromise,
+    ]);
 
-      Respond ONLY with a valid JSON object with the following structure: 
-      {"examiner_line": "Your question here", "next_part": <number>, "cue_card": {"topic": "...", "points": ["...", "..."]} or null, "is_final_question": <boolean>, "input_ids": []}
-    `;
+    finalExamState = safeJsonParse(stateResponseText);
+    if (!finalExamState) throw new Error("Failed to get valid exam state from LLM.");
 
-    const result = await model.generateContent(prompt);
-    const responseText = await result.response.text();
-    const data = safeJsonParse(responseText);
+    for await (const chunk of textStreamResult.stream) {
+      if (res.writableEnded) {
+        console.log("Client disconnected");
+        break;
+      }
+      const textChunk = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (textChunk) {
+        fullModelResponseText += textChunk;
+        sendSseChunk(res, "text_chunk", { text: textChunk });
 
-    if (!data) {
-      return res.status(500).json({ message: "AI failed to generate a valid next step." });
+        sentenceBuffer += textChunk;
+        let match;
+        while ((match = sentenceTerminators.exec(sentenceBuffer)) !== null) {
+          if (res.writableEnded) break;
+          const sentence = sentenceBuffer.substring(0, match.index + 1).trim();
+          sentenceBuffer = sentenceBuffer.substring(match.index + 1);
+          if (sentence) await processAndStreamSentence(sentence);
+        }
+      }
     }
-    res.status(200).json(data);
+
+    if (!res.writableEnded && sentenceBuffer.trim()) {
+      await processAndStreamSentence(sentenceBuffer.trim());
+    }
+
+    if (!res.writableEnded) {
+      const endData = { ...finalExamState, full_text: fullModelResponseText };
+      sendSseChunk(res, "stream_end", endData);
+    }
   } catch (error) {
-    console.error("Error handling exam step:", error);
-    res.status(500).json({ message: "Server error during exam step." });
+    console.error("Error during exam step stream:", error);
+    if (!res.writableEnded) {
+      sendSseChunk(res, "error", { message: "Stream processing error", details: error.message });
+    }
+  } finally {
+    if (!res.writableEnded) {
+      res.end();
+    }
   }
 };
 
@@ -98,28 +123,15 @@ const analyzeExam = async (req, res) => {
 
   try {
     const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
-    const prompt = `
-      You are an expert IELTS examiner. Analyze the following speaking test transcript and provide a score.
-      The user's responses are marked with 'User:'.
-      Transcript:
-      ---
-      ${formattedTranscript}
-      ---
-      Based on the four official IELTS criteria (Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, and Pronunciation - which you must infer from the text), provide a detailed analysis.
-      
-      Respond ONLY with a valid JSON object with the following structure:
-      {"overallBand": <number>, "criteria": [ { "criterionName": "Fluency & Coherence", "bandScore": <number>, "feedback": "...", "examples": [{"user_quote": "...", "suggestion": "...", "type": "Grammar"}] }, ...etc for all 4 criteria... ] }
-    `;
+    const prompt = `You are an expert IELTS examiner... Respond ONLY with a valid JSON object: {"overallBand": <number>, ...}`;
 
-    const result = await model.generateContent(prompt);
-    const responseText = await result.response.text();
+    const responseText = await generateText(prompt);
     const analysisData = safeJsonParse(responseText);
 
     if (!analysisData) {
       return res.status(500).json({ message: "AI failed to generate a valid analysis." });
     }
 
-    // Save the analysis to the database
     const newExamResult = new ExamResult({
       userId,
       transcript,
@@ -127,7 +139,6 @@ const analyzeExam = async (req, res) => {
       criteria: analysisData.criteria,
     });
     const savedResult = await newExamResult.save();
-
     res.status(201).json({ resultId: savedResult._id });
   } catch (error) {
     console.error("Error analyzing exam:", error);
@@ -184,7 +195,7 @@ const getExamResultDetails = async (req, res) => {
 
 module.exports = {
   startExam,
-  handleExamStep,
+  handleExamStepStream,
   analyzeExam,
   getExamHistory,
   getExamResultDetails,

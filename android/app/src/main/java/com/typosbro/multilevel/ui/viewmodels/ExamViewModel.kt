@@ -5,37 +5,32 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.remote.models.CueCard
-import com.typosbro.multilevel.data.remote.models.ExamStepRequest
-import com.typosbro.multilevel.data.remote.models.ExamStepResponse
-import com.typosbro.multilevel.data.remote.models.TranscriptEntry
+import com.typosbro.multilevel.data.remote.models.*
 import com.typosbro.multilevel.data.repositories.ChatRepository
 import com.typosbro.multilevel.data.repositories.Result
 import com.typosbro.multilevel.features.inference.OnnxRuntimeManager
 import com.typosbro.multilevel.features.vosk.VoskRecognitionManager
 import com.typosbro.multilevel.util.AudioPlayer
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.consumeAsFlow
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.json.JSONObject
-import org.vosk.Model // Keep this import
+import org.vosk.Model
 import org.vosk.android.RecognitionListener
 import org.vosk.android.StorageService
 import java.util.*
 
-// ExamPart and ExamUiState data classes remain the same...
+// --- Data classes remain the same ---
 enum class ExamPart { NOT_STARTED, PART_1, PART_2_PREP, PART_2_SPEAKING, PART_3, FINISHED, ANALYSIS_COMPLETE }
 
 data class ExamUiState(
     val currentPart: ExamPart = ExamPart.NOT_STARTED,
     val examinerMessage: String? = null,
-    val isExaminerSpeaking: Boolean = false,
+    val isExaminerSpeaking: Boolean = false, // True while text is streaming OR audio is playing
     val isUserListening: Boolean = false,
     val partialTranscription: String = "",
     val part2CueCard: CueCard? = null,
@@ -44,7 +39,6 @@ data class ExamUiState(
     val error: String? = null,
     val finalResultId: String? = null
 )
-
 
 class ExamViewModel(
     application: Application,
@@ -58,11 +52,17 @@ class ExamViewModel(
     private val fullTranscript = mutableListOf<TranscriptEntry>()
     private var isFinalQuestion = false
     private var timerJob: Job? = null
+    private var textStreamHasEnded = false // Flag to coordinate with audio queue
 
-    // --- VOSK & TTS State (voskModel is now declared) ---
-    private var voskModel: Model? = null // <<< FIX IS HERE
+    // --- VOSK State ---
+    private var voskModel: Model? = null
     private var voskManager: VoskRecognitionManager? = null
-    private val audioPlaybackChannel = Channel<ByteArray>(Channel.UNLIMITED)
+
+    // --- TTS & Audio Queuing System ---
+    private var accumulatedTextForStream: String = ""
+    private val ttsSynthesisRequestChannel = Channel<List<Long>>(Channel.UNLIMITED)
+    private val audioPlaybackDataChannel = Channel<ByteArray>(Channel.UNLIMITED)
+    private val audioPlaybackQueue: Queue<ByteArray> = LinkedList()
     private var isCurrentlyPlayingAudio = false
 
     init {
@@ -72,13 +72,24 @@ class ExamViewModel(
 
     // --- Public Functions (Called from UI) ----
     fun startExam() {
-        _uiState.update { it.copy(currentPart = ExamPart.PART_1) }
+        _uiState.update { it.copy(currentPart = ExamPart.PART_1, error = null) }
         fullTranscript.clear()
         isFinalQuestion = false
 
         viewModelScope.launch {
+            // The initial question is simple, non-streaming is fine here.
             when (val result = chatRepository.getInitialExamQuestion()) {
-                is Result.Success -> handleBackendResponse(result.data)
+                is Result.Success -> {
+                    val response = result.data
+                    fullTranscript.add(TranscriptEntry("Examiner", response.examinerLine))
+                    _uiState.update {
+                        it.copy(
+                            examinerMessage = response.examinerLine,
+                            isExaminerSpeaking = true // Start the speaking state
+                        )
+                    }
+                    synthesizeAndPlaySingle(response.inputIds?.map { it.toLong() })
+                }
                 is Result.Error -> _uiState.update { it.copy(error = result.message) }
             }
         }
@@ -93,80 +104,100 @@ class ExamViewModel(
     fun stopUserSpeechRecognition() {
         if (!uiState.value.isUserListening) return
         _uiState.update { it.copy(isUserListening = false) }
-        voskManager?.stopRecognition() // Listener's onResult will handle the final text
+        voskManager?.stopRecognition()
     }
 
-    // --- Private Exam Flow Logic ---
-    private fun handleBackendResponse(response: ExamStepResponse) {
-        fullTranscript.add(TranscriptEntry("Examiner", response.examinerLine))
-        isFinalQuestion = response.isFinalQuestion
-        _uiState.update {
-            it.copy(
-                examinerMessage = response.examinerLine,
-                currentPart = ExamPart.entries[response.nextPart],
-                part2CueCard = response.cueCard
-            )
-        }
-        response.inputIds?.let { synthesizeAndPlay(it.map { id -> id.toLong() }) }
-        when (_uiState.value.currentPart) {
-            ExamPart.PART_2_PREP -> startPart2PrepTimer()
-            else -> { /* Other parts wait for TTS to finish */ }
-        }
-    }
-
+    // --- Main Logic (Triggered by Vosk onResult) ---
     private fun processUserTranscription(text: String) {
         if (text.isBlank()) {
             if (!isFinalQuestion) startUserSpeechRecognition()
             return
         }
+
         fullTranscript.add(TranscriptEntry("User", text))
         if (isFinalQuestion) {
             endExamAndAnalyze()
             return
         }
-        viewModelScope.launch {
-            val request = ExamStepRequest(
-                part = uiState.value.currentPart.ordinal,
-                userInput = text,
-                transcriptContext = fullTranscript.joinToString("\n") { "${it.speaker}: ${it.text}" }
-            )
-            when (val result = chatRepository.getNextExamStep(request)) {
-                is Result.Success -> handleBackendResponse(result.data)
-                is Result.Error -> _uiState.update { it.copy(error = result.message) }
+
+        // --- THIS IS THE CORRECTED, UNIFIED STREAMING LOGIC ---
+        _uiState.update { it.copy(isExaminerSpeaking = true, examinerMessage = "...") }
+        accumulatedTextForStream = ""
+        textStreamHasEnded = false
+        audioPlaybackQueue.clear()
+        isCurrentlyPlayingAudio = false
+        AudioPlayer.stopPlayback()
+
+        val request = ExamStepRequest(
+            part = uiState.value.currentPart.ordinal,
+            userInput = text,
+            transcriptContext = fullTranscript.joinToString("\n") { "${it.speaker}: ${it.text}" }
+        )
+
+        chatRepository.getNextExamStepStream(request)
+            .onEach { event ->
+                when (event) {
+                    is ExamEvent.TextChunk -> {
+                        accumulatedTextForStream += event.text
+                        _uiState.update { it.copy(examinerMessage = accumulatedTextForStream) }
+                    }
+                    is ExamEvent.InputIdsChunk -> {
+                        if (event.ids.isNotEmpty()) {
+                            ttsSynthesisRequestChannel.send(event.ids.map { it.toLong() })
+                        }
+                    }
+                    is ExamEvent.StreamEnd -> {
+                        textStreamHasEnded = true
+                        fullTranscript.add(TranscriptEntry("Examiner", accumulatedTextForStream))
+                        _uiState.update {
+                            it.copy(
+                                currentPart = ExamPart.entries[event.endData.next_part],
+                                part2CueCard = event.endData.cue_card
+                            )
+                        }
+                        isFinalQuestion = event.endData.is_final_question
+
+                        if (audioPlaybackQueue.isEmpty() && !isCurrentlyPlayingAudio) {
+                            handleExaminerSpeechFinished()
+                        }
+                    }
+                    is ExamEvent.StreamError -> {
+                        _uiState.update { it.copy(error = event.message, isExaminerSpeaking = false) }
+                    }
+                }
             }
-        }
+            .catch { e ->
+                Log.e("ExamViewModel", "Error collecting stream", e)
+                _uiState.update { it.copy(error = e.message, isExaminerSpeaking = false) }
+            }
+            .launchIn(viewModelScope)
     }
 
+    // --- Timers & Final Analysis ---
     private fun startPart2PrepTimer() {
         countdownTimer(60) {
             _uiState.update { it.copy(currentPart = ExamPart.PART_2_SPEAKING) }
-            // Here you should ideally fetch the "start speaking" line from your backend
-            // For simplicity, we create a dummy response.
-            handleBackendResponse(
-                ExamStepResponse(
-                    examinerLine = "Your preparation time is up. Please start speaking now.",
-                    nextPart = ExamPart.PART_2_SPEAKING.ordinal,
-                    cueCard = _uiState.value.part2CueCard, // Keep showing the card
-                    isFinalQuestion = false,
-                    inputIds = listOf() // Ideally get real input_ids for this line
-                )
-            )
+            val prepTimeUpLine = "Your preparation time is up. Please start speaking now."
+            fullTranscript.add(TranscriptEntry("Examiner", prepTimeUpLine))
+            _uiState.update { it.copy(examinerMessage = prepTimeUpLine, isExaminerSpeaking = true) }
+            synthesizeAndPlaySingle(emptyList()) // We can hardcode TTS for this simple line later
             startPart2SpeakingTimer()
         }
     }
 
-    private fun startPart2SpeakingTimer() {
-        countdownTimer(120) {
-            stopUserSpeechRecognition()
-        }
-    }
+    private fun startPart2SpeakingTimer() = countdownTimer(120) { stopUserSpeechRecognition() }
 
     private fun endExamAndAnalyze() {
         _uiState.update { it.copy(currentPart = ExamPart.FINISHED) }
         viewModelScope.launch {
             when (val result = chatRepository.analyzeFullExam(fullTranscript)) {
                 is Result.Success -> {
-                    _uiState.update { it.copy(finalResultId = result.data.resultId, currentPart = ExamPart.ANALYSIS_COMPLETE) }
+                    _uiState.update {
+                        it.copy(
+                            finalResultId = result.data.resultId,
+                            currentPart = ExamPart.ANALYSIS_COMPLETE
+                        )
+                    }
                 }
                 is Result.Error -> _uiState.update { it.copy(error = result.message) }
             }
@@ -186,11 +217,12 @@ class ExamViewModel(
         }
     }
 
-    // --- VOSK & TTS/AUDIO PLAYER IMPLEMENTATION ---
+    // --- VOSK Implementation ---
     private fun initVoskModel() {
-        StorageService.unpack(getApplication(), "model-en-us", "model",
+        StorageService.unpack(
+            getApplication(), "model-en-us", "model",
             { model ->
-                voskModel = model // This now correctly assigns to the class property
+                voskModel = model
                 voskModel?.let {
                     voskManager = VoskRecognitionManager(getApplication(), it, recognitionListener)
                     _uiState.update { state -> state.copy(isModelReady = true) }
@@ -209,49 +241,90 @@ class ExamViewModel(
         override fun onResult(hypothesis: String) {
             val finalText = JSONObject(hypothesis).optString("text", "")
             _uiState.update { it.copy(isUserListening = false, partialTranscription = "") }
+            // This is the single point of entry for processing the user's speech
             processUserTranscription(finalText)
         }
 
         override fun onError(e: Exception) {
             _uiState.update { it.copy(isUserListening = false, error = "Vosk error: ${e.message}") }
         }
-        override fun onFinalResult(hypothesis: String?) { /* Not used */ }
+
+        override fun onFinalResult(hypothesis: String?) {}
         override fun onTimeout() { stopUserSpeechRecognition() }
     }
 
+    // --- TTS & Audio Player System Implementation ---
     private fun initTtsAndAudioPlayer() {
         viewModelScope.launch { OnnxRuntimeManager.initialize(getApplication()) }
+        observeTTSSynthesisRequests()
         observeAudioPlaybackRequests()
     }
 
-    private fun synthesizeAndPlay(inputIds: List<Long>) {
-        if (inputIds.isEmpty()) {
-            if (_uiState.value.currentPart != ExamPart.PART_2_PREP) {
-                startUserSpeechRecognition()
+    private fun observeTTSSynthesisRequests() {
+        viewModelScope.launch(Dispatchers.IO) {
+            ttsSynthesisRequestChannel.consumeAsFlow().collect { sentenceInputIds ->
+                try {
+                    val audioWavByteArray = AudioPlayer.createAudioAndConvertToWav(sentenceInputIds, getApplication())
+                    audioPlaybackDataChannel.send(audioWavByteArray)
+                } catch (e: Exception) { Log.e("ExamTTS_Synth", "Error during TTS synthesis", e) }
             }
-            return
-        }
-        viewModelScope.launch {
-            _uiState.update { it.copy(isExaminerSpeaking = true) }
-            // This function is defined in AudioPlayer.kt (see next section)
-            val audioBytes = AudioPlayer.createAudioAndConvertToWav(inputIds, getApplication())
-            audioPlaybackChannel.send(audioBytes)
         }
     }
 
     private fun observeAudioPlaybackRequests() {
-        viewModelScope.launch {
-            audioPlaybackChannel.consumeAsFlow().collect { audioData ->
-                isCurrentlyPlayingAudio = true
-                AudioPlayer.playAudio(getApplication(), audioData) {
+        viewModelScope.launch(Dispatchers.Main) {
+            audioPlaybackDataChannel.receiveAsFlow().collect { audioData ->
+                audioPlaybackQueue.offer(audioData)
+                playNextAudioInQueue()
+            }
+        }
+    }
+
+    private fun playNextAudioInQueue() {
+        if (isCurrentlyPlayingAudio || audioPlaybackQueue.isEmpty()) return
+
+        isCurrentlyPlayingAudio = true
+        val audioDataToPlay = audioPlaybackQueue.poll()
+
+        if (audioDataToPlay != null) {
+            AudioPlayer.playAudio(getApplication(), audioDataToPlay) {
+                viewModelScope.launch(Dispatchers.Main) {
                     isCurrentlyPlayingAudio = false
-                    _uiState.update { it.copy(isExaminerSpeaking = false) }
-                    val currentPart = _uiState.value.currentPart
-                    if (currentPart != ExamPart.PART_2_PREP && currentPart != ExamPart.FINISHED) {
-                        startUserSpeechRecognition()
+                    playNextAudioInQueue()
+
+                    if (audioPlaybackQueue.isEmpty() && textStreamHasEnded) {
+                        handleExaminerSpeechFinished()
                     }
                 }
             }
+        } else {
+            isCurrentlyPlayingAudio = false
+        }
+    }
+
+    private fun synthesizeAndPlaySingle(inputIds: List<Long>?) {
+        if (inputIds.isNullOrEmpty()) {
+            handleExaminerSpeechFinished()
+            return
+        }
+        viewModelScope.launch {
+            val audioBytes = AudioPlayer.createAudioAndConvertToWav(inputIds, getApplication())
+            AudioPlayer.playAudio(getApplication(), audioBytes) {
+                handleExaminerSpeechFinished()
+            }
+        }
+    }
+
+    private fun handleExaminerSpeechFinished() {
+        Log.d("ExamFlow", "All examiner audio has finished playing.")
+        _uiState.update { it.copy(isExaminerSpeaking = false) }
+
+        if (isFinalQuestion) {
+            endExamAndAnalyze()
+        } else if (_uiState.value.currentPart == ExamPart.PART_2_PREP) {
+            startPart2PrepTimer()
+        } else {
+            startUserSpeechRecognition()
         }
     }
 
@@ -259,6 +332,8 @@ class ExamViewModel(
         super.onCleared()
         voskManager?.stopRecognition()
         timerJob?.cancel()
+        ttsSynthesisRequestChannel.close()
+        audioPlaybackDataChannel.close()
         AudioPlayer.release()
     }
 }

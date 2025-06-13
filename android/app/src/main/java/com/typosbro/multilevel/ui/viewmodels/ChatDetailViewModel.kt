@@ -6,8 +6,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.typosbro.multilevel.data.remote.models.ChatStreamEvent
 import com.typosbro.multilevel.data.repositories.ChatRepository
-import com.typosbro.multilevel.data.repositories.ChatStreamEvent
 import com.typosbro.multilevel.features.vosk.VoskRecognitionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -364,39 +364,7 @@ class ChatDetailViewModel(
         }
     }
 
-    private fun synthesizeAndEnqueueAudio(sentenceInputIds: List<Long>) {
-        if (sentenceInputIds.isEmpty()) return
 
-        viewModelScope.launch(Dispatchers.IO) { // Synthesis on IO thread
-            Log.d("TTS_Queue", "Synthesizing audio for enqueuing: ${sentenceInputIds.size} ids.")
-            try {
-                val session = OnnxRuntimeManager.getSession()
-                val appContext = getApplication<Application>().applicationContext
-                val voiceStyle = "bf_emma"
-                val speed = 1.0f
-
-                val (audioFloatArray, sampleRate) = AudioPlayer.createAudio(
-                    tokens = sentenceInputIds.toLongArray(),
-                    voice = voiceStyle, speed = speed, session = session, context = appContext
-                )
-                val audioWavByteArray = AudioPlayer.convertFloatArrayToWavByteArray(audioFloatArray, sampleRate)
-
-                // Send to the channel to be processed by observeAudioRequests
-                audioPlaybackDataChannel.send(audioWavByteArray)
-                Log.d("TTS_Queue", "Enqueued audio data (${audioWavByteArray.size} bytes). Queue size: ${audioPlaybackQueue.size + 1}")
-
-            } catch (e: Exception) {
-                Log.e("TTS_Queue", "Error during TTS synthesis for enqueuing", e)
-                withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(error = "Sentence TTS Synthesis Error: ${e.message?.take(100)}") }
-                }
-            }
-        }
-    }
-
-
-
-    // New: Coroutine to process TTS synthesis requests sequentially
     private fun observeTTSSynthesisRequests() {
         viewModelScope.launch(Dispatchers.IO) { // This actor runs on IO
             ttsSynthesisRequestChannel.consumeAsFlow().collect { sentenceInputIds ->
@@ -407,7 +375,7 @@ class ChatDetailViewModel(
                 try {
                     val session = OnnxRuntimeManager.getSession()
                     val appContext = getApplication<Application>().applicationContext
-                    val voiceStyle = "bf_emma"
+                    val voiceStyle = "bm_george"
                     val speed = 1.0f
 
                     val (audioFloatArray, sampleRate) = AudioPlayer.createAudio(

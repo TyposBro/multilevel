@@ -18,8 +18,8 @@ data class TranscriptEntry(
  */
 data class ExamStepRequest(
     @SerializedName("part") val part: Int, // Current exam part: 1, 2, or 3
-    @SerializedName("user_input") val userInput: String?,
-    @SerializedName("transcript_context") val transcriptContext: String
+    @SerializedName("userInput") val userInput: String?,
+    @SerializedName("transcriptContext") val transcriptContext: String
 )
 
 /**

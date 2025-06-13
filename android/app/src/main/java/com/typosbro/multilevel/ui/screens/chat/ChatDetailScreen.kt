@@ -1,21 +1,39 @@
 package com.typosbro.multilevel.ui.screens.chat
 
-import ai.onnxruntime.OrtSession
+// import com.typosbro.multilevel.ui.component.TimerModal
 import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager // Correct import for PackageManager
-import android.util.Log
-import android.widget.Toast
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,16 +43,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.typosbro.multilevel.ui.component.ChatMessageBubble
 import com.typosbro.multilevel.ui.component.RecognitionControls
-// Remove TimerModal import if not used
-// import com.typosbro.multilevel.ui.component.TimerModal
 import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.ChatDetailViewModel
-import com.typosbro.multilevel.util.AudioPlayer.createAudio
-import com.typosbro.multilevel.util.AudioPlayer.playAudio
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,22 +64,26 @@ fun ChatDetailScreen(
     // --- Permission Handling ---
     var hasAudioPermission by remember {
         mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
         )
     }
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
+        contract = ActivityResultContracts.RequestPermission(), onResult = { isGranted ->
             hasAudioPermission = isGranted
             if (!isGranted) {
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Audio permission required for voice input.", duration = SnackbarDuration.Long)
+                    snackbarHostState.showSnackbar(
+                        "Audio permission required for voice input.",
+                        duration = SnackbarDuration.Long
+                    )
                 }
             } else {
                 // Permission granted, maybe trigger something if needed, but usually just allows action
             }
-        }
-    )
+        })
 
     // --- Effects ---
     LaunchedEffect(uiState.messageList.size) { // Scroll when new messages arrive
@@ -87,19 +102,13 @@ fun ChatDetailScreen(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(uiState.chatTitle, maxLines = 1) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
-                    }
-                }
-            )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { paddingValues ->
+    Scaffold(topBar = {
+        TopAppBar(title = { Text(uiState.chatTitle, maxLines = 1) }, navigationIcon = {
+            IconButton(onClick = onNavigateBack) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            }
+        })
+    }, snackbarHost = { SnackbarHost(snackbarHostState) }) { paddingValues ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -118,7 +127,10 @@ fun ChatDetailScreen(
                         .fillMaxWidth(), // Ensures it fills width
                     state = listState,
                     reverseLayout = true, // Newest messages at the bottom (displayed at top of list visually)
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp) // Padding for messages
+                    contentPadding = PaddingValues(
+                        horizontal = 8.dp,
+                        vertical = 8.dp
+                    ) // Padding for messages
                 ) {
                     // Partial text bubble (if recording and partial text exists)
                     if (uiState.isRecording && uiState.partialText.isNotBlank()) {
@@ -135,9 +147,7 @@ fun ChatDetailScreen(
 
                     // Render actual messages
                     items(
-                        items = uiState.messageList,
-                        key = { message -> message.id }
-                    ) { message ->
+                        items = uiState.messageList, key = { message -> message.id }) { message ->
                         ChatMessageBubble(message = message)
                     }
                 }
@@ -147,12 +157,10 @@ fun ChatDetailScreen(
 
             // --- Recording Control Area ---
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
                 // Add vertical padding if needed, RecognitionControls usually has internal padding
                 // .padding(vertical = 8.dp)
-                ,
-                horizontalAlignment = Alignment.CenterHorizontally
+                , horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // ** Display Remaining Time **
                 // Conditionally display the Text based on remainingRecordingTime

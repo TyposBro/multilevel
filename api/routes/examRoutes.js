@@ -2,7 +2,7 @@
 const express = require("express");
 const {
   startExam,
-  handleExamStep,
+  handleExamStepStream, // Import the new function
   analyzeExam,
   getExamHistory,
   getExamResultDetails,
@@ -16,7 +16,7 @@ router.use(protect);
 
 // Define the routes
 router.post("/start", startExam);
-router.post("/step", handleExamStep);
+router.post("/step-stream", handleExamStepStream);
 router.post("/analyze", analyzeExam);
 router.get("/history", getExamHistory);
 router.get("/result/:resultId", getExamResultDetails);

@@ -9,25 +9,6 @@ data class AuthResponse(val _id: String, val email: String, val token: String)
 data class ApiMessagePart(val text: String)
 data class ApiMessage(val role: String, val parts: List<ApiMessagePart>)
 
-// Summary for Chat List
-data class ChatSummary(val _id: String, val title: String, val createdAt: String, val updatedAt: String)
-data class ChatListResponse(val chats: List<ChatSummary>)
-
-// Full Chat History Response
-data class ChatHistoryResponse(
-    val chatId: String,
-    val title: String,
-    val history: List<ApiMessage>, // Use the ApiMessage structure
-    val createdAt: String,
-    val updatedAt: String
-)
-
-// Request to send a message
-data class SendMessageRequest(
-    val prompt: String,
-    val lang_code: String? = null,
-    val config_key: String? = null
-)
 
 // Response when sending a message
 data class SendMessageResponse(val message: String, val chatId: String)

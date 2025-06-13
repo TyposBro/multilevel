@@ -5,74 +5,52 @@ import com.typosbro.multilevel.data.remote.models.*
 import retrofit2.Response
 import retrofit2.http.*
 
-// Define Preprocessed data structure based on your API response
-data class PreprocessedData(
-    val phonemes: String?,
-    val input_ids: List<List<Int>>?, // This is what we need for TTS
-    val graphemes: String?,
-    val lang_code_used: String?,
-    val config_key_used: String?
-)
-
-// Update SendMessageApiResponse
-data class SendMessageApiResponse(
-    val message: String, // The text message from the bot
-    val chatId: String,
-    @Deprecated("audioContent is deprecated. TTS is now handled client-side using preprocessed.input_ids.")
-    val audioContent: String?, // Keep for backend compatibility if it's still sent, but mark as deprecated
-    val ttsError: String?,     // Backend might still send this if it had an issue *preparing* data
-    val preprocessed: PreprocessedData? // New field containing input_ids
-)
-
 interface ApiService {
 
-    // --- Authentication ---
+    // --- Auth Endpoints ---
     @POST("auth/register")
     suspend fun register(@Body request: AuthRequest): Response<AuthResponse>
 
     @POST("auth/login")
     suspend fun login(@Body request: AuthRequest): Response<AuthResponse>
 
-    @POST("exam/start")
-    suspend fun startExam(): ExamStepResponse
+    // --- Freestyle Chat Endpoints ---
 
-    @POST("exam/step")
-    suspend fun postExamStep(@Body request: ExamStepRequest): ExamStepResponse
+    @GET("chat/")
+    suspend fun getChatList(): Response<ChatListResponse>
 
-    @POST("exam/analyze")
-    suspend fun analyzeExam(@Body request: AnalyzeExamRequest): AnalyzeExamResponse
+    @POST("chat/")
+    suspend fun createNewChat(@Body request: NewChatRequest): Response<NewChatResponse>
 
-    @GET("exam/result/{resultId}")
-    suspend fun getExamResult(@Path("resultId") resultId: String): ExamResultResponse
-
-    @GET("exam/history")
-    suspend fun getExamHistory(): ExamHistorySummaryResponse
-
-
-
-    // --- Chat Management ---
-    @POST("chat")
-    suspend fun createChat(@Body request: CreateChatRequest? = null): Response<CreateChatResponse>
-
-    @GET("chat")
-    suspend fun listChats(): Response<ChatListResponse>
+    @GET("chat/{chatId}/history")
+    suspend fun getChatHistory(@Path("chatId") chatId: String): Response<ChatHistoryResponse>
 
     @DELETE("chat/{chatId}")
-    suspend fun deleteChat(@Path("chatId") chatId: String): Response<DeleteChatResponse>
+    suspend fun deleteChat(@Path("chatId") chatId: String): Response<GenericSuccessResponse>
 
     @PUT("chat/{chatId}/title")
     suspend fun updateChatTitle(
         @Path("chatId") chatId: String,
-        @Body request: UpdateTitleRequest
-    ): Response<UpdateTitleResponse>
+        @Body request: TitleUpdateRequest
+    ): Response<GenericSuccessResponse>
 
-    // --- Chat Interaction ---
-    @GET("chat/{chatId}/history")
-    suspend fun getChatHistory(@Path("chatId") chatId: String): Response<ChatHistoryResponse>
+    // Note: The streaming sendMessage endpoint is not here because it's handled
+    // directly by OkHttp's SSE client in the ChatRepository.
 
-    @POST("chat/{chatId}/message")
-    suspend fun sendMessage(
-        @Path("chatId") chatId: String,
-        @Body request: SendMessageRequest // SendMessageRequest contains { "prompt": "..." }
-    ): Response<SendMessageApiResponse> // Ensure this uses the updated SendMessageApiResponse
+
+    // --- Structured Exam Endpoints ---
+
+    @POST("exam/start")
+    suspend fun startExam(): Response<ExamStepResponse>
+
+    // Note: The streaming step endpoint is also not here.
+
+    @POST("exam/analyze")
+    suspend fun analyzeExam(@Body request: AnalyzeExamRequest): Response<AnalyzeExamResponse>
+
+    @GET("exam/history")
+    suspend fun getExamHistory(): Response<ExamHistorySummaryResponse>
+
+    @GET("exam/result/{resultId}")
+    suspend fun getExamResult(@Path("resultId") resultId: String): Response<ExamResultResponse>
 }
