@@ -5,6 +5,7 @@ const cors = require("cors");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const examRoutes = require("./routes/examRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 // Load environment variables
@@ -28,6 +29,7 @@ app.get("/", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/exam", examRoutes);
 
 // --- Error Handling Middleware ---
 // Add AFTER your routes
