@@ -3,25 +3,30 @@
 services:
   api:
     build:
-      context: ./api # Path to Express app directory
-      dockerfile: Dockerfile
+      context: ./api
+      dockerfile: Dockerfile.dev
     container_name: backend_api
     ports:
-      - "3000:3000" # Host:Container
+      - "3000:3000"
     env_file:
-      - ./api/.env # Ensure this file does not override KOKORO_TTS_BASE_URL with the old value
+      - ./api/.env
     environment:
+      NODE_ENV: development
       PORT: "3000"
-      # KOKORO_TTS_BASE_URL points to the FastKoko TTS service
-      # KOKORO_TTS_BASE_URL: "http://tts_service:8880/v1"
-      # Add a new environment variable if your Express app needs to call our new preprocessing service
-      KOKORO_PREPROCESS_URL: "http://kokoro_preprocessor:8000/preprocess" # Service name 'kokoro_preprocessor', port 8000
+      KOKORO_PREPROCESS_URL: "http://kokoro_preprocessor:8000/preprocess"
+
+    # --- Live Reloading Setup ---
+    command: npm run dev
+    volumes:
+      # Mount local code to /app (matching WORKDIR in Dockerfile.dev)
+      - ./api:/app
+      # Anonymous volume to keep container's node_modules separate
+      - /app/node_modules
+
     depends_on:
-      # - tts_service # Existing dependency
-      - kokoro_preprocessor # New dependency: wait for our preprocessing service
+      - kokoro_preprocessor
     networks:
       - app_network
-
   # tts_service: # This is the FastKoko TTS service
   # image: ghcr.io/remsky/kokoro-fastapi-gpu:latest
   # deploy:
@@ -45,7 +50,7 @@ services:
   kokoro_preprocessor: # Our new Python FastAPI service for preprocessing
     build:
       context: ./kokoro_preprocess_service # Path to our Python FastAPI app
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: kokoro_preprocess_api_service
     # Optional: Expose port to host for direct testing if needed
     # ports:

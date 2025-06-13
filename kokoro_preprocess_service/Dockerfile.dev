@@ -1,0 +1,22 @@
+# Dockerfile for kokoro_preprocessor
+FROM python:3.10-slim
+
+# Install system dependencies needed for building Python packages (like pyopenjtalk)
+# and any other system libs your Python code might need.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    # Add any other system libraries your Python packages might depend on
+    # For example, if pyopenjtalk has other specific .so library needs, list them here.
+    # Check pyopenjtalk documentation for its system dependencies if 'build-essential' and 'cmake' aren't enough.
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements.txt requirements.txt
+RUN pip install -r requirements.txt
+
+COPY ./app /app
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
