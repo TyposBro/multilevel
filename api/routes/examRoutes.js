@@ -1,4 +1,4 @@
-// routes/examRoutes.js
+// {PATH_TO_PROJECT}/api/routes/examRoutes.js
 const express = require("express");
 const {
   startExam,

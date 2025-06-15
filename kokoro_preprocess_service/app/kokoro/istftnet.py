@@ -1,4 +1,4 @@
-# {PATH_TO_PROJECT}/g2p/src/istftnet.py
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/app/kokoro/istftnet.py
 
 
 # ADAPTED from https://github.com/yl4579/StyleTTS2/blob/main/Modules/istftnet.py

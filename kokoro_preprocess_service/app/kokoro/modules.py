@@ -1,4 +1,4 @@
-# {PATH_TO_PROJECT}/g2p/src/modules.py
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/app/kokoro/modules.py
 
 # https://github.com/yl4579/StyleTTS2/blob/main/models.py
 from .istftnet import AdainResBlk1d

@@ -1,6 +1,6 @@
-// controllers/authController.js
-const User = require('../models/User');
-const generateToken = require('../utils/generateToken'); // Adjust path
+// {PATH_TO_PROJECT}/api/controllers/authController.js
+const User = require("../models/UserModel");
+const generateToken = require("../utils/generateToken"); // Adjust path
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -9,14 +9,14 @@ const registerUser = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ message: 'Please provide email and password' });
+    return res.status(400).json({ message: "Please provide email and password" });
   }
 
   try {
     const userExists = await User.findOne({ email });
 
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ message: "User already exists" });
     }
 
     const user = await User.create({
@@ -31,15 +31,15 @@ const registerUser = async (req, res) => {
         token: generateToken(user._id), // Send token upon successful registration
       });
     } else {
-      res.status(400).json({ message: 'Invalid user data' });
+      res.status(400).json({ message: "Invalid user data" });
     }
   } catch (error) {
-    console.error('Registration Error:', error);
+    console.error("Registration Error:", error);
     // More specific error handling could be added here
-    if (error.name === 'ValidationError') {
-         return res.status(400).json({ message: error.message });
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message });
     }
-    res.status(500).json({ message: 'Server error during registration' });
+    res.status(500).json({ message: "Server error during registration" });
   }
 };
 
@@ -50,12 +50,12 @@ const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ message: 'Please provide email and password' });
+    return res.status(400).json({ message: "Please provide email and password" });
   }
 
   try {
     // Find user by email, explicitly select password which is excluded by default
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email }).select("+password");
 
     if (user && (await user.matchPassword(password))) {
       res.json({
@@ -65,11 +65,11 @@ const loginUser = async (req, res) => {
       });
     } else {
       // Generic message for security (don't reveal if email exists or password is wrong)
-      res.status(401).json({ message: 'Invalid credentials' });
+      res.status(401).json({ message: "Invalid credentials" });
     }
   } catch (error) {
-    console.error('Login Error:', error);
-    res.status(500).json({ message: 'Server error during login' });
+    console.error("Login Error:", error);
+    res.status(500).json({ message: "Server error during login" });
   }
 };
 
@@ -84,7 +84,6 @@ const getUserProfile = async (req, res) => {
     createdAt: req.user.createdAt,
   });
 };
-
 
 module.exports = {
   registerUser,

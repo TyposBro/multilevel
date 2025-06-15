@@ -1,4 +1,4 @@
-# Dockerfile for kokoro_preprocessor
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/Dockerfile
 FROM python:3.10-slim
 
 # Install system dependencies needed for building Python packages (like pyopenjtalk)

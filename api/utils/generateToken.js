@@ -1,5 +1,5 @@
-// utils/generateToken.js
-const jwt = require('jsonwebtoken');
+// {PATH_TO_PROJECT}/api/utils/generateToken.js
+const jwt = require("jsonwebtoken");
 
 const generateToken = (userId) => {
   return jwt.sign({ id: userId }, process.env.JWT_SECRET, {

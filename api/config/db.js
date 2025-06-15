@@ -1,6 +1,6 @@
-// config/db.js
-const mongoose = require('mongoose');
-require('dotenv').config(); // Load .env variables
+// {PATH_TO_PROJECT}/api/config/db.js
+const mongoose = require("mongoose");
+require("dotenv").config(); // Load .env variables
 
 const connectDB = async () => {
   try {

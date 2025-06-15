@@ -1,5 +1,4 @@
-# {PATH_TO_PROJECT}/g2p/src/pipeline.py
-# (or kokoro/pipeline.py)
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/app/kokoro/pipeline.py
 
 from .model import KModel
 from dataclasses import dataclass

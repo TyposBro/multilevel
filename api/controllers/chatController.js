@@ -1,5 +1,5 @@
-// controllers/chatController.js
-const Chat = require("../models/Chat");
+// {PATH_TO_PROJECT}/api/controllers/chatController.js
+const Chat = require("../models/ChatModel");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const axios = require("axios");
 require("dotenv").config();

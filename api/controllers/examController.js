@@ -1,6 +1,6 @@
 // {PATH_TO_PROJECT}/api/controllers/examController.js
 
-const ExamResult = require("../models/ExamResult");
+const ExamResult = require("../models/ExamResultModel.js");
 const { generateText, generateTextStream, safeJsonParse } = require("../utils/gemini.js");
 const { getKokoroInputIds } = require("../utils/kokoro.js");
 const { sendSseChunk, sentenceTerminators } = require("../utils/sse");

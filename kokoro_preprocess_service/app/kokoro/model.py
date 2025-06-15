@@ -1,4 +1,4 @@
-# {PATH_TO_PROJECT}/g2p/src/model.py
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/app/kokoro/model.py
 
 
 from .istftnet import Decoder

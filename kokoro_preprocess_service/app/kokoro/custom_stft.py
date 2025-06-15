@@ -1,4 +1,4 @@
-# {PATH_TO_PROJECT}/g2p/src/custom_stft.py
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/app/kokoro/custom_stft.py
 
 
 from attr import attr

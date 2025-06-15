@@ -1,3 +1,4 @@
+# {PATH_TO_PROJECT}/docker-compose.prod.yaml
 services:
   api:
     image: typosbro/multilevel-api:0.0.1 # PULL from Docker Hub

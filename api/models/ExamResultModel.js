@@ -1,4 +1,4 @@
-// models/ExamResult.js
+// {PATH_TO_PROJECT}/api/models/ExamResultModel.js
 const mongoose = require("mongoose");
 
 const transcriptEntrySchema = new mongoose.Schema(

@@ -1,4 +1,4 @@
-# app/main.py
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/app/main.py
 from fastapi import FastAPI, HTTPException, Body
 from pydantic import BaseModel, Field
 from typing import List, Optional, Union, Dict, Tuple
