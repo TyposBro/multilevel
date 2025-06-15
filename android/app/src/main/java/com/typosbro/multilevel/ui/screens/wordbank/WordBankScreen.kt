@@ -7,9 +7,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -17,7 +17,7 @@ import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 fun WordBankScreen(
     // Add navigation to review screen
     onNavigateToReview: () -> Unit,
-    viewModel: WordBankViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    viewModel: WordBankViewModel = hiltViewModel()
 ) {
     val dueWordsCount by viewModel.dueWordsCount.collectAsStateWithLifecycle()
 

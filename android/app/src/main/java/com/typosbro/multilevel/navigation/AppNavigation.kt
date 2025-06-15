@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -23,7 +24,6 @@ import com.typosbro.multilevel.ui.screens.auth.RegisterScreen
 import com.typosbro.multilevel.ui.screens.chat.ChatDetailScreen
 import com.typosbro.multilevel.ui.screens.chat.ChatListScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamScreen
-import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider // Use the factory
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 
 // Define navigation routes
@@ -55,7 +55,7 @@ fun AppNavigation(
     }
 
     // Observe logout state from AuthViewModel to reset navigation
-    val authViewModel: AuthViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    val authViewModel: AuthViewModel = hiltViewModel()
     val isAuthenticated by authViewModel.authenticationSuccessful.collectAsState() // Observe login/register success too
 
     // React to authentication changes

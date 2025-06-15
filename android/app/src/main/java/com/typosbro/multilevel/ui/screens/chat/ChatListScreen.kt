@@ -14,10 +14,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.typosbro.multilevel.data.remote.models.ChatSummary
-import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel // Import AuthViewModel
 import com.typosbro.multilevel.ui.viewmodels.ChatListViewModel
 import kotlinx.coroutines.launch
@@ -28,8 +28,8 @@ import kotlinx.coroutines.launch
 fun ChatListScreen(
     onNavigateToChat: (chatId: String) -> Unit,
     onLogout: () -> Unit, // Callback for logout
-    chatListViewModel: ChatListViewModel = viewModel(factory = AppViewModelProvider.Factory),
-    authViewModel: AuthViewModel = viewModel(factory = AppViewModelProvider.Factory) // Get AuthViewModel instance
+    chatListViewModel: ChatListViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel() // Get AuthViewModel instance
 ) {
     val chats by chatListViewModel.chats.collectAsStateWithLifecycle()
     val isLoading by chatListViewModel.isLoading.collectAsStateWithLifecycle()

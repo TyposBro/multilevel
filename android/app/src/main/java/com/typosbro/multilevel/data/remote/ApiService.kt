@@ -1,10 +1,9 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/ApiService.kt
-
-
 package com.typosbro.multilevel.data.remote
 
-import ExamHistorySummaryResponse
 import com.typosbro.multilevel.data.remote.models.*
+import okhttp3.ResponseBody
+import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.*
 
@@ -18,7 +17,6 @@ interface ApiService {
     suspend fun login(@Body request: AuthRequest): Response<AuthResponse>
 
     // --- Freestyle Chat Endpoints ---
-
     @GET("chat/")
     suspend fun getChatList(): Response<ChatListResponse>
 
@@ -27,6 +25,14 @@ interface ApiService {
 
     @GET("chat/{chatId}/history")
     suspend fun getChatHistory(@Path("chatId") chatId: String): Response<ChatHistoryResponse>
+
+    // --- NEW: Add the streaming endpoint for freestyle chat ---
+    @POST("chat/{chatId}/message")
+    @Streaming // Important: Tells Retrofit to handle this as a streaming response
+    fun sendMessageAndStream(
+        @Path("chatId") chatId: String,
+        @Body request: SendMessageRequest
+    ): Call<ResponseBody> // Return a Call<ResponseBody> for SSE
 
     @DELETE("chat/{chatId}")
     suspend fun deleteChat(@Path("chatId") chatId: String): Response<GenericSuccessResponse>
@@ -37,16 +43,14 @@ interface ApiService {
         @Body request: TitleUpdateRequest
     ): Response<GenericSuccessResponse>
 
-    // Note: The streaming sendMessage endpoint is not here because it's handled
-    // directly by OkHttp's SSE client in the ChatRepository.
-
-
     // --- Structured Exam Endpoints ---
-
     @POST("exam/start")
     suspend fun startExam(): Response<ExamStepResponse>
 
-    // Note: The streaming step endpoint is also not here.
+    // --- NEW: Add the streaming endpoint for exams ---
+    @POST("exam/step-stream")
+    @Streaming // Important: Tells Retrofit to handle this as a streaming response
+    fun getNextExamStepStream(@Body request: ExamStepRequest): Call<ResponseBody>
 
     @POST("exam/analyze")
     suspend fun analyzeExam(@Body request: AnalyzeExamRequest): Response<AnalyzeExamResponse>

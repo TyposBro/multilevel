@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.data.local.WordEntity
 import com.typosbro.multilevel.data.local.WordDao
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 data class WordBankUiState(
     val dueWords: List<WordEntity> = emptyList(),
@@ -24,8 +26,10 @@ data class WordBankUiState(
     val currentWord: WordEntity?
         get() = dueWords.getOrNull(currentReviewIndex)
 }
-
-class WordBankViewModel(private val wordDao: WordDao) : ViewModel() {
+@HiltViewModel
+class WordBankViewModel @Inject constructor(
+    private val wordDao: WordDao
+) : ViewModel(){
 
     private val _uiState = MutableStateFlow(WordBankUiState())
     val uiState = _uiState.asStateFlow()

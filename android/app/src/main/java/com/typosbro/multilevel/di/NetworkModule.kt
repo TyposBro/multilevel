@@ -1,0 +1,81 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/di/NetworkModule.kt
+package com.typosbro.multilevel.di
+
+import android.content.Context
+import com.typosbro.multilevel.data.local.TokenManager
+import com.typosbro.multilevel.data.remote.ApiService
+import com.typosbro.multilevel.data.remote.RetrofitClient
+import com.typosbro.multilevel.data.remote.interceptors.AuthInterceptor
+import com.typosbro.multilevel.data.repositories.AuthRepository
+import com.typosbro.multilevel.data.repositories.ChatRepository
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
+import javax.inject.Named
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object NetworkModule {
+
+    // Use @Named annotation to provide two different OkHttpClient instances
+    @Provides
+    @Singleton
+    @Named("StandardOkHttpClient")
+    fun provideStandardOkHttpClient(tokenManager: TokenManager): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(tokenManager))
+            .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("SseOkHttpClient")
+    fun provideSseOkHttpClient(tokenManager: TokenManager): OkHttpClient {
+        return OkHttpClient.Builder()
+            .addInterceptor(AuthInterceptor(tokenManager))
+            .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(0, TimeUnit.SECONDS) // No read timeout for SSE
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .pingInterval(20, TimeUnit.SECONDS)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideApiService(@Named("StandardOkHttpClient") okHttpClient: OkHttpClient): ApiService {
+        return Retrofit.Builder()
+            .baseUrl(RetrofitClient.BASE_URL)
+            .client(okHttpClient) // Use the standard client for regular API calls
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(ApiService::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAuthRepository(apiService: ApiService): AuthRepository {
+        return AuthRepository(apiService)
+    }
+
+    @Provides
+    @Singleton
+    fun provideChatRepository(
+        apiService: ApiService,
+        @Named("SseOkHttpClient") sseClient: OkHttpClient // Inject the named SSE client
+    ): ChatRepository {
+        return ChatRepository(apiService, sseClient)
+    }
+}

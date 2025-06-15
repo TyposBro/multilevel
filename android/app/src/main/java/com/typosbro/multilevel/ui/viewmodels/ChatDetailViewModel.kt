@@ -29,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import com.typosbro.multilevel.utils.AudioPlayer
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel // For queuing audio playback requests
 import kotlinx.coroutines.flow.receiveAsFlow // To consume from the channel
@@ -36,8 +37,11 @@ import java.util.UUID
 import java.util.LinkedList // For a simple queue
 import java.util.Queue
 import kotlinx.coroutines.flow.consumeAsFlow
+import javax.inject.Inject
 
-class ChatDetailViewModel(
+
+@HiltViewModel
+class ChatDetailViewModel @Inject constructor(
     application: Application,
     savedStateHandle: SavedStateHandle,
     private val chatRepository: ChatRepository

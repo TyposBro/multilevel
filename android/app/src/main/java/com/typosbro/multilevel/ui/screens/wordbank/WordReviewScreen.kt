@@ -16,17 +16,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.typosbro.multilevel.data.local.WordEntity
-import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WordReviewScreen(
     onNavigateBack: () -> Unit,
-    viewModel: WordBankViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    viewModel: WordBankViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 

@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -38,14 +39,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.typosbro.multilevel.data.remote.models.CueCard
 import com.typosbro.multilevel.ui.component.RecognitionControls
-import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.ExamPart
 import com.typosbro.multilevel.ui.viewmodels.ExamUiState
 import com.typosbro.multilevel.ui.viewmodels.ExamViewModel
@@ -55,11 +57,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun ExamScreen(
     onNavigateToResults: (resultId: String) -> Unit,
-    viewModel: ExamViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    viewModel: ExamViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackBarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     // --- PERMISSION HANDLING LOGIC ---
     var hasAudioPermission by remember {
@@ -76,9 +78,8 @@ fun ExamScreen(
         onResult = { isGranted ->
             hasAudioPermission = isGranted
             if (!isGranted) {
-                // Optionally show a message if permission is denied
                 coroutineScope.launch {
-                    snackbarHostState.showSnackbar(
+                    snackBarHostState.showSnackbar(
                         "Microphone permission is required to take the exam.",
                         duration = SnackbarDuration.Long
                     )
@@ -87,7 +88,6 @@ fun ExamScreen(
         }
     )
 
-    // A helper function to request permission if needed
     val requestPermission: () -> Unit = {
         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
@@ -98,7 +98,7 @@ fun ExamScreen(
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("IELTS Speaking Test") }) },
-        snackbarHost = { SnackbarHost(snackbarHostState) } // Add snackbar host
+        snackbarHost = { SnackbarHost(snackBarHostState) }
     ) { padding ->
         Box(
             modifier = Modifier
@@ -110,8 +110,18 @@ fun ExamScreen(
                 targetState = uiState.currentPart,
                 transitionSpec = {
                     fadeIn() togetherWith fadeOut()
-                }
+                },
+                label = "ExamPartAnimation"
             ) { targetPart ->
+                val onStartRecording = {
+                    if (hasAudioPermission) {
+                        viewModel.startUserSpeechRecognition()
+                    } else {
+                        requestPermission()
+                    }
+                }
+                val onStopRecording = { viewModel.stopUserSpeechRecognition() }
+
                 when (targetPart) {
                     ExamPart.NOT_STARTED -> NotStartedView(onStart = {
                         if (hasAudioPermission) {
@@ -123,25 +133,16 @@ fun ExamScreen(
 
                     ExamPart.PART_1, ExamPart.PART_3 -> ExaminerInteractionView(
                         uiState = uiState,
-                        onStartRecording = {
-                            if (hasAudioPermission) {
-                                viewModel.startUserSpeechRecognition()
-                            } else {
-                                requestPermission()
-                            }
-                        },
-                        onStopRecording = { viewModel.stopUserSpeechRecognition() })
+                        onStartRecording = onStartRecording,
+                        onStopRecording = onStopRecording
+                    )
 
                     ExamPart.PART_2_SPEAKING -> Part2SpeakingView(
                         uiState = uiState,
-                        onStartRecording = {
-                            if (hasAudioPermission) {
-                                viewModel.startUserSpeechRecognition()
-                            } else {
-                                requestPermission()
-                            }
-                        },
-                        onStopRecording = { viewModel.stopUserSpeechRecognition() })
+                        onStartRecording = onStartRecording,
+                        onStopRecording = onStopRecording
+                    )
+
 
                     ExamPart.PART_2_PREP -> Part2PrepView(uiState)
                     ExamPart.FINISHED, ExamPart.ANALYSIS_COMPLETE -> AnalysisView()
@@ -165,7 +166,7 @@ fun NotStartedView(onStart: () -> Unit) {
 @Composable
 fun ExaminerInteractionView(
     uiState: ExamUiState,
-    onStartRecording: () -> Unit, // Pass as a lambda
+    onStartRecording: () -> Unit,
     onStopRecording: () -> Unit
 ) {
     Column(
@@ -175,14 +176,25 @@ fun ExaminerInteractionView(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Examiner Text
-        Text(
-            text = uiState.examinerMessage ?: "...",
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
+        // Top section with timer and examiner text
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            AnimatedVisibility(visible = uiState.isUserListening && uiState.timerValue > 0) {
+                Text(
+                    text = "Time left: ${uiState.timerValue}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (uiState.timerValue <= 10) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = uiState.examinerMessage ?: "...",
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center
+            )
+        }
 
-        // User Input Area
+        // Bottom section with user transcription and controls
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = uiState.partialTranscription,
@@ -192,8 +204,9 @@ fun ExaminerInteractionView(
             Spacer(Modifier.height(16.dp))
             RecognitionControls(
                 isRecording = uiState.isUserListening,
-                onStartRecording = onStartRecording, // Use the passed lambda
-                onStopRecording = onStopRecording
+                onStartRecording = onStartRecording,
+                onStopRecording = onStopRecording,
+                enabled = !uiState.isExaminerSpeaking
             )
         }
     }
@@ -205,16 +218,19 @@ fun Part2PrepView(uiState: ExamUiState) {
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
         Text("Part 2: Cue Card", style = MaterialTheme.typography.headlineMedium)
+        Spacer(Modifier.height(8.dp))
         Text("You have one minute to prepare.", style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.height(24.dp))
         Text(
             text = "${uiState.timerValue}s",
             style = MaterialTheme.typography.displayMedium,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(vertical = 24.dp)
         )
+        Spacer(Modifier.height(24.dp))
         uiState.part2CueCard?.let {
             CueCardView(cueCard = it)
         }
@@ -224,7 +240,7 @@ fun Part2PrepView(uiState: ExamUiState) {
 @Composable
 fun Part2SpeakingView(
     uiState: ExamUiState,
-    onStartRecording: () -> Unit, // Pass as a lambda
+    onStartRecording: () -> Unit,
     onStopRecording: () -> Unit
 ) {
     Column(
@@ -234,16 +250,21 @@ fun Part2SpeakingView(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
+        // Top section with timer and cue card
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Time remaining: ${uiState.timerValue}s",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.secondary
-            )
+            AnimatedVisibility(visible = uiState.isUserListening && uiState.timerValue > 0) {
+                Text(
+                    text = "Time left: ${uiState.timerValue}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (uiState.timerValue <= 10) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                )
+            }
             Spacer(Modifier.height(16.dp))
             uiState.part2CueCard?.let { CueCardView(cueCard = it) }
         }
 
+        // Bottom section with user transcription and controls
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = uiState.partialTranscription,
@@ -253,8 +274,9 @@ fun Part2SpeakingView(
             Spacer(Modifier.height(16.dp))
             RecognitionControls(
                 isRecording = uiState.isUserListening,
-                onStartRecording = onStartRecording, // Use the passed lambda
-                onStopRecording = onStopRecording
+                onStartRecording = onStartRecording,
+                onStopRecording = onStopRecording,
+                enabled = !uiState.isExaminerSpeaking
             )
         }
     }
@@ -267,7 +289,7 @@ fun CueCardView(cueCard: CueCard) {
             Text(cueCard.topic, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
             cueCard.points.forEach { point ->
-                Text("• $point", style = MaterialTheme.typography.bodyMedium)
+                Text("• $point", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 4.dp))
             }
         }
     }

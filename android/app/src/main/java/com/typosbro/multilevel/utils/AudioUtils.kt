@@ -29,7 +29,7 @@ object AudioPlayer {
             val session = OnnxRuntimeManager.getSession()
             val (audioFloatArray, sampleRate) = createAudio(
                 tokens = inputIds.toLongArray(),
-                voice = "bm_george", // or from a config
+                voice = "bf_emma", // or from a config
                 speed = 1.0f,
                 session = session,
                 context = context

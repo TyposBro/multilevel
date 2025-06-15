@@ -4,10 +4,12 @@ package com.typosbro.multilevel.ui.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.data.local.TokenManager
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 // A simple data class for user profile details
 data class UserProfile(
@@ -20,10 +22,12 @@ data class ProfileUiState(
     val isDarkTheme: Boolean = false // This would be loaded from DataStore
 )
 
-class ProfileViewModel(
-    private val tokenManager: TokenManager,
-    private val authViewModel: AuthViewModel // To call logout
-) : ViewModel() {
+
+@HiltViewModel
+class ProfileViewModel @Inject constructor(
+    private val tokenManager: TokenManager
+    // We will get the AuthViewModel from the UI layer
+) : ViewModel(){
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState = _uiState.asStateFlow()
@@ -55,8 +59,7 @@ class ProfileViewModel(
         // viewModelScope.launch { settingsRepository.setTheme(isDark) }
     }
 
-    fun logout() {
-        // Delegate logout to the AuthViewModel which handles token clearing.
+    fun logout(authViewModel: AuthViewModel) {
         authViewModel.logout()
     }
 }

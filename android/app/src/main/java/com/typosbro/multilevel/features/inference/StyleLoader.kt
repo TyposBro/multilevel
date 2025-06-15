@@ -10,13 +10,8 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 val names = listOf(
-    "af",
-    "af_bella",
-    "af_nicole",
-    "af_sarah",
-    "af_sky",
-    "am_adam",
-    "am_michael",
+    "bf_alice",
+    "bf_emma",
     "bf_isabella",
     "bm_george",
     "bm_lewis"

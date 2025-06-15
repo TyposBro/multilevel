@@ -33,3 +33,13 @@ data class FeedbackExample(
     @SerializedName("suggestion") val suggestion: String, // How it could be improved
     @SerializedName("type") val type: String // e.g., "Grammar", "Vocabulary", "Filler Word"
 )
+
+data class ExamHistorySummaryResponse(
+    @SerializedName("history") val history: List<ExamResultSummary>
+)
+
+data class ExamResultSummary(
+    @SerializedName("id") val id: String,
+    @SerializedName("exam_date") val examDate: Long,
+    @SerializedName("overall_band") val overallBand: Double
+)

@@ -16,8 +16,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.ChatListViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,7 +26,7 @@ fun PracticeHubScreen(
     onNavigateToExam: () -> Unit,
     // You can keep the old chat list here as "Freestyle Practice"
     onNavigateToChat: (chatId: String) -> Unit,
-    viewModel: ChatListViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    viewModel: ChatListViewModel = hiltViewModel()
 ) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("Speaking Practice") }) }

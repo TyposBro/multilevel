@@ -17,11 +17,13 @@ import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import com.typosbro.multilevel.navigation.AppNavigation // Import your AppNavigation
 import com.typosbro.multilevel.ui.theme.MultilevelTheme
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -17,11 +17,11 @@ data class TranscriptEntry(
  * The request body sent to the server to get the next examiner question/prompt.
  */
 data class ExamStepRequest(
-    @SerializedName("part") val part: Int, // Current exam part: 1, 2, or 3
+    @SerializedName("part") val part: Int,
     @SerializedName("userInput") val userInput: String?,
-    @SerializedName("transcriptContext") val transcriptContext: String
+    @SerializedName("transcriptContext") val transcriptContext: String,
+    @SerializedName("question_count_in_part") val questionCountInPart: Int
 )
-
 /**
  * The response from the server for each step of the exam.
  */

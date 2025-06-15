@@ -40,11 +40,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.typosbro.multilevel.ui.component.ChatMessageBubble
 import com.typosbro.multilevel.ui.component.RecognitionControls
-import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.ChatDetailViewModel
 import kotlinx.coroutines.launch
 
@@ -54,7 +54,7 @@ import kotlinx.coroutines.launch
 fun ChatDetailScreen(
     onNavigateBack: () -> Unit,
     // chatId is handled by ViewModel's SavedStateHandle now
-    viewModel: ChatDetailViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    viewModel: ChatDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()

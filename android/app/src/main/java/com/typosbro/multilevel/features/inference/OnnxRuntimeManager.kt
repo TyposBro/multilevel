@@ -19,14 +19,7 @@ import java.io.OutputStream
 object OnnxRuntimeManager {
     private var environment: OrtEnvironment? = null
     private var session: OrtSession? = null
-    private const val MODEL_FILE_NAME = "model.onnx"
-//    private const val MODEL_FILE_NAME = "model_f16.onnx"
-//    private const val MODEL_FILE_NAME = "model_q4.onnx"
-//    private const val MODEL_FILE_NAME = "model_q4f16.onnx"
-//    private const val MODEL_FILE_NAME = "model_q8f16.onnx"
-//    private const val MODEL_FILE_NAME = "model_quantized.onnx"
-//    private const val MODEL_FILE_NAME = "model_uint8.onnx"
-//    private const val MODEL_FILE_NAME = "model_uint8f16.onnx"
+    private const val MODEL_FILE_NAME = "model_quantized.onnx"
 
 
 

@@ -26,12 +26,16 @@ class VoskRecognitionManager(
      * Start recognition from microphone
      */
     fun startMicrophoneRecognition() {
+        // If a recognition service is already active, we must stop it before starting a new one.
+        // This prevents resource conflicts and ensures we start fresh for each user utterance.
         if (speechService != null) {
             stopRecognition()
-            return
+            // The 'return' statement was here, which was the bug.
+            // It prevented a new service from starting on subsequent calls.
         }
 
         try {
+            // Always create and start a new recognizer service.
             val recognizer = Recognizer(model, 16000.0f)
             speechService = SpeechService(recognizer, 16000.0f)
             speechService?.startListening(listener)

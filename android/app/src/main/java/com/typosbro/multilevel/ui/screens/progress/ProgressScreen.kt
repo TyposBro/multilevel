@@ -1,7 +1,6 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/progress/ProgressScreen.kt
 package com.typosbro.multilevel.ui.screens.progress
 
-import ExamResultSummary
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,9 +20,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
+import com.typosbro.multilevel.data.remote.models.ExamResultSummary
 import com.typosbro.multilevel.ui.viewmodels.ProgressViewModel
 import java.text.SimpleDateFormat
 import java.util.*
@@ -33,7 +33,7 @@ import java.util.*
 fun ProgressScreen(
     // In a real app, you'd navigate to the full result screen
     onNavigateToResult: (resultId: String) -> Unit,
-    viewModel: ProgressViewModel = viewModel(factory = AppViewModelProvider.Factory)
+    viewModel: ProgressViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 

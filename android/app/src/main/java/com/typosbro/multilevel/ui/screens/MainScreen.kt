@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -26,6 +27,8 @@ import com.typosbro.multilevel.ui.screens.profile.ProfileScreen
 import com.typosbro.multilevel.ui.screens.progress.ProgressScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordBankScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordReviewScreen
+import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
+import com.typosbro.multilevel.ui.viewmodels.ProfileViewModel
 
 // Define routes for the main tabs
 object MainDestinations {
@@ -83,11 +86,16 @@ fun MainScreen(
                 }
             }
             composable(MainDestinations.PROGRESS_ROUTE) {
-                // Pass the navigation action down to the ProgressScreen
-                // THIS FIXES THE ERROR
                 ProgressScreen(onNavigateToResult = onNavigateToExamResult)
             }
-            composable(MainDestinations.PROFILE_ROUTE) { ProfileScreen() }
+            composable(MainDestinations.PROFILE_ROUTE) {
+                val profileViewModel: ProfileViewModel = hiltViewModel()
+                val authViewModel: AuthViewModel = hiltViewModel(it) // Get activity-scoped AuthViewModel
+                ProfileScreen(
+                    viewModel = profileViewModel,
+                    onLogout = { profileViewModel.logout(authViewModel) }
+                )
+            }
         }
     }
 }

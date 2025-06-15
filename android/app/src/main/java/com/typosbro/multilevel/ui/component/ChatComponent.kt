@@ -4,6 +4,10 @@
 package com.typosbro.multilevel.ui.component
 
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -11,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -78,45 +83,52 @@ fun ChatMessageBubble(
 /**
  * UI component for the recognition controls with animated recording indicator
  */
+
 @Composable
 fun RecognitionControls(
     isRecording: Boolean,
     onStartRecording: () -> Unit,
     onStopRecording: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true // Add the enabled parameter
 ) {
-
-
-
-
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 4.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            IconButton(
-                onClick = if (isRecording) onStopRecording else onStartRecording,
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(
-                        color = if (isRecording) Color.Red
-                        else MaterialTheme.colorScheme.primary
-                    )
+    // Animate between the start and stop buttons
+    AnimatedContent(
+        targetState = isRecording,
+        transitionSpec = {
+            scaleIn() togetherWith scaleOut()
+        },
+        label = "RecognitionControlButton"
+    ) { recording ->
+        if (recording) {
+            // Stop Button
+            FilledIconButton(
+                onClick = onStopRecording,
+                modifier = modifier.size(64.dp),
+                // The button is only clickable if the parent says it's enabled.
+                enabled = enabled,
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
             ) {
                 Icon(
-                    imageVector = if (isRecording) Icons.Default.MicOff else Icons.Default.Mic,
-                    contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
+                    imageVector = Icons.Default.Stop,
+                    contentDescription = "Stop Recording",
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        } else {
+            // Start Button
+            FilledIconButton(
+                onClick = onStartRecording,
+                modifier = modifier.size(64.dp),
+                // The button is only clickable if the parent says it's enabled.
+                enabled = enabled
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = "Start Recording",
+                    modifier = Modifier.size(32.dp)
                 )
             }
         }
