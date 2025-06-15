@@ -1,4 +1,6 @@
-package com.typosbro.multilevel.util // Or a suitable package
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/utils/AudioPlayer.kt
+
+package com.typosbro.multilevel.utils
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment

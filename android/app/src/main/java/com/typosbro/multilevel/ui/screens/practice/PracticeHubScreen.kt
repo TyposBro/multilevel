@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/practice/PracticeHubScreen.kt
 package com.typosbro.multilevel.ui.screens.practice
 
 import androidx.compose.foundation.layout.Column

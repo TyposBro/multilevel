@@ -1,3 +1,5 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/features/vosk/VoskRecognitionManager.kt
+
 package com.typosbro.multilevel.features.vosk
 
 import android.content.Context

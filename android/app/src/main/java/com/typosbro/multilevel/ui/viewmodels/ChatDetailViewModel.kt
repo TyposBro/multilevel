@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ChatDetailViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
 import android.app.Application
@@ -27,15 +28,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
-import com.typosbro.multilevel.util.AudioPlayer
+import com.typosbro.multilevel.utils.AudioPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel // For queuing audio playback requests
 import kotlinx.coroutines.flow.receiveAsFlow // To consume from the channel
-import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.LinkedList // For a simple queue
 import java.util.Queue
-import kotlinx.coroutines.channels.actor // Might not be needed with simpler channel approach
 import kotlinx.coroutines.flow.consumeAsFlow
 
 class ChatDetailViewModel(

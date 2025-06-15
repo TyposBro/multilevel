@@ -1,11 +1,12 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/local/Word.kt
 package com.typosbro.multilevel.data.local
-// Create new file: data/local/Word.kt
+
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "words")
-data class Word(
+data class WordEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val text: String,
     val definition: String,

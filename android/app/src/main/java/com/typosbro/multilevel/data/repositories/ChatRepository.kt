@@ -1,3 +1,5 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/repositories/ChatRepository.kt
+
 package com.typosbro.multilevel.data.repositories
 
 import ExamHistorySummaryResponse
@@ -73,7 +75,7 @@ class ChatRepository(
             .build()
 
         // 'this' inside channelFlow is a ProducerScope, which matches the listener's expectation.
-        val listener = SseListener(this, gson)
+        val listener = SseListenerRepository(this, gson)
         val eventSource = EventSources.createFactory(okHttpClient).newEventSource(request, listener)
 
         // awaitClose is the standard way to keep the channelFlow open

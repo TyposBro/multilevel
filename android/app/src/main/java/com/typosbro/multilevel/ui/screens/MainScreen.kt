@@ -1,6 +1,4 @@
-// This is the corrected version of your file
-// In: ui/screens/MainScreen.kt
-
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/MainScreen.kt
 package com.typosbro.multilevel.ui.screens
 
 import androidx.compose.foundation.layout.Box

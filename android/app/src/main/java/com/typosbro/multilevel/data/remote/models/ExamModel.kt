@@ -1,4 +1,4 @@
-// Create this file at: app/src/main/java/com/typosbro/multilevel/data/remote/models/ExamModels.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/models/ExamModel.kt
 
 package com.typosbro.multilevel.data.remote.models
 

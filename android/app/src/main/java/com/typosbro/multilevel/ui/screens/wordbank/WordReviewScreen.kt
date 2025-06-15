@@ -1,4 +1,4 @@
-// Create new file: ui/screens/wordbank/WordReviewScreen.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/wordbank/WordReviewScreen.kt
 package com.typosbro.multilevel.ui.screens.wordbank
 
 import androidx.compose.animation.AnimatedContent
@@ -18,7 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.typosbro.multilevel.data.local.Word
+import com.typosbro.multilevel.data.local.WordEntity
 import com.typosbro.multilevel.ui.viewmodels.AppViewModelProvider
 import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 
@@ -77,7 +77,7 @@ fun WordReviewScreen(
 
 @Composable
 fun Flashcard(
-    word: Word,
+    word: WordEntity,
     onKnewIt: () -> Unit,
     onDidNotKnowIt: () -> Unit
 ) {

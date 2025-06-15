@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/auth/LoginScreen.kt
 package com.typosbro.multilevel.ui.screens.auth
 
 import androidx.compose.foundation.layout.*

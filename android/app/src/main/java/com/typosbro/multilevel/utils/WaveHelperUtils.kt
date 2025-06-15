@@ -1,4 +1,6 @@
-package com.typosbro.multilevel.util
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/utils/WaveHelperUtils.kt
+
+package com.typosbro.multilevel.utils
 
 
 import android.app.Activity

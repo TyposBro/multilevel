@@ -1,3 +1,5 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/models/ChatModel.kt
+
 package com.typosbro.multilevel.data.remote.models
 
 import com.google.gson.annotations.SerializedName

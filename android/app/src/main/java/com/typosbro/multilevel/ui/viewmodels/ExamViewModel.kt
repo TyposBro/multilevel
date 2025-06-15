@@ -1,4 +1,4 @@
-// In: ui/viewmodels/ExamViewModel.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ExamViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
 import android.app.Application
@@ -10,7 +10,7 @@ import com.typosbro.multilevel.data.repositories.ChatRepository
 import com.typosbro.multilevel.data.repositories.Result
 import com.typosbro.multilevel.features.inference.OnnxRuntimeManager
 import com.typosbro.multilevel.features.vosk.VoskRecognitionManager
-import com.typosbro.multilevel.util.AudioPlayer
+import com.typosbro.multilevel.utils.AudioPlayer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel

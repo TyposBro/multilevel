@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/models/StreamEventsModel.kt
 package com.typosbro.multilevel.data.remote.models
 
 // --- Data classes for parsing JSON from SSE events ---

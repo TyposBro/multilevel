@@ -1,4 +1,4 @@
-// Create new file: ui/viewmodels/ProfileViewModel.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ProfileViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
 import androidx.lifecycle.ViewModel

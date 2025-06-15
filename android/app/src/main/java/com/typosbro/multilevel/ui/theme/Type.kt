@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/theme/Type.kt
 package com.typosbro.multilevel.ui.theme
 
 import androidx.compose.material3.Typography

@@ -1,4 +1,4 @@
-// Create new file: ui/viewmodels/ProgressViewModel.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ProgressViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
 import ExamResultSummary

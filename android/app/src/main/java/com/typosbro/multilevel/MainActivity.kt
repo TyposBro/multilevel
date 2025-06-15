@@ -1,3 +1,5 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/MainActivity.kt
+
 package com.typosbro.multilevel
 
 import ai.onnxruntime.OrtSession

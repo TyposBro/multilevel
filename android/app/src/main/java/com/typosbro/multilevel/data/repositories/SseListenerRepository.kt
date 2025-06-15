@@ -1,3 +1,5 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/repositories/SseListenerRepository.kt
+
 package com.typosbro.multilevel.data.repositories
 
 import com.google.gson.Gson
@@ -12,7 +14,7 @@ import okhttp3.sse.EventSourceListener
  * A generic SSE Listener for the FREESTYLE CHAT stream.
  * It parses events and emits them into a Flow's ProducerScope.
  */
-class SseListener(
+class SseListenerRepository(
     private val scope: ProducerScope<ChatStreamEvent>,
     private val gson: Gson
 ) : EventSourceListener() {

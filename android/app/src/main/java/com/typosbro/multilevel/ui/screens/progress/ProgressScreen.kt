@@ -1,4 +1,4 @@
-// Create new file: ui/screens/progress/ProgressScreen.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/progress/ProgressScreen.kt
 package com.typosbro.multilevel.ui.screens.progress
 
 import ExamResultSummary

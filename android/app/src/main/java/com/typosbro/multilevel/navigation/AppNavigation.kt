@@ -1,3 +1,5 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/navigation/AppNavigation.kt
+
 package com.typosbro.multilevel.navigation
 
 import androidx.compose.foundation.layout.Box

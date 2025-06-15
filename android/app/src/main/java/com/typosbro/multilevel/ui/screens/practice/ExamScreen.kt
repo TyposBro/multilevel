@@ -1,4 +1,4 @@
-// Create new file: ui/screens/practice/ExamScreen.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/practice/ExamScreen.kt
 package com.typosbro.multilevel.ui.screens.practice
 
 import android.Manifest

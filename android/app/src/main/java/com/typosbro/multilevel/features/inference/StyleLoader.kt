@@ -1,3 +1,5 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/features/inference/StyleLoader.kt
+
 // Adopted from: https://github.com/puff-dayo/Kokoro-82M-Android
 
 package com.typosbro.multilevel.features.inference // Ensure this matches your package structure

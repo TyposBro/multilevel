@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/interceptors/AuthInterceptor.kt
 package com.typosbro.multilevel.data.remote.interceptors
 
 import com.typosbro.multilevel.data.local.TokenManager

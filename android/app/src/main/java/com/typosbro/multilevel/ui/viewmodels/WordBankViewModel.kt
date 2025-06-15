@@ -1,9 +1,9 @@
-// Create new file: ui/viewmodels/WordBankViewModel.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/WordBankViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.local.Word
+import com.typosbro.multilevel.data.local.WordEntity
 import com.typosbro.multilevel.data.local.WordDao
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,12 +16,12 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 data class WordBankUiState(
-    val dueWords: List<Word> = emptyList(),
+    val dueWords: List<WordEntity> = emptyList(),
     val currentReviewIndex: Int = 0,
     val isSessionActive: Boolean = false,
     val isSessionFinished: Boolean = false
 ) {
-    val currentWord: Word?
+    val currentWord: WordEntity?
         get() = dueWords.getOrNull(currentReviewIndex)
 }
 
@@ -74,7 +74,7 @@ class WordBankViewModel(private val wordDao: WordDao) : ViewModel() {
         }
     }
 
-    fun handleReview(word: Word, knewIt: Boolean) {
+    fun handleReview(word: WordEntity, knewIt: Boolean) {
         val currentStage = word.srsStage
         val nextStage = if (knewIt) {
             currentStage + 1
@@ -119,8 +119,8 @@ class WordBankViewModel(private val wordDao: WordDao) : ViewModel() {
     // Example function to add words. You'll call this from your Results Screen.
     private suspend fun addSampleWords() {
         val now = System.currentTimeMillis()
-        wordDao.insert(Word(text = "Ubiquitous", definition = "Present, appearing, or found everywhere.", example = "Smartphones have become ubiquitous in modern society.", cefrLevel = "C1", topic = "Technology", nextReviewTimestamp = now))
-        wordDao.insert(Word(text = "Ephemeral", definition = "Lasting for a very short time.", example = "The beauty of the cherry blossoms is ephemeral.", cefrLevel = "C1", topic = "Nature", nextReviewTimestamp = now))
-        wordDao.insert(Word(text = "Pragmatic", definition = "Dealing with things sensibly and realistically in a practical way.", example = "She took a pragmatic approach to solving the problem.", cefrLevel = "B2", topic = "General", nextReviewTimestamp = now))
+        wordDao.insert(WordEntity(text = "Ubiquitous", definition = "Present, appearing, or found everywhere.", example = "Smartphones have become ubiquitous in modern society.", cefrLevel = "C1", topic = "Technology", nextReviewTimestamp = now))
+        wordDao.insert(WordEntity(text = "Ephemeral", definition = "Lasting for a very short time.", example = "The beauty of the cherry blossoms is ephemeral.", cefrLevel = "C1", topic = "Nature", nextReviewTimestamp = now))
+        wordDao.insert(WordEntity(text = "Pragmatic", definition = "Dealing with things sensibly and realistically in a practical way.", example = "She took a pragmatic approach to solving the problem.", cefrLevel = "B2", topic = "General", nextReviewTimestamp = now))
     }
 }

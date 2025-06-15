@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ResultModels.kt
 import com.google.gson.annotations.SerializedName
 import com.typosbro.multilevel.data.repositories.Result
 // Add this to data/remote/models/ResultModels.kt

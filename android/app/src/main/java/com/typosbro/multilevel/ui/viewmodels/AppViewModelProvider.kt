@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/AppViewModelProvider.kt
 package com.typosbro.multilevel.ui.viewmodels
 
 import android.app.Application
@@ -26,7 +27,7 @@ object AppViewModelProvider {
             // Get OkHttpClient instance using the method from RetrofitClient
             val okHttpClient by lazy { RetrofitClient.getOkHttpClient(application.applicationContext) }
 
-            // ApiService (used by AuthRepository and potentially non-SSE parts of ChatRepository if you split them)
+            // ApiService (used by AuthRepository.kt and potentially non-SSE parts of ChatRepository if you split them)
             val apiService by lazy { RetrofitClient.create(application.applicationContext) }
 
 

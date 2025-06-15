@@ -1,6 +1,7 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/chat/ChatDetailScreen.kt
 package com.typosbro.multilevel.ui.screens.chat
 
-// import com.typosbro.multilevel.ui.component.TimerModal
+
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult

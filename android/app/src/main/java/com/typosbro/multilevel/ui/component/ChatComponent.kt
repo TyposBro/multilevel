@@ -1,3 +1,6 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/component/ChatComponent.kt
+
+
 package com.typosbro.multilevel.ui.component
 
 

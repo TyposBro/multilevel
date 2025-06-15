@@ -1,4 +1,4 @@
-// Create new file: ui/screens/wordbank/WordBankScreen.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/wordbank/WordBankScreen.kt
 package com.typosbro.multilevel.ui.screens.wordbank
 
 import androidx.compose.foundation.layout.*

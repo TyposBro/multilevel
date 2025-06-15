@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/repositories/AuthRepository.kt
 package com.typosbro.multilevel.data.repositories
 
 import com.typosbro.multilevel.data.remote.ApiService

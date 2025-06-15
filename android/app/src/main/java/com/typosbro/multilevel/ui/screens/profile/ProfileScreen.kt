@@ -1,4 +1,4 @@
-// Create new file: ui/screens/profile/ProfileScreen.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/profile/ProfileScreen.kt
 package com.typosbro.multilevel.ui.screens.profile
 
 import androidx.compose.foundation.clickable
