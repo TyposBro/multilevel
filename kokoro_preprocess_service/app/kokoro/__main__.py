@@ -1,5 +1,4 @@
-# {PATH_TO_PROJECT}/g2p/src/__main__.py
-
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/app/kokoro/__main__.py
 
 """Kokoro TTS CLI
 Example usage:

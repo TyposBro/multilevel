@@ -1,4 +1,4 @@
-# {PATH_TO_PROJECT}/g2p/src/__init__.py
+# {PATH_TO_PROJECT}/kokoro_preprocess_service/app/kokoro/__init__.py
 
 __version__ = '0.9.4'
 
