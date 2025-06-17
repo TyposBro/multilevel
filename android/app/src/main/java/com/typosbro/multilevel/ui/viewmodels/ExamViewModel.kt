@@ -11,6 +11,7 @@ import com.typosbro.multilevel.data.repositories.Result
 import com.typosbro.multilevel.features.inference.OnnxRuntimeManager
 import com.typosbro.multilevel.features.vosk.VoskRecognitionManager
 import com.typosbro.multilevel.utils.AudioPlayer
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
@@ -24,6 +25,7 @@ import org.vosk.android.RecognitionListener
 import org.vosk.android.StorageService
 import java.util.*
 import java.util.concurrent.atomic.AtomicInteger
+import javax.inject.Inject
 
 enum class ExamPart { NOT_STARTED, PART_1, PART_2_PREP, PART_2_SPEAKING, PART_3, FINISHED, ANALYSIS_COMPLETE }
 
@@ -40,7 +42,8 @@ data class ExamUiState(
     val finalResultId: String? = null
 )
 
-class ExamViewModel(
+@HiltViewModel
+class ExamViewModel @Inject constructor(
     application: Application,
     private val chatRepository: ChatRepository
 ) : AndroidViewModel(application) {
