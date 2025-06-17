@@ -72,7 +72,7 @@ class ChatDetailViewModel(
                 val multilingual = false
 
                 // Copy files to a cache directory where the native code can access them
-                val modelFile = copyRawResourceToFile(modelName, R.raw.)
+                val modelFile = copyRawResourceToFile(modelName, R.raw.whisper_tiny_en)
                 val vocabFile = copyRawResourceToFile(vocabName, R.raw.filters_vocab_en)
 
                 if (modelFile == null || vocabFile == null) {

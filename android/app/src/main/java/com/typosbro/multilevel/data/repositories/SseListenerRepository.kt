@@ -34,8 +34,7 @@ class SseListenerRepository(
                 else -> null
             }
 
-            // --- FIX IS HERE ---
-            // Only try to send if the parsed event is not null.
+            // --- FIX: Only try to send if the parsed event is not null. ---
             if (parsedEvent != null) {
                 scope.trySend(parsedEvent)
             }
@@ -77,8 +76,7 @@ class ExamSseListener(
                 else -> null
             }
 
-            // --- FIX IS HERE ---
-            // Only try to send if the parsed event is not null.
+            // --- FIX: Only try to send if the parsed event is not null. ---
             if (parsedEvent != null) {
                 scope.trySend(parsedEvent)
             }

@@ -74,8 +74,8 @@ object NetworkModule {
     @Singleton
     fun provideChatRepository(
         apiService: ApiService,
-        @Named("SseOkHttpClient") sseClient: OkHttpClient // Inject the named SSE client
-    ): ChatRepository {
-        return ChatRepository(apiService, sseClient)
-    }
+        @Named("SseOkHttpClient") sseClient: OkHttpClient,
+        tokenManager: TokenManager
+    ): ChatRepository = ChatRepository(apiService, sseClient, tokenManager)
+
 }

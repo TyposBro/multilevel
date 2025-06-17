@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.typosbro.multilevel.data.remote.models.CueCard
 import com.typosbro.multilevel.ui.component.RecognitionControls
 import com.typosbro.multilevel.ui.viewmodels.ExamPart
@@ -178,7 +177,8 @@ fun ExaminerInteractionView(
     ) {
         // Top section with timer and examiner text
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            AnimatedVisibility(visible = uiState.isUserListening && uiState.timerValue > 0) {
+            // FIX: Use isRecording here
+            AnimatedVisibility(visible = uiState.isRecording && uiState.timerValue > 0) {
                 Text(
                     text = "Time left: ${uiState.timerValue}",
                     style = MaterialTheme.typography.titleMedium,
@@ -203,10 +203,10 @@ fun ExaminerInteractionView(
             )
             Spacer(Modifier.height(16.dp))
             RecognitionControls(
-                isRecording = uiState.isUserListening,
+                // FIX: Use isRecording here
+                isRecording = uiState.isRecording,
                 onStartRecording = onStartRecording,
-                onStopRecording = onStopRecording,
-                enabled = !uiState.isExaminerSpeaking
+                onStopRecording = onStopRecording
             )
         }
     }
@@ -252,7 +252,8 @@ fun Part2SpeakingView(
     ) {
         // Top section with timer and cue card
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            AnimatedVisibility(visible = uiState.isUserListening && uiState.timerValue > 0) {
+            // FIX: Use isRecording here
+            AnimatedVisibility(visible = uiState.isRecording && uiState.timerValue > 0) {
                 Text(
                     text = "Time left: ${uiState.timerValue}",
                     style = MaterialTheme.typography.titleMedium,
@@ -273,10 +274,10 @@ fun Part2SpeakingView(
             )
             Spacer(Modifier.height(16.dp))
             RecognitionControls(
-                isRecording = uiState.isUserListening,
+                // FIX: Use isRecording here
+                isRecording = uiState.isRecording,
                 onStartRecording = onStartRecording,
-                onStopRecording = onStopRecording,
-                enabled = !uiState.isExaminerSpeaking
+                onStopRecording = onStopRecording
             )
         }
     }

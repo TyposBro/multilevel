@@ -1,10 +1,11 @@
+// {PATH_TO_PROJECT}/app/build.gradle.kts
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.hilt.android)
-
 }
 
 android {
@@ -19,6 +20,12 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // FIX: Add the NDK block to specify which native architectures to build.
+        // This is crucial for the C++ code.
+        ndk {
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+        }
     }
 
     buildTypes {
@@ -30,20 +37,30 @@ android {
             )
         }
     }
+
+    // FIX: Add the externalNativeBuild block to link your C++ code via CMake.
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
     }
+
     kotlinOptions {
         jvmTarget = "1.8"
     }
+
     buildFeatures {
         compose = true
     }
 }
 
 dependencies {
-
+    // Core Android & Compose
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -53,41 +70,45 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.material)
-
-
-    // Material Icons Extended
     implementation(libs.androidx.material.icons.core)
     implementation(libs.androidx.material.icons.extended)
 
-
-    // Navigation Compose
+    // Navigation
     implementation(libs.androidx.navigation.compose)
 
-    // Vosk dependencies
-    implementation (libs.vosk.android)
-    implementation (libs.commons.compress)
-
-    // Models
-    implementation(project(":models"))
-
-    // ViewModel
+    // ViewModels
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
-
-    // Networking (Retrofit & OkHttp)
+    // Networking
     implementation(libs.retrofit)
     implementation(libs.converter.gson)
     implementation(libs.okhttp)
     implementation(libs.logging.interceptor)
-    // OkHttp SSE
-    implementation(libs.okhttp.sse) // Added this line
+    implementation(libs.okhttp.sse)
 
-    // Secure Storage (Jetpack Security)
+    // Secure Storage
     implementation(libs.androidx.security.crypto)
 
-    // Testing (Optional but recommended)
+    // ONNX Runtime (for TTS)
+    implementation(libs.onnxruntime.android)
+
+    // FIX: Add TensorFlow Lite dependencies (for Whisper STT Java fallback)
+    implementation(libs.tensorflow.lite)
+    implementation(libs.tensorflow.lite.support)
+
+    // Room (Local Database)
+    implementation(libs.androidx.room.runtime)
+    ksp(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
+
+    // Dagger Hilt
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.androidx.hilt.navigation.compose)
+
+    // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -95,46 +116,4 @@ dependencies {
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
-
-
-
-    // Android Gradle Plugins
-    implementation(libs.onnxruntime.android)
-    implementation(libs.npy)
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.ipa.transcribers)
-
-    // Room for local database
-
-    implementation(libs.androidx.room.runtime)
-
-    // If this project uses any Kotlin source, use Kotlin Symbol Processing (KSP)
-    // See Add the KSP plugin to your project
-    ksp(libs.androidx.room.compiler)
-
-    // optional - Kotlin Extensions and Coroutines support for Room
-    implementation(libs.androidx.room.ktx)
-
-    // optional - RxJava2 support for Room
-    implementation(libs.androidx.room.rxjava2)
-
-    // optional - RxJava3 support for Room
-    implementation(libs.androidx.room.rxjava3)
-
-    // optional - Guava support for Room, including Optional and ListenableFuture
-    implementation(libs.androidx.room.guava)
-
-    // optional - Test helpers
-    testImplementation(libs.androidx.room.testing)
-
-    // optional - Paging 3 Integration
-    implementation(libs.androidx.room.paging)
-
-    // Dagger Hilt - NOW USING KSP
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    implementation(libs.androidx.hilt.navigation.compose)
-
-
 }

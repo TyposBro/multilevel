@@ -21,7 +21,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -42,7 +41,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.typosbro.multilevel.ui.component.ChatMessageBubble
 import com.typosbro.multilevel.ui.component.RecognitionControls
 import com.typosbro.multilevel.ui.viewmodels.ChatDetailViewModel
@@ -53,7 +51,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun ChatDetailScreen(
     onNavigateBack: () -> Unit,
-    // chatId is handled by ViewModel's SavedStateHandle now
     viewModel: ChatDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -81,25 +78,22 @@ fun ChatDetailScreen(
                         duration = SnackbarDuration.Long
                     )
                 }
-            } else {
-                // Permission granted, maybe trigger something if needed, but usually just allows action
             }
         })
 
     // --- Effects ---
-    LaunchedEffect(uiState.messageList.size) { // Scroll when new messages arrive
+    LaunchedEffect(uiState.messageList.size) {
         if (uiState.messageList.isNotEmpty()) {
-            // Scroll to the newest message (which is at index 0 because of reverseLayout)
             listState.animateScrollToItem(0)
         }
     }
 
-    LaunchedEffect(uiState.error) { // Show errors in Snackbar
+    LaunchedEffect(uiState.error) {
         uiState.error?.let {
             coroutineScope.launch {
                 snackbarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
             }
-            viewModel.clearError() // Clear error after showing
+            viewModel.clearError()
         }
     }
 
@@ -113,40 +107,36 @@ fun ChatDetailScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues) // Apply padding from Scaffold
+                .padding(paddingValues)
         ) {
-            // Loading indicator for initial history load
             if (uiState.isLoading && uiState.messageList.isEmpty()) {
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else {
-                // Chat Messages Area
                 LazyColumn(
                     modifier = Modifier
-                        .weight(1f) // Takes up remaining space
-                        .fillMaxWidth(), // Ensures it fills width
+                        .weight(1f)
+                        .fillMaxWidth(),
                     state = listState,
-                    reverseLayout = true, // Newest messages at the bottom (displayed at top of list visually)
+                    reverseLayout = true,
                     contentPadding = PaddingValues(
                         horizontal = 8.dp,
                         vertical = 8.dp
-                    ) // Padding for messages
+                    )
                 ) {
-                    // Partial text bubble (if recording and partial text exists)
                     if (uiState.isRecording && uiState.partialText.isNotBlank()) {
                         item {
                             ChatMessageBubble(
-                                message = com.typosbro.multilevel.ui.component.ChatMessage( // Use explicit import
-                                    text = uiState.partialText + "...", // Indicate it's partial
+                                message = com.typosbro.multilevel.ui.component.ChatMessage(
+                                    text = uiState.partialText + "...",
                                     isUser = true
                                 ),
-                                modifier = Modifier.padding(bottom = 4.dp) // Spacing below partial
+                                modifier = Modifier.padding(bottom = 4.dp)
                             )
                         }
                     }
 
-                    // Render actual messages
                     items(
                         items = uiState.messageList, key = { message -> message.id }) { message ->
                         ChatMessageBubble(message = message)
@@ -154,25 +144,13 @@ fun ChatDetailScreen(
                 }
             }
 
-            // Spacer removed, padding handled by Column/RecognitionControls surface
-
             // --- Recording Control Area ---
             Column(
-                modifier = Modifier.fillMaxWidth()
-                // Add vertical padding if needed, RecognitionControls usually has internal padding
-                // .padding(vertical = 8.dp)
-                , horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // ** Display Remaining Time **
-                // Conditionally display the Text based on remainingRecordingTime
-                uiState.remainingRecordingTime?.let { time ->
-                    Text(
-                        text = "$time s",
-                        style = MaterialTheme.typography.labelMedium, // Or bodySmall, etc.
-                        color = MaterialTheme.colorScheme.onSurfaceVariant, // Use theme color
-                        modifier = Modifier.padding(bottom = 4.dp) // Space between timer and button
-                    )
-                }
+                // --- FIX: The timer display is removed as it's no longer in the UI state ---
+                // uiState.remainingRecordingTime?.let { ... } // This block is deleted
 
                 // Recognition Controls
                 RecognitionControls(
@@ -183,18 +161,15 @@ fun ChatDetailScreen(
                         } else if (!uiState.isModelReady) {
                             coroutineScope.launch { snackbarHostState.showSnackbar("Voice model not ready yet.") }
                         } else {
-                            // Start recording
                             viewModel.startMicRecognition()
                         }
                     },
                     onStopRecording = {
-                        // Stop recording
                         viewModel.stopRecognitionAndSend()
                     },
-                    modifier = Modifier.fillMaxWidth() // Let RecognitionControls handle its own padding/surface
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }
     }
 }
-

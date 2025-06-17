@@ -1,86 +1,96 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/repositories/ChatRepository.kt
 package com.typosbro.multilevel.data.repositories
 
-
-import android.util.Log
 import com.google.gson.Gson
+import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.data.remote.ApiService
+import com.typosbro.multilevel.data.remote.RetrofitClient
 import com.typosbro.multilevel.data.remote.models.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.ResponseBody
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.sse.EventSources
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import javax.inject.Inject
+import javax.inject.Singleton
 
-class ChatRepository(
+@Singleton
+class ChatRepository @Inject constructor(
     private val apiService: ApiService,
-    private val sseClient: OkHttpClient // Use the dedicated SSE client
+    private val okHttpClient: OkHttpClient, // Hilt will provide the correct named instance
+    private val tokenManager: TokenManager
 ) {
     private val gson = Gson()
 
     // --- Freestyle Chat Methods ---
+
     suspend fun getChatList(): Result<ChatListResponse> = safeApiCall { apiService.getChatList() }
+
     suspend fun createNewChat(title: String?): Result<NewChatResponse> = safeApiCall { apiService.createNewChat(NewChatRequest(title)) }
+
     suspend fun getChatHistory(chatId: String): Result<ChatHistoryResponse> = safeApiCall { apiService.getChatHistory(chatId) }
+
     suspend fun deleteChat(chatId: String): Result<GenericSuccessResponse> = safeApiCall { apiService.deleteChat(chatId) }
+
     suspend fun updateChatTitle(chatId: String, newTitle: String): Result<GenericSuccessResponse> = safeApiCall { apiService.updateChatTitle(chatId, TitleUpdateRequest(newTitle)) }
 
-    /**
-     * Sends a message and streams the response. Now uses ApiService.
-     */
     fun sendMessageAndStream(
         chatId: String,
         prompt: String,
         langCodeForTTS: String?,
         configKeyForTTS: String?
     ): Flow<ChatStreamEvent> = channelFlow {
-        val request = SendMessageRequest(
-            prompt = prompt,
-            lang_code = langCodeForTTS,
-            config_key = configKeyForTTS
-        )
-        val call = apiService.sendMessageAndStream(chatId, request)
-        val listener = SseListenerRepository(this, gson)
-        // Use the dedicated SSE client for the EventSource
-        val eventSource = EventSources.createFactory(sseClient).newEventSource(call.request(), listener)
+        val messageRequest = SendMessageRequest(prompt, langCodeForTTS, configKeyForTTS)
+        val jsonBody = gson.toJson(messageRequest)
+        val requestBody = jsonBody.toRequestBody("application/json".toMediaType())
+        val token = tokenManager.getToken()
 
-        awaitClose { eventSource.cancel() }
+        val request = Request.Builder()
+            .url("${RetrofitClient.BASE_URL}chat/$chatId/message")
+            .header("Authorization", "Bearer $token")
+            .post(requestBody)
+            .build()
+
+        val listener = SseListenerRepository(this, gson)
+        val eventSource = EventSources.createFactory(okHttpClient).newEventSource(request, listener)
+
+        awaitClose {
+            eventSource.cancel()
+        }
     }
 
     // --- Structured Exam Methods ---
+
     suspend fun getInitialExamQuestion(): Result<ExamStepResponse> = safeApiCall { apiService.startExam() }
 
-    /**
-     * Gets the next step in the exam by streaming. Now uses ApiService.
-     */
     fun getNextExamStepStream(request: ExamStepRequest): Flow<ExamEvent> = channelFlow {
-        Log.d("ChatRepository", "getNextExamStepStream called with request: $request")
+        val jsonBody = gson.toJson(request)
+        val requestBody = jsonBody.toRequestBody("application/json; charset=utf-8".toMediaType())
+        val token = tokenManager.getToken()
 
-        // Create the Retrofit call via the ApiService
-        val call = apiService.getNextExamStepStream(request)
+        val httpRequest = Request.Builder()
+            .url("${RetrofitClient.BASE_URL}exam/step-stream")
+            .header("Authorization", "Bearer $token")
+            .post(requestBody)
+            .build()
 
-        // The listener remains the same, handling the parsed events
         val listener = ExamSseListener(this, gson)
+        val eventSource = EventSources.createFactory(okHttpClient).newEventSource(httpRequest, listener)
 
-        // Use the dedicated SSE OkHttpClient to create the EventSource
-        val eventSource = EventSources.createFactory(sseClient).newEventSource(call.request(), listener)
-
-        // This ensures the connection stays open until the Flow is cancelled
         awaitClose {
-            Log.d("ChatRepository", "Closing SSE connection for exam stream.")
             eventSource.cancel()
         }
     }
 
     suspend fun analyzeFullExam(transcript: List<TranscriptEntry>): Result<AnalyzeExamResponse> {
-        val request = AnalyzeExamRequest(transcript = transcript)
+        val request = AnalyzeExamRequest(transcript)
         return safeApiCall { apiService.analyzeExam(request) }
     }
 
     suspend fun getExamHistorySummary(): Result<ExamHistorySummaryResponse> = safeApiCall { apiService.getExamHistory() }
+
     suspend fun getExamResultDetails(resultId: String): Result<ExamResultResponse> = safeApiCall { apiService.getExamResult(resultId) }
 }
