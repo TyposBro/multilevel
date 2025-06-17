@@ -15,104 +15,83 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Recorder {
 
+    // A simpler listener that only provides audio data.
     public interface RecorderListener {
-        void onUpdateReceived(String message);
         void onDataReceived(float[] samples);
+        void onRecordingStopped(); // Add a callback for when recording actually stops
     }
 
     private static final String TAG = "Recorder";
-    public static final String MSG_RECORDING = "Recording...";
-    public static final String MSG_RECORDING_DONE = "Recording done...!";
-    public static final int RECORDING_DURATION_S = 60;
-
     private final Context mContext;
-    private final AtomicBoolean mInProgress = new AtomicBoolean(false);
+    private final AtomicBoolean mIsRecording = new AtomicBoolean(false);
     private RecorderListener mListener;
     private Thread recordingThread;
 
-    public Recorder(Context context) {
+    public Recorder(Context context, RecorderListener listener) {
         this.mContext = context;
-    }
-
-    public void setListener(RecorderListener listener) {
         this.mListener = listener;
     }
 
+    public boolean isRecording() {
+        return mIsRecording.get();
+    }
+
     public void start() {
-        if (mInProgress.get()) {
+        if (mIsRecording.get()) {
             Log.d(TAG, "Recording is already in progress...");
             return;
         }
-        mInProgress.set(true);
+        mIsRecording.set(true);
         recordingThread = new Thread(this::recordAudio);
         recordingThread.start();
     }
 
     public void stop() {
-        if (!mInProgress.get()) return;
-        mInProgress.set(false);
-        if (recordingThread != null && recordingThread.isAlive()) {
-            try {
-                recordingThread.join(500); // Wait a bit for the loop to finish
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }
-    }
-
-    private void sendUpdate(String message) {
-        if (mListener != null)
-            mListener.onUpdateReceived(message);
-    }
-
-    private void sendData(float[] samples) {
-        if (mListener != null)
-            mListener.onDataReceived(samples);
+        if (!mIsRecording.get()) return;
+        mIsRecording.set(false); // Signal the thread to stop
     }
 
     private void recordAudio() {
         if (ActivityCompat.checkSelfPermission(mContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            sendUpdate("Permission not granted for recording");
-            mInProgress.set(false);
+            Log.e(TAG, "Permission not granted for recording");
+            mIsRecording.set(false);
+            if (mListener != null) mListener.onRecordingStopped();
             return;
         }
 
-        sendUpdate(MSG_RECORDING);
-
+        Log.d(TAG, "Starting audio recording thread.");
         int sampleRateInHz = 16000;
         int channelConfig = AudioFormat.CHANNEL_IN_MONO;
         int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
 
         int bufferSizeInBytes = AudioRecord.getMinBufferSize(sampleRateInHz, channelConfig, audioFormat);
         AudioRecord audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);
-        audioRecord.startRecording();
 
-        // Process audio in chunks of ~1 second for real-time feel
-        int chunkBufferSize = sampleRateInHz * (16 / 8) * 1; // 1 sec of 16-bit mono audio
-        byte[] audioData = new byte[chunkBufferSize];
-        long recordingStartTime = System.currentTimeMillis();
+        try {
+            audioRecord.startRecording();
+            byte[] audioData = new byte[bufferSizeInBytes];
 
-        while (mInProgress.get()) {
-            int bytesRead = audioRecord.read(audioData, 0, audioData.length);
-            if (bytesRead > 0) {
-                float[] samples = convertToFloatArray(ByteBuffer.wrap(audioData, 0, bytesRead));
-                sendData(samples);
-            } else {
-                Log.e(TAG, "AudioRecord read error: " + bytesRead);
-                break;
+            while (mIsRecording.get()) {
+                int bytesRead = audioRecord.read(audioData, 0, audioData.length);
+                if (bytesRead > 0 && mListener != null) {
+                    float[] samples = convertToFloatArray(ByteBuffer.wrap(audioData, 0, bytesRead));
+                    mListener.onDataReceived(samples);
+                } else if (bytesRead < 0) {
+                    Log.e(TAG, "AudioRecord read error: " + bytesRead);
+                    break;
+                }
             }
-
-            // Optional: Add a max duration check
-            if (System.currentTimeMillis() - recordingStartTime > RECORDING_DURATION_S * 1000) {
-                Log.d(TAG, "Max recording duration reached.");
-                break;
+        } catch (Exception e) {
+            Log.e(TAG, "Exception during recording", e);
+        } finally {
+            Log.d(TAG, "Stopping audio recording thread.");
+            mIsRecording.set(false); // Ensure state is false
+            audioRecord.stop();
+            audioRecord.release();
+            if (mListener != null) {
+                mListener.onRecordingStopped();
             }
         }
-
-        audioRecord.stop();
-        audioRecord.release();
-        mInProgress.set(false);
-        sendUpdate(MSG_RECORDING_DONE);
     }
 
     private float[] convertToFloatArray(ByteBuffer buffer) {

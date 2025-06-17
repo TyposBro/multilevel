@@ -104,7 +104,7 @@ fun MainScreen(
 fun BottomNavigationBar(navController: NavHostController) {
     val items = listOf(
         Triple("Practice", Icons.Default.Home, MainDestinations.PRACTICE_ROUTE),
-        Triple("Word Bank", Icons.Default.Style, MainDestinations.WORDBANK_ROUTE),
+//        Triple("Word Bank", Icons.Default.Style, MainDestinations.WORDBANK_ROUTE),
         Triple("Progress", Icons.Default.History, MainDestinations.PROGRESS_ROUTE),
         Triple("Profile", Icons.Default.Person, MainDestinations.PROFILE_ROUTE)
     )
