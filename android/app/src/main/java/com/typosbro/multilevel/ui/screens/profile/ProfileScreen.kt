@@ -8,31 +8,57 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.PrivacyTip
-import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.ui.viewmodels.ProfileViewModel
+import java.text.SimpleDateFormat
+import java.util.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    viewModel: ProfileViewModel = hiltViewModel(),
+    viewModel: ProfileViewModel, // Injected from MainScreen
     onLogout: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLogoutDialog by remember { mutableStateOf(false) }
 
+    // Formatter for the join date
+    val formattedDate = remember(uiState.userProfile.createdAt) {
+        if (uiState.userProfile.createdAt.isEmpty()) {
+            "..."
+        } else {
+            try {
+                // Input format from server (ISO 8601)
+                val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+                parser.timeZone = TimeZone.getTimeZone("UTC")
+                val date = parser.parse(uiState.userProfile.createdAt)
+                // Desired output format
+                val formatter = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
+                date?.let { formatter.format(it) } ?: "..."
+            } catch (e: Exception) {
+                "Invalid date" // Fallback
+            }
+        }
+    }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("Profile & Settings") }) }
     ) { padding ->
+
+        if (uiState.isLoading) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            return@Scaffold
+        }
+
         LazyColumn(
             modifier = Modifier
                 .padding(padding)
@@ -43,7 +69,13 @@ fun ProfileScreen(
                 SectionHeader("Account")
                 ListItem(
                     headlineContent = { Text("Email") },
-                    supportingContent = { Text(uiState.userProfile.email ?: "Not logged in") }
+                    supportingContent = { Text(uiState.userProfile.email) },
+                    leadingContent = { Icon(Icons.Default.AccountCircle, contentDescription = "Email") }
+                )
+                ListItem(
+                    headlineContent = { Text("Member Since") },
+                    supportingContent = { Text(formattedDate) },
+                    leadingContent = { Icon(Icons.Default.Event, contentDescription = "Member Since") }
                 )
                 ListItem(
                     headlineContent = { Text("Subscription", fontWeight = FontWeight.SemiBold) },
@@ -54,20 +86,17 @@ fun ProfileScreen(
                 )
             }
 
-            // --- Settings Section ---
+            // --- Other sections remain the same ---
             item {
                 SectionHeader("Settings")
                 ListItem(
                     headlineContent = { Text("Dark Mode") },
                     leadingContent = { Icon(Icons.Default.DarkMode, contentDescription = "Dark Mode") },
                     trailingContent = {
-                        // In a real app, this value would control the app's theme.
                         Switch(checked = uiState.isDarkTheme, onCheckedChange = { viewModel.onThemeChanged(it) })
                     }
                 )
             }
-
-            // --- Support Section ---
             item {
                 SectionHeader("Support & Legal")
                 ListItem(
@@ -85,9 +114,8 @@ fun ProfileScreen(
                     leadingContent = { Icon(Icons.Default.Info, contentDescription = "About") },
                     modifier = Modifier.clickable { /* Show About dialog */ }
                 )
-            }
 
-            // --- Logout Button ---
+            }
             item {
                 Spacer(Modifier.height(32.dp))
                 ListItem(
@@ -105,13 +133,13 @@ fun ProfileScreen(
             onConfirm = {
                 onLogout()
                 showLogoutDialog = false
-                // Navigation to login screen is handled automatically by AppNavigation's LaunchedEffect
             },
             onDismiss = { showLogoutDialog = false }
         )
     }
 }
 
+// ... SectionHeader and LogoutConfirmationDialog composables are unchanged ...
 @Composable
 private fun SectionHeader(title: String) {
     Column {

@@ -4,6 +4,7 @@ package com.typosbro.multilevel.data.remote
 
 import android.content.Context
 import com.google.gson.GsonBuilder
+import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.data.remote.interceptors.AuthInterceptor
 import okhttp3.OkHttpClient
@@ -20,7 +21,8 @@ object RetrofitClient {
 
 
     fun getOkHttpClient(context: Context): OkHttpClient {
-        val tokenManager = TokenManager(context.applicationContext)
+        val tokenManager = SessionManager(TokenManager(context.applicationContext))
+
         val loggingInterceptor = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC // Or BODY for more detail
         }
@@ -35,7 +37,7 @@ object RetrofitClient {
     }
 
     fun create(context: Context): ApiService {
-        val tokenManager = TokenManager(context.applicationContext) // Use application context
+        val tokenManager = SessionManager(TokenManager(context.applicationContext))
 
         // Logging Interceptor (for debugging)
         val loggingInterceptor = HttpLoggingInterceptor().apply {

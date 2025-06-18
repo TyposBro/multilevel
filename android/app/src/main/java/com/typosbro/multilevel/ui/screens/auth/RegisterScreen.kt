@@ -16,7 +16,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 
 @Composable
 fun RegisterScreen(
-    onRegisterSuccess: () -> Unit,
     onNavigateToLogin: () -> Unit,
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -25,14 +24,7 @@ fun RegisterScreen(
     var confirmPassword by remember { mutableStateOf("") } // Add confirm password
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
     val error by authViewModel.error.collectAsStateWithLifecycle()
-    val isRegistered by authViewModel.authenticationSuccessful.collectAsStateWithLifecycle()
 
-    LaunchedEffect(isRegistered) {
-        if (isRegistered) {
-            onRegisterSuccess()
-            authViewModel.resetAuthStatus()
-        }
-    }
 
     Column(
         modifier = Modifier

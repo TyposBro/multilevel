@@ -17,4 +17,8 @@ class AuthRepository(private val apiService: ApiService) {
     suspend fun register(request: AuthRequest): RepositoryResult<AuthResponse> = withContext(Dispatchers.IO) {
         safeApiCall { apiService.register(request) }
     }
+
+    suspend fun getUserProfile(): RepositoryResult<UserProfileResponse> = withContext(Dispatchers.IO) {
+        safeApiCall { apiService.getProfile() }
+    }
 }

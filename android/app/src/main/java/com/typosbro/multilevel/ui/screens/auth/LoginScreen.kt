@@ -15,7 +15,6 @@ import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
@@ -23,14 +22,7 @@ fun LoginScreen(
     var password by remember { mutableStateOf("") }
     val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
     val error by authViewModel.error.collectAsStateWithLifecycle()
-    val isAuthenticated by authViewModel.authenticationSuccessful.collectAsStateWithLifecycle()
 
-    LaunchedEffect(isAuthenticated) {
-        if (isAuthenticated) {
-            onLoginSuccess()
-            authViewModel.resetAuthStatus() // Reset after navigation
-        }
-    }
 
     LaunchedEffect(error) {
         // Optional: Show snackbar or dialog for errors

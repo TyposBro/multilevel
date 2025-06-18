@@ -2,31 +2,32 @@
 package com.typosbro.multilevel.ui.viewmodels
 
 import androidx.lifecycle.viewModelScope
+import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.data.remote.models.AuthRequest
 import com.typosbro.multilevel.data.repositories.AuthRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
     private val authRepository: AuthRepository,
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val sessionManager: SessionManager
 ) : BaseViewModel() {
 
-    // Using simple state for auth success signal
-    private val _authenticationSuccessful = MutableStateFlow(false)
-    val authenticationSuccessful = _authenticationSuccessful.asStateFlow()
+    // --- REMOVED ---
+    // private val _authenticationSuccessful = MutableStateFlow(false)
+    // val authenticationSuccessful = _authenticationSuccessful.asStateFlow()
 
     fun login(email: String, password: String) {
         launchDataLoad(
             block = { authRepository.login(AuthRequest(email, password)) },
             onSuccess = { authResponse ->
+                // The ONLY responsibility is to save the token.
+                // Navigation will be handled by observing the token's state.
                 tokenManager.saveToken(authResponse.token)
-                _authenticationSuccessful.value = true // Signal success
             }
         )
     }
@@ -36,21 +37,18 @@ class AuthViewModel @Inject constructor(
             block = { authRepository.register(AuthRequest(email, password)) },
             onSuccess = { authResponse ->
                 tokenManager.saveToken(authResponse.token)
-                _authenticationSuccessful.value = true // Signal success
             }
         )
     }
 
-    // Reset the success signal when navigating away
-    fun resetAuthStatus() {
-        _authenticationSuccessful.value = false
-    }
+    // --- REMOVED ---
+    // fun resetAuthStatus() { ... }
 
     fun logout() {
         viewModelScope.launch {
-            tokenManager.clearToken()
-            // Optionally add API call to invalidate token on backend
-            _authenticationSuccessful.value = false // Ensure state is reset
+            sessionManager.logout()
         }
     }
+
+    fun getSessionManager(): SessionManager = sessionManager
 }

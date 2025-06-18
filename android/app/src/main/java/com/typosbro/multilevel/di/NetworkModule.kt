@@ -2,6 +2,7 @@
 package com.typosbro.multilevel.di
 
 import android.content.Context
+import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.data.remote.ApiService
 import com.typosbro.multilevel.data.remote.RetrofitClient
@@ -25,13 +26,18 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    // Use @Named annotation to provide two different OkHttpClient instances
+    @Provides
+    @Singleton
+    fun provideAuthInterceptor(sessionManager: SessionManager): AuthInterceptor {
+        return AuthInterceptor(sessionManager)
+    }
+
     @Provides
     @Singleton
     @Named("StandardOkHttpClient")
-    fun provideStandardOkHttpClient(tokenManager: TokenManager): OkHttpClient {
+    fun provideStandardOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient { // <-- Change parameter
         return OkHttpClient.Builder()
-            .addInterceptor(AuthInterceptor(tokenManager))
+            .addInterceptor(authInterceptor) // <-- Use the injected interceptor
             .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
@@ -42,9 +48,9 @@ object NetworkModule {
     @Provides
     @Singleton
     @Named("SseOkHttpClient")
-    fun provideSseOkHttpClient(tokenManager: TokenManager): OkHttpClient {
+    fun provideSseOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient { // <-- Change parameter
         return OkHttpClient.Builder()
-            .addInterceptor(AuthInterceptor(tokenManager))
+            .addInterceptor(authInterceptor) // <-- Use the injected interceptor
             .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS) // No read timeout for SSE
@@ -52,6 +58,10 @@ object NetworkModule {
             .pingInterval(20, TimeUnit.SECONDS)
             .build()
     }
+
+
+
+
 
     @Provides
     @Singleton

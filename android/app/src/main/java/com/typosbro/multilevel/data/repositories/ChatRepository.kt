@@ -17,12 +17,13 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.sse.EventSources
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 @Singleton
 class ChatRepository @Inject constructor(
     private val apiService: ApiService,
-    private val okHttpClient: OkHttpClient, // Hilt will provide the correct named instance
+    @Named("SseOkHttpClient") private val okHttpClient: OkHttpClient, // Hilt will provide the correct named instance
     private val tokenManager: TokenManager
 ) {
     private val gson = Gson()

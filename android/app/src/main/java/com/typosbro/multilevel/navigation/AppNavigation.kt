@@ -1,22 +1,16 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/navigation/AppNavigation.kt
-
 package com.typosbro.multilevel.navigation
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.ui.screens.MainScreen
 import com.typosbro.multilevel.ui.screens.auth.LoginScreen
@@ -26,20 +20,19 @@ import com.typosbro.multilevel.ui.screens.chat.ChatListScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamResultScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamScreen
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
+import kotlinx.coroutines.flow.collectLatest
 
 // Define navigation routes
 object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val REGISTER_ROUTE = "register"
-    const val MAIN_HUB_ROUTE = "main_hub" // New route for MainScreen
+    const val MAIN_HUB_ROUTE = "main_hub"
     const val EXAM_SCREEN_ROUTE = "exam_screen"
     const val EXAM_RESULT_ROUTE = "exam_result/{resultId}"
-
-    // OLD MVP ROUTES
     const val CHAT_LIST_ROUTE = "chat_list"
-    const val CHAT_DETAIL_ROUTE = "chat_detail" // Base route
-    const val CHAT_ID_ARG = "chatId" // Argument name
-    const val CHAT_DETAIL_ROUTE_WITH_ARGS = "$CHAT_DETAIL_ROUTE/{$CHAT_ID_ARG}" // Route with arg placeholder
+    const val CHAT_DETAIL_ROUTE = "chat_detail"
+    const val CHAT_ID_ARG = "chatId"
+    const val CHAT_DETAIL_ROUTE_WITH_ARGS = "$CHAT_DETAIL_ROUTE/{$CHAT_ID_ARG}"
 }
 
 @Composable
@@ -47,28 +40,51 @@ fun AppNavigation(
     navController: NavHostController = rememberNavController()
 ) {
     val context = LocalContext.current
-    // Check initial auth state using TokenManager directly or via AuthViewModel state if preferred
     val tokenManager = remember { TokenManager(context) }
-    var startDestination by remember {
+    val authViewModel: AuthViewModel = hiltViewModel()
+
+    // Get the singleton SessionManager instance via the AuthViewModel
+    val sessionManager: SessionManager = authViewModel.getSessionManager()
+
+    // Determine the initial screen based on whether a token exists on startup.
+    val startDestination by remember {
         mutableStateOf(
             if (tokenManager.hasToken()) AppDestinations.MAIN_HUB_ROUTE else AppDestinations.LOGIN_ROUTE
         )
     }
 
-    // Observe logout state from AuthViewModel to reset navigation
-    val authViewModel: AuthViewModel = hiltViewModel()
-    val isAuthenticated by authViewModel.authenticationSuccessful.collectAsState() // Observe login/register success too
-
-    // React to authentication changes
-    LaunchedEffect(key1 = tokenManager.getToken()) { // React if token changes (login/logout)
-        startDestination = if (tokenManager.hasToken()) AppDestinations.MAIN_HUB_ROUTE else AppDestinations.LOGIN_ROUTE
-        // Force navigation if already past the auth screens
-        if (!tokenManager.hasToken() && navController.currentDestination?.route != AppDestinations.LOGIN_ROUTE && navController.currentDestination?.route != AppDestinations.REGISTER_ROUTE) {
+    // EFFECT 1: Handles automatic logout when token expires.
+    // This LaunchedEffect listens for events from the SessionManager.
+    // The network interceptor will trigger this event if it gets a 401 error.
+    LaunchedEffect(key1 = sessionManager) {
+        sessionManager.logoutEvents.collectLatest {
+            // When a logout event is received, navigate to the login screen
+            // and clear the entire back stack to prevent the user from going back.
             navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                popUpTo(navController.graph.startDestinationId) { inclusive = true } // Clear back stack
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 launchSingleTop = true
             }
-        } else if (tokenManager.hasToken() && (navController.currentDestination?.route == AppDestinations.LOGIN_ROUTE || navController.currentDestination?.route == AppDestinations.REGISTER_ROUTE)) {
+        }
+    }
+
+    // EFFECT 2: Handles manual login/logout and app startup state.
+    // This observes the token directly. It's useful for redirecting the user
+    // immediately after they manually log in or log out.
+    val token by tokenManager.tokenFlow.collectAsState(initial = tokenManager.getToken())
+    LaunchedEffect(key1 = token) {
+        val currentRoute = navController.currentDestination?.route
+        val onAuthScreen = currentRoute == AppDestinations.LOGIN_ROUTE || currentRoute == AppDestinations.REGISTER_ROUTE
+
+        if (token == null && !onAuthScreen) {
+            // If token is cleared (manual logout) and we are NOT on an auth screen,
+            // navigate to login.
+            navController.navigate(AppDestinations.LOGIN_ROUTE) {
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
+                launchSingleTop = true
+            }
+        } else if (token != null && onAuthScreen) {
+            // If a token is present (successful login) and we ARE on an auth screen,
+            // navigate to the main hub.
             navController.navigate(AppDestinations.MAIN_HUB_ROUTE) {
                 popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 launchSingleTop = true
@@ -76,37 +92,23 @@ fun AppNavigation(
         }
     }
 
-
     NavHost(
         navController = navController,
-        startDestination = startDestination // Dynamically set start destination
+        startDestination = startDestination
     ) {
         composable(AppDestinations.LOGIN_ROUTE) {
             LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate(AppDestinations.MAIN_HUB_ROUTE) {
-                        popUpTo(AppDestinations.LOGIN_ROUTE) { inclusive = true } // Remove login from back stack
-                        launchSingleTop = true
-                    }
-                },
                 onNavigateToRegister = { navController.navigate(AppDestinations.REGISTER_ROUTE) }
             )
         }
 
         composable(AppDestinations.REGISTER_ROUTE) {
             RegisterScreen(
-                onRegisterSuccess = {
-                    navController.navigate(AppDestinations.MAIN_HUB_ROUTE) {
-                        popUpTo(AppDestinations.REGISTER_ROUTE) { inclusive = true } // Remove register from back stack
-                        launchSingleTop = true
-                    }
-                },
                 onNavigateToLogin = { navController.navigate(AppDestinations.LOGIN_ROUTE) }
             )
         }
 
         composable(AppDestinations.MAIN_HUB_ROUTE) {
-            // We now pass the navigation actions into MainScreen
             MainScreen(
                 onNavigateToExam = {
                     navController.navigate(AppDestinations.EXAM_SCREEN_ROUTE)
@@ -115,19 +117,15 @@ fun AppNavigation(
                     navController.navigate("exam_result/$resultId")
                 },
                 onNavigateToChat = { chatId ->
-                    // Handle navigation to your old freestyle chat if you keep it
                     navController.navigate("${AppDestinations.CHAT_DETAIL_ROUTE}/$chatId")
                 }
             )
         }
 
-        // Exam and Result screens are defined at the top level,
-        // so they can be navigated to from anywhere.
         composable(AppDestinations.EXAM_SCREEN_ROUTE) {
             ExamScreen(
                 onNavigateToResults = { resultId ->
                     navController.navigate("exam_result/$resultId") {
-                        // Pop the exam screen off the back stack when going to results
                         popUpTo(AppDestinations.EXAM_SCREEN_ROUTE) { inclusive = true }
                     }
                 }
@@ -140,8 +138,6 @@ fun AppNavigation(
             ExamResultScreen(onNavigateBack = { navController.popBackStack() })
         }
 
-
-
         // OLD MVP ROUTES
         composable(AppDestinations.CHAT_LIST_ROUTE) {
             ChatListScreen(
@@ -149,14 +145,15 @@ fun AppNavigation(
                     navController.navigate("${AppDestinations.CHAT_DETAIL_ROUTE}/$chatId")
                 },
                 onLogout = {
-                    // Navigation is handled by LaunchedEffect observing tokenManager.getToken()
+                    // The logout button in ProfileViewModel now calls sessionManager.logout(),
+                    // which is handled by our new LaunchedEffect.
                 }
             )
         }
         composable(
             route = AppDestinations.CHAT_DETAIL_ROUTE_WITH_ARGS,
             arguments = listOf(navArgument(AppDestinations.CHAT_ID_ARG) { type = NavType.StringType })
-        ) { // No need to pass chatId explicitly, ViewModel handles it via SavedStateHandle
+        ) {
             ChatDetailScreen(
                 onNavigateBack = { navController.popBackStack() }
             )

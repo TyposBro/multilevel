@@ -16,6 +16,9 @@ interface ApiService {
     @POST("auth/login")
     suspend fun login(@Body request: AuthRequest): Response<AuthResponse>
 
+    @GET("auth/profile")
+    suspend fun getProfile(): Response<UserProfileResponse>
+
     // --- Freestyle Chat Endpoints ---
     @GET("chat/")
     suspend fun getChatList(): Response<ChatListResponse>

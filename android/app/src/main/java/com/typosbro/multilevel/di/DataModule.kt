@@ -2,6 +2,7 @@
 package com.typosbro.multilevel.di
 
 import android.content.Context
+import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.data.local.WordDao
 import com.typosbro.multilevel.data.local.WordDatabase
@@ -32,5 +33,11 @@ object DataModule {
     @Singleton
     fun provideWordDao(database: WordDatabase): WordDao {
         return database.wordDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSessionManager(tokenManager: TokenManager): SessionManager {
+        return SessionManager(tokenManager)
     }
 }
