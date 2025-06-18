@@ -5,11 +5,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.conflate
 
+// This class is now just a simple, direct wrapper around EncryptedSharedPreferences.
 class TokenManager(context: Context) {
 
     private val masterKey = MasterKey.Builder(context)
@@ -44,21 +41,5 @@ class TokenManager(context: Context) {
         return getToken() != null
     }
 
-    // --- NEW FLOW TO OBSERVE TOKEN CHANGES ---
-    val tokenFlow: Flow<String?> = callbackFlow {
-        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key == AUTH_TOKEN_KEY) {
-                trySend(getToken())
-            }
-        }
-        sharedPreferences.registerOnSharedPreferenceChangeListener(listener)
-
-        // Send the initial value
-        trySend(getToken())
-
-        // Unregister the listener when the flow is cancelled
-        awaitClose {
-            sharedPreferences.unregisterOnSharedPreferenceChangeListener(listener)
-        }
-    }.conflate() // Use conflate to only emit the latest value if the collector is slow
+    // --- REMOVED THE tokenFlow callbackFlow ---
 }

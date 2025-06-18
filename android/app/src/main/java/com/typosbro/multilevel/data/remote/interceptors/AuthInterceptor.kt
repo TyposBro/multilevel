@@ -1,5 +1,4 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/interceptors/AuthInterceptor.kt
-
 package com.typosbro.multilevel.data.remote.interceptors
 
 import com.typosbro.multilevel.data.local.SessionManager
@@ -12,7 +11,10 @@ class AuthInterceptor @Inject constructor(
     private val sessionManager: SessionManager
 ) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val token = sessionManager.getToken()
+        // --- THIS IS THE CORRECTED LINE ---
+        // Get the current token directly from the StateFlow's value property.
+        val token = sessionManager.tokenFlow.value
+
         val originalRequest = chain.request()
         val path = originalRequest.url.encodedPath
 

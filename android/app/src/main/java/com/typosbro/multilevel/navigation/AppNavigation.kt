@@ -1,8 +1,12 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/navigation/AppNavigation.kt
 package com.typosbro.multilevel.navigation
 
-import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -11,7 +15,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.typosbro.multilevel.data.local.SessionManager
-import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.ui.screens.MainScreen
 import com.typosbro.multilevel.ui.screens.auth.LoginScreen
 import com.typosbro.multilevel.ui.screens.auth.RegisterScreen
@@ -20,7 +23,6 @@ import com.typosbro.multilevel.ui.screens.chat.ChatListScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamResultScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamScreen
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
-import kotlinx.coroutines.flow.collectLatest
 
 // Define navigation routes
 object AppDestinations {
@@ -39,52 +41,29 @@ object AppDestinations {
 fun AppNavigation(
     navController: NavHostController = rememberNavController()
 ) {
-    val context = LocalContext.current
-    val tokenManager = remember { TokenManager(context) }
     val authViewModel: AuthViewModel = hiltViewModel()
-
-    // Get the singleton SessionManager instance via the AuthViewModel
     val sessionManager: SessionManager = authViewModel.getSessionManager()
 
-    // Determine the initial screen based on whether a token exists on startup.
     val startDestination by remember {
         mutableStateOf(
-            if (tokenManager.hasToken()) AppDestinations.MAIN_HUB_ROUTE else AppDestinations.LOGIN_ROUTE
+            if (sessionManager.tokenFlow.value != null) AppDestinations.MAIN_HUB_ROUTE else AppDestinations.LOGIN_ROUTE
         )
     }
 
-    // EFFECT 1: Handles automatic logout when token expires.
-    // This LaunchedEffect listens for events from the SessionManager.
-    // The network interceptor will trigger this event if it gets a 401 error.
-    LaunchedEffect(key1 = sessionManager) {
-        sessionManager.logoutEvents.collectLatest {
-            // When a logout event is received, navigate to the login screen
-            // and clear the entire back stack to prevent the user from going back.
-            navController.navigate(AppDestinations.LOGIN_ROUTE) {
-                popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                launchSingleTop = true
-            }
-        }
-    }
+    // This effect is now observing the rock-solid StateFlow from SessionManager.
+    val token by sessionManager.tokenFlow.collectAsState()
 
-    // EFFECT 2: Handles manual login/logout and app startup state.
-    // This observes the token directly. It's useful for redirecting the user
-    // immediately after they manually log in or log out.
-    val token by tokenManager.tokenFlow.collectAsState(initial = tokenManager.getToken())
     LaunchedEffect(key1 = token) {
         val currentRoute = navController.currentDestination?.route
-        val onAuthScreen = currentRoute == AppDestinations.LOGIN_ROUTE || currentRoute == AppDestinations.REGISTER_ROUTE
+        val onAuthScreen =
+            currentRoute == AppDestinations.LOGIN_ROUTE || currentRoute == AppDestinations.REGISTER_ROUTE
 
         if (token == null && !onAuthScreen) {
-            // If token is cleared (manual logout) and we are NOT on an auth screen,
-            // navigate to login.
             navController.navigate(AppDestinations.LOGIN_ROUTE) {
                 popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 launchSingleTop = true
             }
         } else if (token != null && onAuthScreen) {
-            // If a token is present (successful login) and we ARE on an auth screen,
-            // navigate to the main hub.
             navController.navigate(AppDestinations.MAIN_HUB_ROUTE) {
                 popUpTo(navController.graph.startDestinationId) { inclusive = true }
                 launchSingleTop = true
@@ -152,7 +131,9 @@ fun AppNavigation(
         }
         composable(
             route = AppDestinations.CHAT_DETAIL_ROUTE_WITH_ARGS,
-            arguments = listOf(navArgument(AppDestinations.CHAT_ID_ARG) { type = NavType.StringType })
+            arguments = listOf(navArgument(AppDestinations.CHAT_ID_ARG) {
+                type = NavType.StringType
+            })
         ) {
             ChatDetailScreen(
                 onNavigateBack = { navController.popBackStack() }
