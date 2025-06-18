@@ -131,14 +131,39 @@ const analyzeExam = async (req, res) => {
 
   try {
     const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
-    const prompt = `You are an expert IELTS examiner. Analyze the following speaking test transcript. Provide a detailed evaluation for each of the four criteria (Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, Pronunciation). For each criterion, give a band score (e.g., 6.5) and constructive feedback with specific examples from the user's speech. Finally, calculate the overall band score. Respond ONLY with a valid JSON object: {"overallBand": <number>, "criteria": [{"criterionName": "Fluency & Coherence", "bandScore": <number>, "feedback": "...", "examples": [{"userQuote": "...", "suggestion": "..."}]}, ...]}`;
+
+    // [FIX 1] Improved Prompt: Made the prompt for the 'type' field much more explicit.
+    const prompt = `You are an expert IELTS examiner. Analyze the following speaking test transcript. Provide a detailed evaluation for each of the four criteria (Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, Pronunciation). For each criterion, give a band score (e.g., 6.5) and constructive feedback with specific examples from the user's speech. Finally, calculate the overall band score. It is CRITICAL that every object inside the "examples" array has a "type" property. The value for "type" MUST be one of: "Fluency", "Vocabulary", "Grammar", or "Pronunciation". Respond ONLY with a valid JSON object using this exact structure: {"overallBand": <number>, "criteria": [{"criterionName": "Fluency & Coherence", "bandScore": <number>, "feedback": "...", "examples": [{"userQuote": "...", "suggestion": "...", "type": "Fluency"}]}, ...]}`;
 
     const responseText = await generateText(prompt);
     const analysisData = safeJsonParse(responseText);
 
-    if (!analysisData) {
+    if (!analysisData || !analysisData.criteria || !analysisData.overallBand) {
+      console.error("AI failed to generate a valid analysis JSON.", responseText);
       return res.status(500).json({ message: "AI failed to generate a valid analysis." });
     }
+
+    // [FIX 2] Defensive Programming: Sanitize the data before saving.
+    // This ensures that even if the AI forgets the 'type' field, we don't crash.
+    analysisData.criteria.forEach((criterion) => {
+      if (criterion.examples && Array.isArray(criterion.examples)) {
+        criterion.examples.forEach((example) => {
+          if (!example.type) {
+            // If 'type' is missing, assign a default based on the criterion name.
+            if (criterion.criterionName.includes("Fluency")) example.type = "Fluency";
+            else if (
+              criterion.criterionName.includes("Lexical") ||
+              criterion.criterionName.includes("Vocabulary")
+            )
+              example.type = "Vocabulary";
+            else if (criterion.criterionName.includes("Grammar")) example.type = "Grammar";
+            else if (criterion.criterionName.includes("Pronunciation"))
+              example.type = "Pronunciation";
+            else example.type = "General"; // Fallback
+          }
+        });
+      }
+    });
 
     const newExamResult = new ExamResult({
       userId,
@@ -146,6 +171,7 @@ const analyzeExam = async (req, res) => {
       overallBand: analysisData.overallBand,
       criteria: analysisData.criteria,
     });
+
     const savedResult = await newExamResult.save();
     res.status(201).json({ resultId: savedResult._id });
   } catch (error) {

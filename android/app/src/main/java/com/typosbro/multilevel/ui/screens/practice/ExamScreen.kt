@@ -3,6 +3,7 @@ package com.typosbro.multilevel.ui.screens.practice
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -92,15 +93,23 @@ fun ExamScreen(
         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    // This effect handles the one-shot navigation event.
-    // It triggers when finalResultId is set, then consumes the event.
-    val finalResultId = uiState.finalResultId
-    LaunchedEffect(finalResultId) {
-        if (finalResultId != null) {
-            onNavigateToResults(finalResultId)
-            viewModel.onResultNavigationConsumed()
+    // This effect handles the one-shot navigation event using the consumable event pattern.
+    // It triggers when finalResultId is not null, then immediately consumes the event.
+    LaunchedEffect(uiState.finalResultId) {
+        uiState.finalResultId?.let { resultId ->
+            Log.d("ExamScreen", "Final result ID received: $resultId. Navigating.")
+            onNavigateToResults(resultId)
+            viewModel.onNavigationToResultConsumed()
         }
     }
+
+    // This effect shows a snackbar when an error occurs.
+    LaunchedEffect(uiState.error) {
+        uiState.error?.let {
+            snackBarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
+        }
+    }
+
 
     Scaffold(
         topBar = {
@@ -181,7 +190,6 @@ fun ExamScreen(
         }
     }
 }
-
 @Composable
 fun NotStartedView(onStart: () -> Unit) {
     Column(
@@ -477,6 +485,19 @@ fun AnalysisView(uiState: ExamUiState) {
                 "This may take a few moments.",
                 style = MaterialTheme.typography.bodyMedium
             )
+        } else if (uiState.error != null) {
+            Text(
+                text = "Analysis Failed",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = uiState.error,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
+
         } else {
             Text(
                 "Analysis complete! Redirecting to results...",
