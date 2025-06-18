@@ -1,4 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/practice/ExamScreen.kt
 package com.typosbro.multilevel.ui.screens.practice
 
 import android.Manifest
@@ -93,11 +92,14 @@ fun ExamScreen(
         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    // This effect handles the one-shot navigation event using the consumable event pattern.
-    // It triggers when finalResultId is not null, then immediately consumes the event.
+    // [FINAL UI FIX]
+    // The key for LaunchedEffect is the specific piece of data that triggers the effect.
+    // This ensures the effect runs *exactly* when `finalResultId` changes from null to a value.
     LaunchedEffect(uiState.finalResultId) {
+        // Add logging to confirm this block runs.
+        Log.d("ExamScreen", "LaunchedEffect triggered. finalResultId is: ${uiState.finalResultId}")
         uiState.finalResultId?.let { resultId ->
-            Log.d("ExamScreen", "Final result ID received: $resultId. Navigating.")
+            Log.d("ExamScreen", "finalResultId is not null. Navigating with: $resultId")
             onNavigateToResults(resultId)
             viewModel.onNavigationToResultConsumed()
         }
@@ -109,7 +111,6 @@ fun ExamScreen(
             snackBarHostState.showSnackbar(it, duration = SnackbarDuration.Long)
         }
     }
-
 
     Scaffold(
         topBar = {
@@ -463,7 +464,10 @@ fun CueCardView(cueCard: CueCard) {
 fun AnalysisView(uiState: ExamUiState) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(16.dp)
+        verticalArrangement = Arrangement.Center, // Center the content
+        modifier = Modifier
+            .fillMaxSize() // Ensure it fills the screen
+            .padding(16.dp)
     ) {
         Text(
             "Exam Complete!",
@@ -471,38 +475,46 @@ fun AnalysisView(uiState: ExamUiState) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
-        if (uiState.isLoading) {
-            Text(
-                "Analyzing your performance...",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Spacer(Modifier.height(16.dp))
-            CircularProgressIndicator()
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "This may take a few moments.",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        } else if (uiState.error != null) {
-            Text(
-                text = "Analysis Failed",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.error
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = uiState.error,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center
-            )
-
-        } else {
-            Text(
-                "Analysis complete! Redirecting to results...",
-                style = MaterialTheme.typography.titleMedium
-            )
+        // This logic now clearly separates the different final states
+        when {
+            // State 1: Analysis is happening
+            uiState.isLoading -> {
+                Text(
+                    "Analyzing your performance...",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(16.dp))
+                CircularProgressIndicator()
+            }
+            // State 2: Analysis failed
+            uiState.error != null -> {
+                Text(
+                    text = "Analysis Failed",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = uiState.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
+            }
+            // State 3: Analysis is done, about to navigate
+            uiState.finalResultId != null -> {
+                Text(
+                    "Analysis complete!",
+                    style = MaterialTheme.typography.titleMedium,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(16.dp))
+                CircularProgressIndicator() // Show a spinner to indicate action
+                Spacer(Modifier.height(8.dp))
+                Text("Redirecting to your results...")
+            }
         }
     }
 }

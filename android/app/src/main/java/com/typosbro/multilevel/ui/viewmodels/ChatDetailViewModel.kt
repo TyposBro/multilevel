@@ -2,13 +2,12 @@
 package com.typosbro.multilevel.ui.viewmodels
 
 import android.content.Context
-import android.util.Log
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.data.remote.models.ChatStreamEvent
 import com.typosbro.multilevel.data.repositories.ChatRepository
-import com.typosbro.multilevel.data.repositories.Result
+import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.features.whisper.Recorder
 import com.typosbro.multilevel.features.whisper.engine.WhisperEngineNative
 import com.typosbro.multilevel.navigation.AppDestinations
@@ -78,7 +77,7 @@ class ChatDetailViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             when (val result = chatRepository.getChatHistory(chatId)) {
-                is Result.Success -> {
+                is RepositoryResult.Success -> {
                     val history = result.data.history.map {
                         ChatMessage(
                             text = it.parts.firstOrNull()?.text ?: "",
@@ -93,7 +92,7 @@ class ChatDetailViewModel @Inject constructor(
                         )
                     }
                 }
-                is Result.Error -> _uiState.update { it.copy(isLoading = false, error = result.message) }
+                is RepositoryResult.Error -> _uiState.update { it.copy(isLoading = false, error = result.message) }
             }
         }
     }

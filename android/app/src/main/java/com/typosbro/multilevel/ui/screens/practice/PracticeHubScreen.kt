@@ -40,16 +40,10 @@ fun PracticeHubScreen(
                 onClick = onNavigateToExam // Navigate to the full exam
             ) {
                 Column(Modifier.padding(24.dp)) {
-                    Text("Full Mock Exam", style = MaterialTheme.typography.headlineSmall)
+                    Text("Full IELTS Speaking Mock Exam", style = MaterialTheme.typography.headlineSmall)
                     Text("Simulate a full 11-14 minute test.", style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            // Add buttons for individual part practice later
-            // ...
-
-            HorizontalDivider(modifier = Modifier.padding(16.dp))
-            Text("Freestyle Chat History", style = MaterialTheme.typography.titleMedium)
-            // Your existing LazyColumn with the chat list goes here
         }
     }
 }

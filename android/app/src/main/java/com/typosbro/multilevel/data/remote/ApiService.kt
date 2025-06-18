@@ -26,13 +26,12 @@ interface ApiService {
     @GET("chat/{chatId}/history")
     suspend fun getChatHistory(@Path("chatId") chatId: String): Response<ChatHistoryResponse>
 
-    // --- NEW: Add the streaming endpoint for freestyle chat ---
     @POST("chat/{chatId}/message")
-    @Streaming // Important: Tells Retrofit to handle this as a streaming response
+    @Streaming
     fun sendMessageAndStream(
         @Path("chatId") chatId: String,
         @Body request: SendMessageRequest
-    ): Call<ResponseBody> // Return a Call<ResponseBody> for SSE
+    ): Call<ResponseBody>
 
     @DELETE("chat/{chatId}")
     suspend fun deleteChat(@Path("chatId") chatId: String): Response<GenericSuccessResponse>
@@ -47,10 +46,9 @@ interface ApiService {
     @POST("exam/start")
     suspend fun startExam(): Response<ExamStepResponse>
 
-    // --- NEW: Add the streaming endpoint for exams ---
-    @POST("exam/step-stream")
-    @Streaming // Important: Tells Retrofit to handle this as a streaming response
-    fun getNextExamStepStream(@Body request: ExamStepRequest): Call<ResponseBody>
+    // [FIX] Replaced the streaming endpoint with a simple suspend function
+    @POST("exam/step")
+    suspend fun getNextExamStep(@Body request: ExamStepRequest): Response<ExamStepResponse>
 
     @POST("exam/analyze")
     suspend fun analyzeExam(@Body request: AnalyzeExamRequest): Response<AnalyzeExamResponse>

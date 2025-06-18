@@ -1,9 +1,6 @@
-// {PATH_TO_PROJECT}/api/controllers/examController.js
-
 const ExamResult = require("../models/ExamResultModel.js");
-const { generateText, generateTextStream, safeJsonParse } = require("../utils/gemini.js");
+const { generateText, safeJsonParse } = require("../utils/gemini.js");
 const { getKokoroInputIds } = require("../utils/kokoro.js");
-const { sendSseChunk, sentenceTerminators } = require("../utils/sse");
 
 /**
  * @desc    Start a new mock exam
@@ -30,93 +27,61 @@ const startExam = async (req, res) => {
 };
 
 /**
- * @desc    Handle the next step in an exam VIA STREAMING
- * @route   POST /api/exam/step-stream
+ * @desc    Handle the next step in an exam
+ * @route   POST /api/exam/step
  * @access  Private
  */
-const handleExamStepStream = async (req, res) => {
+const handleExamStep = async (req, res) => {
   const { part, userInput, transcriptContext, questionCountInPart } = req.body;
-  console.log("Received exam step request:", {
-    part,
-    userInput,
-    questionCountInPart,
-    transcriptContext: transcriptContext.slice(-100),
-  });
 
-  // --- SSE Setup ---
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.write(": SSE connection initiated\n\n");
-
-  let fullModelResponseText = "";
-  let sentenceBuffer = "";
-  let finalExamState = {};
-
-  const processAndStreamSentence = async (textToProcess) => {
-    if (res.writableEnded || !textToProcess) return;
-    const input_ids = await getKokoroInputIds(textToProcess);
-    sendSseChunk(res, "input_ids_chunk", {
-      sentence: textToProcess,
-      input_ids: input_ids,
-    });
-  };
+  // [DEBUG LOG] Log the full incoming request body for /step
+  console.log("--- handleExamStep: INCOMING REQUEST ---");
+  console.log(JSON.stringify(req.body, null, 2)); // Pretty-print the JSON
+  console.log("------------------------------------");
 
   try {
-    const streamingPrompt = `You are an IELTS examiner in a mock speaking test. The user just said: "${userInput}". Based on the conversation context, provide ONLY your next spoken line as a natural, continuous stream of text. Do not add any JSON or extra formatting.`;
-    const statePrompt = `You are the logic engine for an IELTS exam. The user is in Part ${part}. This is question number ${
-      questionCountInPart + 1
-    } for this part. The conversation so far is:\n---\n${transcriptContext}\nUser: ${userInput}\n---\nBased on this, determine the next state of the exam. Your decision should consider the current part and question count to decide if it's time to move to the next part. Respond ONLY with a valid JSON object: {"next_part": <number>, "cue_card": {"topic": "...", "points": ["...", "..."]} or null, "is_final_question": <boolean>}`;
+    const prompt = `You are an IELTS examiner and the logic engine for a mock speaking test.
+The user is in Part ${part}.
+This is question number ${questionCountInPart + 1} for this part.
+The user just said: "${userInput}"
+The conversation history is:
+---
+${transcriptContext}
+---
+Based on the current state and user input, generate your next response.
+Your response MUST be a single, valid JSON object with the following structure:
+{
+  "examiner_line": "Your full spoken response here.",
+  "next_part": <number for the next part, e.g., 1, 2, 3>,
+  "cue_card": {"topic": "...", "points": ["...", "..."]} or null,
+  "is_final_question": <boolean>
+}
+- If moving to Part 2, provide the cue card. For example, your 'examiner_line' might be "Now, I'm going to give you a topic...", but the cue card JSON object should contain the actual topic, like 'Describe a historical place...'. Otherwise, "cue_card" should be null.
+- Decide if this is the final question of the part or the test.
+- The "examiner_line" should be natural and appropriate for the context.
+`;
 
-    // Execute in parallel
-    const statePromise = generateText(statePrompt);
-    const textStreamPromise = generateTextStream(streamingPrompt);
-    const [stateResponseText, textStreamResult] = await Promise.all([
-      statePromise,
-      textStreamPromise,
-    ]);
+    const responseText = await generateText(prompt);
+    const data = safeJsonParse(responseText);
 
-    finalExamState = safeJsonParse(stateResponseText);
-    if (!finalExamState) throw new Error("Failed to get valid exam state from LLM.");
-
-    for await (const chunk of textStreamResult.stream) {
-      if (res.writableEnded) {
-        console.log("Client disconnected");
-        break;
-      }
-      const textChunk = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (textChunk) {
-        fullModelResponseText += textChunk;
-        sendSseChunk(res, "text_chunk", { text: textChunk });
-
-        sentenceBuffer += textChunk;
-        let match;
-        while ((match = sentenceTerminators.exec(sentenceBuffer)) !== null) {
-          if (res.writableEnded) break;
-          const sentence = sentenceBuffer.substring(0, match.index + 1).trim();
-          sentenceBuffer = sentenceBuffer.substring(match.index + 1);
-          if (sentence) await processAndStreamSentence(sentence);
-        }
-      }
+    if (!data || !data.examiner_line) {
+      console.error("AI failed to generate a valid step JSON.", responseText);
+      return res.status(500).json({ message: "AI failed to generate a valid step response." });
     }
 
-    if (!res.writableEnded && sentenceBuffer.trim()) {
-      await processAndStreamSentence(sentenceBuffer.trim());
-    }
+    // Generate audio IDs for the complete response at once
+    data.input_ids = await getKokoroInputIds(data.examiner_line);
 
-    if (!res.writableEnded) {
-      const endData = { ...finalExamState, full_text: fullModelResponseText };
-      sendSseChunk(res, "stream_end", endData);
-    }
+    // [DEBUG LOG] Log the final data being sent back to the client
+    console.log("--- handleExamStep: OUTGOING RESPONSE ---");
+    // Don't log the full input_ids array as it's very long
+    console.log(JSON.stringify({ ...data, input_ids_length: data.input_ids?.length }, null, 2));
+    console.log("-------------------------------------");
+
+    res.status(200).json(data);
   } catch (error) {
-    console.error("Error during exam step stream:", error);
-    if (!res.writableEnded) {
-      sendSseChunk(res, "error", { message: "Stream processing error", details: error.message });
-    }
-  } finally {
-    if (!res.writableEnded) {
-      res.end();
-    }
+    console.error("Error processing exam step:", error);
+    res.status(500).json({ message: "Server error during exam step." });
   }
 };
 
@@ -129,11 +94,22 @@ const analyzeExam = async (req, res) => {
   const { transcript } = req.body;
   const userId = req.user._id;
 
+  // [DEBUG LOG] Log the incoming transcript for /analyze
+  console.log("--- analyzeExam: INCOMING REQUEST ---");
+  console.log(JSON.stringify(req.body, null, 2));
+  console.log("------------------------------------");
+
   try {
     const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
 
-    // [FIX 1] Improved Prompt: Made the prompt for the 'type' field much more explicit.
-    const prompt = `You are an expert IELTS examiner. Analyze the following speaking test transcript. Provide a detailed evaluation for each of the four criteria (Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, Pronunciation). For each criterion, give a band score (e.g., 6.5) and constructive feedback with specific examples from the user's speech. Finally, calculate the overall band score. It is CRITICAL that every object inside the "examples" array has a "type" property. The value for "type" MUST be one of: "Fluency", "Vocabulary", "Grammar", or "Pronunciation". Respond ONLY with a valid JSON object using this exact structure: {"overallBand": <number>, "criteria": [{"criterionName": "Fluency & Coherence", "bandScore": <number>, "feedback": "...", "examples": [{"userQuote": "...", "suggestion": "...", "type": "Fluency"}]}, ...]}`;
+    const prompt = `You are an expert IELTS examiner. Analyze the following speaking test transcript. Provide a detailed evaluation for each of the four criteria (Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, Pronunciation). For each criterion, give a band score and constructive feedback.
+    
+    IMPORTANT: If the user's speech in the transcript is insufficient, nonsensical, or completely empty, you MUST still provide a full analysis. In this case, assign a low band score (e.g., 1.0) for each criterion and provide feedback explaining that the score is low due to a lack of sufficient speech to analyze.
+    
+    Finally, calculate the overall band score.
+    
+    CRITICAL: Your entire response must be ONLY a single, valid JSON object using this exact structure, with no extra text or explanations before or after the JSON:
+    {"overallBand": <number>, "criteria": [{"criterionName": "Fluency & Coherence", "bandScore": <number>, "feedback": "...", "examples": [{"userQuote": "...", "suggestion": "...", "type": "Fluency"}]}, ...]}`;
 
     const responseText = await generateText(prompt);
     const analysisData = safeJsonParse(responseText);
@@ -143,23 +119,17 @@ const analyzeExam = async (req, res) => {
       return res.status(500).json({ message: "AI failed to generate a valid analysis." });
     }
 
-    // [FIX 2] Defensive Programming: Sanitize the data before saving.
-    // This ensures that even if the AI forgets the 'type' field, we don't crash.
+    // Defensive programming to ensure 'type' field exists
     analysisData.criteria.forEach((criterion) => {
       if (criterion.examples && Array.isArray(criterion.examples)) {
         criterion.examples.forEach((example) => {
           if (!example.type) {
-            // If 'type' is missing, assign a default based on the criterion name.
             if (criterion.criterionName.includes("Fluency")) example.type = "Fluency";
-            else if (
-              criterion.criterionName.includes("Lexical") ||
-              criterion.criterionName.includes("Vocabulary")
-            )
-              example.type = "Vocabulary";
+            else if (criterion.criterionName.includes("Lexical")) example.type = "Vocabulary";
             else if (criterion.criterionName.includes("Grammar")) example.type = "Grammar";
             else if (criterion.criterionName.includes("Pronunciation"))
               example.type = "Pronunciation";
-            else example.type = "General"; // Fallback
+            else example.type = "General";
           }
         });
       }
@@ -173,9 +143,18 @@ const analyzeExam = async (req, res) => {
     });
 
     const savedResult = await newExamResult.save();
+
+    // [DEBUG LOG] Log the successful result ID before sending
+    console.log("--- analyzeExam: SUCCESS ---");
+    console.log(`Successfully saved and sending resultId: ${savedResult._id}`);
+    console.log("--------------------------");
+
     res.status(201).json({ resultId: savedResult._id });
   } catch (error) {
-    console.error("Error analyzing exam:", error);
+    // [DEBUG LOG] Enhanced error logging
+    console.error("--- analyzeExam: CATCH BLOCK ERROR ---");
+    console.error(error);
+    console.error("------------------------------------");
     res.status(500).json({ message: "Server error during exam analysis." });
   }
 };
@@ -228,7 +207,7 @@ const getExamResultDetails = async (req, res) => {
 
 module.exports = {
   startExam,
-  handleExamStepStream,
+  handleExamStep,
   analyzeExam,
   getExamHistory,
   getExamResultDetails,

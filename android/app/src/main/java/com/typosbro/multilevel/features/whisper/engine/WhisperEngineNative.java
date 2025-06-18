@@ -35,14 +35,51 @@ public class WhisperEngineNative implements WhisperEngine {
 
     @Override
     public String transcribeBuffer(float[] samples) {
-        if (!mIsInitialized) return "";
-        return transcribeBuffer(nativePtr, samples);
+        if (!mIsInitialized) {
+            Log.w(TAG, "transcribeBuffer called before engine was initialized.");
+            return "";
+        }
+
+        // [THE FIX] Wrap the native call in a try-catch block.
+        try {
+            // This is the call that is causing the native crash.
+            String result = transcribeBuffer(nativePtr, samples);
+
+            // It's also good practice to check for a null result from JNI.
+            if (result == null) {
+                Log.w(TAG, "Native transcribeBuffer returned null. Returning empty string.");
+                return "";
+            }
+            return result;
+
+        } catch (Throwable t) {
+            // Catch any error, including the JNI UTF-8 error, which is a Throwable.
+            Log.e(TAG, "FATAL: Native 'transcribeBuffer' call failed and was caught.", t);
+
+            // Return a safe, empty string to prevent the app from crashing.
+            return "";
+        }
     }
 
     @Override
     public String transcribeFile(String waveFile) {
-        if (!mIsInitialized) return "";
-        return transcribeFile(nativePtr, waveFile);
+        if (!mIsInitialized) {
+            Log.w(TAG, "transcribeFile called before engine was initialized.");
+            return "";
+        }
+
+        // [THE FIX] Also apply the same safety wrapper to this method.
+        try {
+            String result = transcribeFile(nativePtr, waveFile);
+            if (result == null) {
+                Log.w(TAG, "Native transcribeFile returned null. Returning empty string.");
+                return "";
+            }
+            return result;
+        } catch (Throwable t) {
+            Log.e(TAG, "FATAL: Native 'transcribeFile' call failed and was caught.", t);
+            return "";
+        }
     }
 
     private int loadModel(String modelPath, boolean isMultilingual) {

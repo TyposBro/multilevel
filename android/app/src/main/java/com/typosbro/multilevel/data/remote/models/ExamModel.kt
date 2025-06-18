@@ -1,5 +1,4 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/models/ExamModel.kt
-
 package com.typosbro.multilevel.data.remote.models
 
 import com.google.gson.annotations.SerializedName
@@ -20,7 +19,7 @@ data class ExamStepRequest(
     @SerializedName("part") val part: Int,
     @SerializedName("userInput") val userInput: String?,
     @SerializedName("transcriptContext") val transcriptContext: String,
-    @SerializedName("question_count_in_part") val questionCountInPart: Int
+    @SerializedName("questionCountInPart") val questionCountInPart: Int
 )
 /**
  * The response from the server for each step of the exam.
@@ -55,5 +54,6 @@ data class AnalyzeExamRequest(
  * that can be used later to fetch the full results.
  */
 data class AnalyzeExamResponse(
-    @SerializedName("result_id") val resultId: String
+    @SerializedName("resultId") val resultId: String
 )
+

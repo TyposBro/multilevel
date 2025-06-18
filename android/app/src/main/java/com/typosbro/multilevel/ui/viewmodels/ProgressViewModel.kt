@@ -5,7 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.data.remote.models.ExamResultSummary
 import com.typosbro.multilevel.data.repositories.ChatRepository
-import com.typosbro.multilevel.data.repositories.Result
+import com.typosbro.multilevel.data.remote.models.RepositoryResult
+
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,7 +39,7 @@ class ProgressViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             when (val result = chatRepository.getExamHistorySummary()) {
-                is Result.Success -> {
+                is RepositoryResult.Success -> {
                     val historyList = result.data.history.sortedBy { it.examDate }
                     _uiState.update {
                         it.copy(
@@ -50,7 +51,7 @@ class ProgressViewModel @Inject constructor(
                         )
                     }
                 }
-                is Result.Error -> {
+                is RepositoryResult.Error -> {
                     _uiState.update { it.copy(isLoading = false, error = result.message) }
                 }
             }

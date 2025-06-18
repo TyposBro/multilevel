@@ -1,4 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ExamViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
 import android.content.Context
@@ -6,12 +5,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.data.remote.models.CueCard
-import com.typosbro.multilevel.data.remote.models.ExamEvent
-import com.typosbro.multilevel.data.remote.models.ExamStreamEndData
 import com.typosbro.multilevel.data.remote.models.ExamStepRequest
+import com.typosbro.multilevel.data.remote.models.ExamStepResponse
 import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import com.typosbro.multilevel.data.repositories.ChatRepository
-import com.typosbro.multilevel.data.repositories.Result
+import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.features.whisper.Recorder
 import com.typosbro.multilevel.features.whisper.engine.WhisperEngineNative
 import com.typosbro.multilevel.utils.AudioPlayer
@@ -22,9 +20,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -79,30 +74,40 @@ class ExamViewModel @Inject constructor(
     private var isPlayingAudio = false
 
     companion object {
-        const val PART_1_DURATION = 300 // 5 minutes
-        const val PART_2_PREP_DURATION = 60 // 1 minute
-        const val PART_2_SPEAKING_DURATION = 120 // 2 minutes
-        const val PART_3_DURATION = 300 // 5 minutes
+        const val PART_1_DURATION = 20 // 5 minutes
+        const val PART_2_PREP_DURATION = 10 // 1 minute
+        const val PART_2_SPEAKING_DURATION = 20 // 2 minutes
+        const val PART_3_DURATION = 20 // 5 minutes
         const val FINAL_ANSWER_WINDOW_S = 10 // Last 10 seconds of Part 3
-        const val REDIRECT_DELAY_MS = 2000L
+    }
+
+    private fun updateState(caller: String, transform: (ExamUiState) -> ExamUiState) {
+        val currentState = _uiState.value
+        val newState = transform(currentState)
+        _uiState.value = newState
+        if (currentState != newState) {
+            Log.d("STATE_UPDATE", "Caller: $caller")
+            Log.d("STATE_UPDATE", "  - OLD: $currentState")
+            Log.d("STATE_UPDATE", "  - NEW: $newState")
+        }
     }
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            _uiState.update { it.copy(isLoading = true) }
+            updateState("init") { it.copy(isLoading = true) }
             whisperEngine = WhisperEngineNative(context).also {
                 val modelFile = getAssetFile("whisper-tiny.en.tflite")
                 it.initialize(modelFile.absolutePath, "", false)
             }
             recorder = Recorder(context, this@ExamViewModel)
             withContext(Dispatchers.Main) {
-                _uiState.update { it.copy(isLoading = false) }
+                updateState("init_complete") { it.copy(isLoading = false) }
             }
         }
     }
 
     fun onNavigationToResultConsumed() {
-        _uiState.update { it.copy(finalResultId = null) }
+        updateState("onNavigationToResultConsumed") { it.copy(finalResultId = null) }
     }
 
     override fun onDataReceived(samples: FloatArray) {
@@ -135,11 +140,16 @@ class ExamViewModel @Inject constructor(
         }
 
         val fullTranscription = withContext(Dispatchers.Default) {
-            whisperEngine?.transcribeBuffer(allSamples) ?: ""
+            try {
+                whisperEngine?.transcribeBuffer(allSamples) ?: ""
+            } catch (t: Throwable) {
+                Log.e("ExamViewModel", "Whisper transcription failed", t)
+                ""
+            }
         }
 
         Log.d("ExamViewModel", "Full transcription result: '$fullTranscription'")
-        _uiState.update { it.copy(partialTranscription = fullTranscription) }
+        updateState("transcribeBufferedAudio") { it.copy(partialTranscription = fullTranscription) }
 
         if (fullTranscription.isNotBlank()) {
             transcript.add(TranscriptEntry("User", fullTranscription))
@@ -148,51 +158,39 @@ class ExamViewModel @Inject constructor(
         handleTranscriptionResult(fullTranscription)
     }
 
-    /**
-     * [THE FIX - PART 1] This function is now the single source of truth for advancing the exam state
-     * after the user speaks. It correctly handles all state transitions, including the final one.
-     */
     private fun handleTranscriptionResult(transcription: String) {
-        // If the Part 3 timer has run out, this transcription is the final one. Conclude the exam.
         if (isExamFinishedByTimer.get()) {
             concludeExamAndAnalyze()
             return
         }
-
         when (_uiState.value.currentPart) {
             ExamPart.PART_1 -> continueWithPart1Questions(transcription)
-            ExamPart.PART_2_SPEAKING -> moveToPart3() // User finished long turn, now move to Part 3
+            ExamPart.PART_2_SPEAKING -> moveToPart3()
             ExamPart.PART_3 -> continueWithPart3Questions(transcription)
-            else -> { /* Do nothing for other states like NOT_STARTED, PART_2_PREP, etc. */ }
+            else -> { /* Do nothing */ }
         }
     }
 
-    // =================== Exam Flow and State Management ===================
-
     fun startExam() {
         if (_uiState.value.isLoading) return
-        // Reset all state for a new exam
         questionCountInPart = 0
         transcript.clear()
         isExamFinishedByTimer.set(false)
         cancelAllTimers()
-
-        _uiState.update {
+        updateState("startExam") {
             it.copy(
                 isLoading = true,
                 currentPart = ExamPart.PART_1,
                 examinerMessage = "Starting IELTS Speaking Test - Part 1..."
             )
         }
-
         startPart1Timer()
-
         viewModelScope.launch {
             when (val result = chatRepository.getInitialExamQuestion()) {
-                is Result.Success -> {
+                is RepositoryResult.Success -> {
                     val response = result.data
                     transcript.add(TranscriptEntry("Examiner", response.examinerLine))
-                    _uiState.update {
+                    updateState("startExam_success") {
                         it.copy(
                             isLoading = false,
                             examinerMessage = response.examinerLine,
@@ -201,7 +199,7 @@ class ExamViewModel @Inject constructor(
                     }
                     playAudioQueue(listOfNotNull(response.inputIds))
                 }
-                is Result.Error -> _uiState.update { it.copy(isLoading = false, error = result.message) }
+                is RepositoryResult.Error -> updateState("startExam_error") { it.copy(isLoading = false, error = result.message) }
             }
         }
     }
@@ -209,7 +207,7 @@ class ExamViewModel @Inject constructor(
     private fun startPart1Timer() {
         part1TimerJob = viewModelScope.launch {
             for (i in PART_1_DURATION downTo 1) {
-                _uiState.update { it.copy(timerValue = i) }
+                updateState("part1Timer") { it.copy(timerValue = i) }
                 delay(1000)
             }
             if (_uiState.value.currentPart == ExamPart.PART_1) {
@@ -220,28 +218,25 @@ class ExamViewModel @Inject constructor(
     }
 
     private fun continueWithPart1Questions(userInput: String) {
-        _uiState.update { it.copy(isLoading = true, partialTranscription = "") }
+        updateState("continueWithPart1Questions") { it.copy(isLoading = true, partialTranscription = "") }
         questionCountInPart++
-
         val request = ExamStepRequest(
             part = 1,
             userInput = userInput,
             transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
             questionCountInPart = questionCountInPart
         )
-
-        processExamStepStream(request) { _, fullText, ttsChunks ->
-            if (fullText.isNotBlank()) transcript.add(TranscriptEntry("Examiner", fullText))
-            _uiState.update { it.copy(isLoading = false) }
-            playAudioQueue(ttsChunks)
+        processExamStep(request) { response ->
+            if (response.examinerLine.isNotBlank()) transcript.add(TranscriptEntry("Examiner", response.examinerLine))
+            updateState("continueWithPart1Questions_success") { it.copy(isLoading = false, examinerMessage = response.examinerLine) }
+            playAudioQueue(listOfNotNull(response.inputIds))
         }
     }
 
     private fun moveToPart2() {
         part1TimerJob?.cancel()
         questionCountInPart = 0
-
-        _uiState.update {
+        updateState("moveToPart2") {
             it.copy(
                 currentPart = ExamPart.PART_2_PREP,
                 examinerMessage = "Moving to Part 2...",
@@ -249,7 +244,6 @@ class ExamViewModel @Inject constructor(
                 isReadyForUserInput = false, partialTranscription = ""
             )
         }
-
         viewModelScope.launch {
             val request = ExamStepRequest(
                 part = 2,
@@ -257,18 +251,17 @@ class ExamViewModel @Inject constructor(
                 transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
                 questionCountInPart = 0
             )
-
-            processExamStepStream(request) { endData, fullText, ttsChunks ->
-                if (fullText.isNotBlank()) transcript.add(TranscriptEntry("Examiner", fullText))
-                _uiState.update {
+            processExamStep(request) { response ->
+                if (response.examinerLine.isNotBlank()) transcript.add(TranscriptEntry("Examiner", response.examinerLine))
+                updateState("moveToPart2_success") {
                     it.copy(
                         isLoading = false,
                         currentPart = ExamPart.PART_2_PREP,
-                        part2CueCard = endData.cue_card,
-                        examinerMessage = fullText
+                        part2CueCard = response.cueCard,
+                        examinerMessage = response.examinerLine
                     )
                 }
-                playAudioQueue(ttsChunks) { startPart2PrepTimer() }
+                playAudioQueue(listOfNotNull(response.inputIds)) { startPart2PrepTimer() }
             }
         }
     }
@@ -276,10 +269,10 @@ class ExamViewModel @Inject constructor(
     private fun startPart2PrepTimer() {
         part2PrepTimerJob = viewModelScope.launch {
             for (i in PART_2_PREP_DURATION downTo 1) {
-                _uiState.update { it.copy(timerValue = i) }
+                updateState("part2PrepTimer") { it.copy(timerValue = i) }
                 delay(1000)
             }
-            _uiState.update {
+            updateState("startPart2PrepTimer_finished") {
                 it.copy(
                     currentPart = ExamPart.PART_2_SPEAKING,
                     examinerMessage = "Your preparation time is over. Please start speaking now. You have up to 2 minutes.",
@@ -294,7 +287,7 @@ class ExamViewModel @Inject constructor(
     private fun startPart2SpeakingTimer() {
         part2SpeakingTimerJob = viewModelScope.launch {
             for (i in PART_2_SPEAKING_DURATION downTo 1) {
-                _uiState.update { it.copy(timerValue = i) }
+                updateState("part2SpeakingTimer") { it.copy(timerValue = i) }
                 delay(1000)
             }
             if (_uiState.value.currentPart == ExamPart.PART_2_SPEAKING) {
@@ -307,8 +300,7 @@ class ExamViewModel @Inject constructor(
         part2SpeakingTimerJob?.cancel()
         part2PrepTimerJob?.cancel()
         questionCountInPart = 0
-
-        _uiState.update {
+        updateState("moveToPart3") {
             it.copy(
                 currentPart = ExamPart.PART_3,
                 examinerMessage = "Thank you.",
@@ -316,9 +308,7 @@ class ExamViewModel @Inject constructor(
                 isReadyForUserInput = false, partialTranscription = "", part2CueCard = null
             )
         }
-
         startPart3Timer()
-
         viewModelScope.launch {
             val request = ExamStepRequest(
                 part = 3,
@@ -326,23 +316,18 @@ class ExamViewModel @Inject constructor(
                 transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
                 questionCountInPart = 0
             )
-
-            processExamStepStream(request) { _, fullText, ttsChunks ->
-                if (fullText.isNotBlank()) transcript.add(TranscriptEntry("Examiner", fullText))
-                _uiState.update { it.copy(isLoading = false, examinerMessage = fullText) }
-                playAudioQueue(ttsChunks)
+            processExamStep(request) { response ->
+                if (response.examinerLine.isNotBlank()) transcript.add(TranscriptEntry("Examiner", response.examinerLine))
+                updateState("moveToPart3_success") { it.copy(isLoading = false, examinerMessage = response.examinerLine) }
+                playAudioQueue(listOfNotNull(response.inputIds))
             }
         }
     }
 
-    /**
-     * [THE FIX - PART 2] The Part 3 timer is simplified. On timeout, it just sets a flag and stops
-     * the recorder. The actual exam conclusion is handled by `handleTranscriptionResult`.
-     */
     private fun startPart3Timer() {
         part3TimerJob = viewModelScope.launch {
             for (i in PART_3_DURATION downTo 1) {
-                _uiState.update { it.copy(timerValue = i) }
+                updateState("part3Timer") { it.copy(timerValue = i) }
                 delay(1000)
             }
             if (_uiState.value.currentPart == ExamPart.PART_3 && !isExamFinishedByTimer.get()) {
@@ -357,22 +342,15 @@ class ExamViewModel @Inject constructor(
         }
     }
 
-    /**
-     * [THE FIX - PART 3] Logic is simplified. If the final time window is reached, it concludes the exam.
-     * Otherwise, it proceeds with the next question.
-     */
     private fun continueWithPart3Questions(userInput: String) {
         if (_uiState.value.currentPart >= ExamPart.FINISHED) return
-
-        _uiState.update { it.copy(isLoading = true, partialTranscription = "") }
-
+        updateState("continueWithPart3Questions") { it.copy(isLoading = true, partialTranscription = "") }
         if (_uiState.value.timerValue <= FINAL_ANSWER_WINDOW_S) {
             Log.d("ExamViewModel", "Final answer received in time window. Concluding exam.")
             isExamFinishedByTimer.set(true)
             concludeExamAndAnalyze()
             return
         }
-
         questionCountInPart++
         val request = ExamStepRequest(
             part = 3,
@@ -380,84 +358,67 @@ class ExamViewModel @Inject constructor(
             transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
             questionCountInPart = questionCountInPart
         )
-        processExamStepStream(request) { _, fullText, ttsChunks ->
-            if (fullText.isNotBlank()) transcript.add(TranscriptEntry("Examiner", fullText))
-            _uiState.update { it.copy(isLoading = false) }
-            playAudioQueue(ttsChunks)
+        processExamStep(request) { response ->
+            if (response.examinerLine.isNotBlank()) transcript.add(TranscriptEntry("Examiner", response.examinerLine))
+            updateState("continueWithPart3Questions_success") { it.copy(isLoading = false, examinerMessage = response.examinerLine) }
+            playAudioQueue(listOfNotNull(response.inputIds))
         }
     }
 
-    /**
-     * [THE FIX - PART 4] This new function is the single, unified way to end the exam.
-     * It avoids all previous race conditions and faulty logic.
-     */
     private fun concludeExamAndAnalyze() {
-        if (_uiState.value.currentPart >= ExamPart.FINISHED) return // Prevent multiple calls
-
+        if (_uiState.value.currentPart >= ExamPart.FINISHED) return
         cancelAllTimers()
         val finalMessage = "Thank you, that's the end of the IELTS Speaking Test. You will receive your results in a few moments."
         transcript.add(TranscriptEntry("Examiner", finalMessage))
-
-        _uiState.update {
+        updateState("concludeExamAndAnalyze") {
             it.copy(
                 currentPart = ExamPart.FINISHED,
                 examinerMessage = finalMessage,
                 timerValue = 0,
                 isRecording = false,
-                isReadyForUserInput = false
+                isReadyForUserInput = false,
+                isLoading = true
             )
         }
         analyzeExam()
     }
 
     private fun analyzeExam() {
-        _uiState.update { it.copy(currentPart = ExamPart.ANALYSIS_COMPLETE, isLoading = true) }
         viewModelScope.launch {
             when (val result = chatRepository.analyzeFullExam(transcript)) {
-                is Result.Success -> {
-                    _uiState.update { it.copy(isLoading = false) }
-                    delay(REDIRECT_DELAY_MS)
-                    _uiState.update { it.copy(finalResultId = result.data.resultId) }
+                is RepositoryResult.Success -> {
+                    updateState("analyzeExam_success") {
+                        it.copy(
+                            currentPart = ExamPart.ANALYSIS_COMPLETE,
+                            isLoading = false,
+                            finalResultId = result.data.resultId
+                        )
+                    }
                 }
-                is Result.Error -> {
+                is RepositoryResult.Error -> {
                     Log.e("ExamViewModel", "Analysis failed: ${result.message}")
-                    _uiState.update { it.copy(isLoading = false, error = "Analysis failed. Please try again later.") }
+                    updateState("analyzeExam_error") {
+                        it.copy(isLoading = false, error = "Analysis failed. Please try again later.")
+                    }
                 }
             }
         }
     }
 
-    // =================== Helper and System Functions ===================
-
-    private fun processExamStepStream(
-        request: ExamStepRequest,
-        onStreamEnd: (ExamStreamEndData, String, List<List<Int>>) -> Unit
-    ) {
+    private fun processExamStep(request: ExamStepRequest, onSuccess: (response: ExamStepResponse) -> Unit) {
         if (_uiState.value.currentPart >= ExamPart.FINISHED) return
-
-        val ttsChunks = mutableListOf<List<Int>>()
-        var fullText = ""
-
-        chatRepository.getNextExamStepStream(request)
-            .onEach { event ->
-                if (_uiState.value.currentPart >= ExamPart.FINISHED) return@onEach
-                when (event) {
-                    is ExamEvent.TextChunk -> {
-                        fullText += event.text
-                        _uiState.update { it.copy(examinerMessage = fullText) }
-                    }
-                    is ExamEvent.InputIdsChunk -> ttsChunks.add(event.ids)
-                    is ExamEvent.StreamEnd -> onStreamEnd(event.endData, fullText, ttsChunks)
-                    is ExamEvent.StreamError -> _uiState.update { it.copy(isLoading = false, error = event.message) }
-                }
+        viewModelScope.launch {
+            when (val result = chatRepository.getNextExamStep(request)) {
+                is RepositoryResult.Success -> { onSuccess(result.data) }
+                is RepositoryResult.Error -> { updateState("processExamStep_error") { it.copy(isLoading = false, error = result.message) } }
             }
-            .launchIn(viewModelScope)
+        }
     }
 
     fun startUserSpeechRecognition() {
         if (recorder?.isRecording == true || isPlayingAudio || _uiState.value.currentPart >= ExamPart.FINISHED) return
         audioDataBuffer.clear()
-        _uiState.update { it.copy(isRecording = true, partialTranscription = "", isReadyForUserInput = true) }
+        updateState("startUserSpeechRecognition") { it.copy(isRecording = true, partialTranscription = "", isReadyForUserInput = true) }
         recorder?.start()
     }
 
@@ -467,20 +428,20 @@ class ExamViewModel @Inject constructor(
             part2SpeakingTimerJob?.cancel()
         }
         recorder?.stop()
-        _uiState.update { it.copy(isRecording = false, isReadyForUserInput = false, partialTranscription = "Processing...") }
+        updateState("stopUserSpeechRecognition") { it.copy(isRecording = false, isReadyForUserInput = false, partialTranscription = "Processing...") }
     }
 
     private fun playAudioQueue(ids: List<List<Int>>, onComplete: (() -> Unit)? = null) {
-        if (_uiState.value.currentPart >= ExamPart.FINISHED || ids.isEmpty()) {
-            onComplete?.invoke() ?: if (_uiState.value.currentPart < ExamPart.FINISHED) {
+        if (_uiState.value.currentPart >= ExamPart.FINISHED || ids.isEmpty() || ids.firstOrNull()?.isEmpty() == true) {
+            if (onComplete != null) {
+                onComplete()
+            } else if (_uiState.value.currentPart < ExamPart.FINISHED) {
                 startUserSpeechRecognition()
-            } else
-
+            }
             return
         }
-
         isPlayingAudio = true
-        _uiState.update { it.copy(isReadyForUserInput = false) }
+        updateState("playAudioQueue_start") { it.copy(isReadyForUserInput = false) }
         audioQueue.clear()
         audioQueue.addAll(ids)
         playNextAudioInQueue(onComplete)

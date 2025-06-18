@@ -23,6 +23,7 @@ import com.typosbro.multilevel.ui.screens.auth.LoginScreen
 import com.typosbro.multilevel.ui.screens.auth.RegisterScreen
 import com.typosbro.multilevel.ui.screens.chat.ChatDetailScreen
 import com.typosbro.multilevel.ui.screens.chat.ChatListScreen
+import com.typosbro.multilevel.ui.screens.practice.ExamResultScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamScreen
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 
@@ -136,12 +137,7 @@ fun AppNavigation(
             route = AppDestinations.EXAM_RESULT_ROUTE,
             arguments = listOf(navArgument("resultId") { type = NavType.StringType })
         ) {
-            // Replace this with your actual ExamResultScreen
-            // For now, a placeholder:
-            // ExamResultScreen(onNavigateBack = { navController.popBackStack() })
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center){
-                Text("Exam Result Screen for ID: ${it.arguments?.getString("resultId")}")
-            }
+            ExamResultScreen(onNavigateBack = { navController.popBackStack() })
         }
 
 
