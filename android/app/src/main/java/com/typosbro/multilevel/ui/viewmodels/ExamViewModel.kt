@@ -1,15 +1,6 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ExamViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
-// TODO: Once frontend moves to the next part of the exam,
-//  stop incoming audio inputs/text from backend
-//  and make sure to delete the last message/question from backend
-//  not to affect the next part of the exam or scoring.
-
-// TODO: Add timer for each part of the exam
-// TODO: Add prep time for Part 2
-// TODO: Add start/stop recording buttons for each part
-
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -36,6 +27,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import kotlin.collections.ArrayList
 
@@ -74,13 +66,14 @@ class ExamViewModel @Inject constructor(
 
     private var whisperEngine: WhisperEngineNative? = null
     private var recorder: Recorder? = null
-    private var timerJob: Job? = null
 
     // IELTS-specific timers for each part
     private var part1TimerJob: Job? = null
     private var part2PrepTimerJob: Job? = null
     private var part2SpeakingTimerJob: Job? = null
     private var part3TimerJob: Job? = null
+    private var isExamFinishedByTimer = AtomicBoolean(false)
+
 
     private val audioDataBuffer = mutableListOf<FloatArray>()
     private val transcript = mutableListOf<TranscriptEntry>()
@@ -90,10 +83,12 @@ class ExamViewModel @Inject constructor(
 
     // IELTS timing constants (in seconds)
     companion object {
-        const val PART_1_DURATION = 5 * 60 // 5 minutes (4-5 minutes range, using max)
-        const val PART_2_PREP_DURATION = 60 // 1 minute preparation
-        const val PART_2_SPEAKING_DURATION = 2 * 60 // 2 minutes speaking time
-        const val PART_3_DURATION = 5 * 60 // 5 minutes (4-5 minutes range, using max)
+        const val PART_1_DURATION = 30 // 5 minutes (4-5 minutes range, using max)
+        const val PART_2_PREP_DURATION = 10 // 1 minute preparation
+        const val PART_2_SPEAKING_DURATION = 30 // 2 minutes speaking time
+        const val PART_3_DURATION = 30 // 5 minutes (4-5 minutes range, using max)
+        const val FINAL_ANSWER_WINDOW_S = 10 // Last 10 seconds of Part 3
+        const val REDIRECT_DELAY_MS = 3000L // 3-second delay before redirecting
     }
 
     init {
@@ -154,21 +149,23 @@ class ExamViewModel @Inject constructor(
     }
 
     private fun handleEmptyTranscription() {
-        when (_uiState.value.currentPart) {
-            ExamPart.PART_1 -> continueWithPart1Questions("")
-            ExamPart.PART_2_SPEAKING -> continueWithPart2Speaking("")
-            ExamPart.PART_3 -> continueWithPart3Questions("")
-            else -> { /* Do nothing for prep phases */ }
-        }
+        transcript.add(TranscriptEntry("User", ""))
+        handleTranscriptionResult("")
     }
 
     private fun handleTranscriptionResult(transcription: String) {
+        if (isExamFinishedByTimer.get()) return
+
         when (_uiState.value.currentPart) {
             ExamPart.PART_1 -> continueWithPart1Questions(transcription)
             ExamPart.PART_2_SPEAKING -> continueWithPart2Speaking(transcription)
             ExamPart.PART_3 -> continueWithPart3Questions(transcription)
-            else -> getNextExamStep(transcription) // Fallback for other parts
+            else -> { /* Do nothing for other states like prep */ }
         }
+    }
+
+    fun onResultNavigationConsumed() {
+        _uiState.update { it.copy(finalResultId = null) }
     }
 
     // =================== IELTS PART 1: Introduction and Interview (4-5 minutes) ===================
@@ -176,6 +173,7 @@ class ExamViewModel @Inject constructor(
         if (_uiState.value.isLoading) return
         questionCountInPart = 0
         transcript.clear()
+        isExamFinishedByTimer.set(false)
         _uiState.update {
             it.copy(
                 isLoading = true,
@@ -208,15 +206,13 @@ class ExamViewModel @Inject constructor(
     private fun startPart1Timer() {
         part1TimerJob?.cancel()
         part1TimerJob = viewModelScope.launch {
-            // Show countdown timer for Part 1
             for (i in PART_1_DURATION downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
-            // Time's up for Part 1 - move to Part 2
             if (_uiState.value.currentPart == ExamPart.PART_1) {
-                Log.d("ExamViewModel", "Part 1 completed (5 minutes), moving to Part 2")
-                recorder?.stop()
+                Log.d("ExamViewModel", "Part 1 timer finished. Moving to Part 2.")
+                if (_uiState.value.isRecording) recorder?.stop()
                 moveToPart2()
             }
         }
@@ -233,8 +229,7 @@ class ExamViewModel @Inject constructor(
             questionCountInPart = questionCountInPart
         )
 
-        processExamStepStream(request) { endData, fullText, ttsChunks ->
-            // Always stay in Part 1 until timer expires
+        processExamStepStream(request) { _, fullText, ttsChunks ->
             if (fullText.isNotBlank()) {
                 transcript.add(TranscriptEntry("Examiner", fullText))
             }
@@ -244,7 +239,6 @@ class ExamViewModel @Inject constructor(
     }
 
     // =================== IELTS PART 2: Long Turn (3-4 minutes total) ===================
-    // In the moveToPart2() function, ensure proper state management:
     private fun moveToPart2() {
         part1TimerJob?.cancel()
         questionCountInPart = 0
@@ -252,19 +246,19 @@ class ExamViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 currentPart = ExamPart.PART_2_PREP,
-                examinerMessage = "That's the end of Part 1. Now we'll move to Part 2. I'll give you a topic and you'll have 1 minute to prepare.",
+                examinerMessage = "Moving to Part 2...",
                 isLoading = true,
                 timerValue = 0,
-                isRecording = false, // Stop recording from Part 1
-                isReadyForUserInput = false, // Not ready for input during prep
-                partialTranscription = "" // Clear previous transcription
+                isRecording = false,
+                isReadyForUserInput = false,
+                partialTranscription = ""
             )
         }
 
         viewModelScope.launch {
             val request = com.typosbro.multilevel.data.remote.models.ExamStepRequest(
                 part = 2,
-                userInput = "Moving to Part 2",
+                userInput = "Moving to Part 2. Provide the standard instructions for Part 2, but DO NOT mention the topic itself in your spoken line.",
                 transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
                 questionCountInPart = 0
             )
@@ -281,8 +275,6 @@ class ExamViewModel @Inject constructor(
                         examinerMessage = fullText
                     )
                 }
-
-                // Play audio then start 1-minute preparation timer
                 playAudioQueue(ttsChunks) {
                     startPart2PrepTimer()
                 }
@@ -296,21 +288,18 @@ class ExamViewModel @Inject constructor(
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
-            // Preparation time over - start speaking
             _uiState.update {
                 it.copy(
                     currentPart = ExamPart.PART_2_SPEAKING,
-                    examinerMessage = "Your preparation time is over. Please start speaking now. You have 2 minutes.",
+                    examinerMessage = "Your preparation time is over. Please start speaking now. You have up to 2 minutes.",
                     timerValue = 0
                 )
             }
             startPart2SpeakingTimer()
-            // Automatically start recording for Part 2 speaking
             startUserSpeechRecognition()
         }
     }
 
-    // In the startPart2SpeakingTimer() function, ensure proper recording state:
     private fun startPart2SpeakingTimer() {
         part2SpeakingTimerJob?.cancel()
         part2SpeakingTimerJob = viewModelScope.launch {
@@ -318,36 +307,25 @@ class ExamViewModel @Inject constructor(
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
-            // 2 minutes speaking time over
-            recorder?.stop()
-            _uiState.update {
-                it.copy(
-                    examinerMessage = "Thank you. That's the end of your talk.",
-                    timerValue = 0,
-                    isRecording = false,
-                    isReadyForUserInput = false
-                )
+            if (_uiState.value.isRecording) {
+                recorder?.stop()
+            } else {
+                moveToPart3()
             }
-            // Brief follow-up questions, then move to Part 3
-            delay(2000) // Brief pause
-            moveToPart3()
         }
     }
+
     private fun continueWithPart2Speaking(userInput: String) {
-        // For Part 2, we mainly just collect the long turn speech
-        // Don't ask follow-up questions during the 2-minute speaking time
-        if (userInput.isNotBlank()) {
-            transcript.add(TranscriptEntry("User", userInput))
-        }
         _uiState.update { it.copy(partialTranscription = "") }
-        // Continue recording until timer expires
-        if (_uiState.value.currentPart == ExamPart.PART_2_SPEAKING) {
+
+        if (part2SpeakingTimerJob?.isCompleted == true) {
+            moveToPart3()
+        } else if (_uiState.value.currentPart == ExamPart.PART_2_SPEAKING) {
             startUserSpeechRecognition()
         }
     }
 
     // =================== IELTS PART 3: Discussion (4-5 minutes) ===================
-    // In the moveToPart3() function, ensure proper state management:
     private fun moveToPart3() {
         part2SpeakingTimerJob?.cancel()
         questionCountInPart = 0
@@ -355,13 +333,13 @@ class ExamViewModel @Inject constructor(
         _uiState.update {
             it.copy(
                 currentPart = ExamPart.PART_3,
-                examinerMessage = "Now let's move to Part 3. We'll discuss some more abstract questions related to the topic.",
+                examinerMessage = "Thank you.",
                 isLoading = true,
                 timerValue = 0,
                 isRecording = false,
                 isReadyForUserInput = false,
                 partialTranscription = "",
-                part2CueCard = null // Clear cue card for Part 3
+                part2CueCard = null
             )
         }
 
@@ -370,12 +348,12 @@ class ExamViewModel @Inject constructor(
         viewModelScope.launch {
             val request = com.typosbro.multilevel.data.remote.models.ExamStepRequest(
                 part = 3,
-                userInput = "Moving to Part 3",
+                userInput = "The user has just finished their Part 2 talk. Say 'Thank you' and then begin Part 3 by asking the first discussion question.",
                 transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
                 questionCountInPart = 0
             )
 
-            processExamStepStream(request) { endData, fullText, ttsChunks ->
+            processExamStepStream(request) { _, fullText, ttsChunks ->
                 if (fullText.isNotBlank()) {
                     transcript.add(TranscriptEntry("Examiner", fullText))
                 }
@@ -398,46 +376,80 @@ class ExamViewModel @Inject constructor(
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
-            // Part 3 completed - end exam
-            if (_uiState.value.currentPart == ExamPart.PART_3) {
-                Log.d("ExamViewModel", "Part 3 completed (5 minutes), ending exam")
-                recorder?.stop()
+            if (_uiState.value.currentPart == ExamPart.PART_3 && !isExamFinishedByTimer.get()) {
+                Log.d("ExamViewModel", "Part 3 timer finished. Ending exam.")
+                isExamFinishedByTimer.set(true)
+                if (_uiState.value.isRecording) recorder?.stop()
                 endExam()
             }
         }
     }
 
     private fun continueWithPart3Questions(userInput: String) {
+        if (isExamFinishedByTimer.get()) return
+
         _uiState.update { it.copy(isLoading = true, partialTranscription = "") }
         questionCountInPart++
 
-        val request = com.typosbro.multilevel.data.remote.models.ExamStepRequest(
-            part = 3,
-            userInput = userInput,
-            transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
-            questionCountInPart = questionCountInPart
-        )
+        if (_uiState.value.currentPart == ExamPart.PART_3 && _uiState.value.timerValue <= FINAL_ANSWER_WINDOW_S) {
+            Log.d("ExamViewModel", "Final answer received. Concluding exam.")
+            isExamFinishedByTimer.set(true)
+            part3TimerJob?.cancel()
 
-        processExamStepStream(request) { endData, fullText, ttsChunks ->
-            // Always stay in Part 3 until timer expires
-            if (fullText.isNotBlank()) {
-                transcript.add(TranscriptEntry("Examiner", fullText))
+            val finalUserInput = "This is the user's final answer: \"$userInput\". Please respond by saying 'Thank you, that's the end of the IELTS Speaking Test. You will receive your results in a few moments.' and nothing else."
+            val request = com.typosbro.multilevel.data.remote.models.ExamStepRequest(
+                part = 3,
+                userInput = finalUserInput,
+                transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
+                questionCountInPart = 99
+            )
+
+            processExamStepStream(request) { _, fullText, ttsChunks ->
+                if (fullText.isNotBlank()) {
+                    transcript.add(TranscriptEntry("Examiner", fullText))
+                }
+                playAudioQueue(ttsChunks) {
+                    analyzeExam()
+                }
             }
-            _uiState.update { it.copy(isLoading = false) }
-            playAudioQueue(ttsChunks)
+        } else {
+            val request = com.typosbro.multilevel.data.remote.models.ExamStepRequest(
+                part = 3,
+                userInput = userInput,
+                transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
+                questionCountInPart = questionCountInPart
+            )
+
+            processExamStepStream(request) { _, fullText, ttsChunks ->
+                if (fullText.isNotBlank()) {
+                    transcript.add(TranscriptEntry("Examiner", fullText))
+                }
+                _uiState.update { it.copy(isLoading = false) }
+                playAudioQueue(ttsChunks)
+            }
         }
     }
 
     private fun endExam() {
         cancelAllTimers()
+        val finalMessage = "Thank you, that's the end of the IELTS Speaking Test. You will receive your results in a few moments."
+        val request = com.typosbro.multilevel.data.remote.models.ExamStepRequest(
+            part = 3, userInput = finalMessage, transcriptContext = "", questionCountInPart = 99
+        )
         _uiState.update {
             it.copy(
-                currentPart = ExamPart.FINISHED,
-                examinerMessage = "That's the end of the IELTS Speaking Test. Thank you.",
-                timerValue = 0
+                examinerMessage = finalMessage,
+                timerValue = 0,
+                isRecording = false,
+                isReadyForUserInput = false
             )
         }
-        analyzeExam()
+        processExamStepStream(request) { _, _, ttsChunks ->
+            transcript.add(TranscriptEntry("Examiner", finalMessage))
+            playAudioQueue(ttsChunks) {
+                analyzeExam()
+            }
+        }
     }
 
     // =================== HELPER FUNCTIONS ===================
@@ -445,11 +457,13 @@ class ExamViewModel @Inject constructor(
         request: com.typosbro.multilevel.data.remote.models.ExamStepRequest,
         onStreamEnd: (ExamStreamEndData, String, List<List<Int>>) -> Unit
     ) {
+        if (isExamFinishedByTimer.get() && request.questionCountInPart != 99) return
         val ttsChunks = mutableListOf<List<Int>>()
         var fullText = ""
 
         chatRepository.getNextExamStepStream(request)
             .onEach { event ->
+                if (isExamFinishedByTimer.get() && request.questionCountInPart != 99) return@onEach
                 when (event) {
                     is ExamEvent.TextChunk -> {
                         fullText += event.text
@@ -463,11 +477,8 @@ class ExamViewModel @Inject constructor(
             .launchIn(viewModelScope)
     }
 
-
-
-    // Update startUserSpeechRecognition to properly set state:
     fun startUserSpeechRecognition() {
-        if (recorder?.isRecording == true || isPlayingAudio) return
+        if (recorder?.isRecording == true || isPlayingAudio || isExamFinishedByTimer.get()) return
         audioDataBuffer.clear()
         _uiState.update {
             it.copy(
@@ -481,22 +492,20 @@ class ExamViewModel @Inject constructor(
 
     fun stopUserSpeechRecognition() {
         if (recorder?.isRecording != true) return
+        if (_uiState.value.currentPart == ExamPart.PART_2_SPEAKING) {
+            part2SpeakingTimerJob?.cancel()
+        }
         recorder?.stop()
         _uiState.update { it.copy(isRecording = false, isReadyForUserInput = false, partialTranscription = "Processing...") }
     }
 
-    // Fix the playAudioQueue completion behavior:
     private fun playAudioQueue(ids: List<List<Int>>, onComplete: (() -> Unit)? = null) {
+        if (isExamFinishedByTimer.get() && onComplete == null) return
         if (ids.isEmpty()) {
             onComplete?.invoke() ?: run {
-                // Only auto-start recording for parts that need user input
                 when (_uiState.value.currentPart) {
-                    ExamPart.PART_1, ExamPart.PART_3 -> startUserSpeechRecognition()
-                    ExamPart.PART_2_SPEAKING -> startUserSpeechRecognition()
-                    else -> {
-                        // For PART_2_PREP, don't start recording
-                        _uiState.update { it.copy(isReadyForUserInput = false) }
-                    }
+                    ExamPart.PART_1, ExamPart.PART_3, ExamPart.PART_2_SPEAKING -> startUserSpeechRecognition()
+                    else -> _uiState.update { it.copy(isReadyForUserInput = false) }
                 }
             }
             return
@@ -509,9 +518,19 @@ class ExamViewModel @Inject constructor(
     }
 
     private fun playNextAudioInQueue(onComplete: (() -> Unit)? = null) {
+        if (isExamFinishedByTimer.get() && onComplete == null) {
+            audioQueue.clear()
+            isPlayingAudio = false
+            return
+        }
         if (audioQueue.isEmpty()) {
             isPlayingAudio = false
-            onComplete?.invoke() ?: startUserSpeechRecognition()
+            val currentPart = _uiState.value.currentPart
+            if (onComplete != null) {
+                onComplete()
+            } else if (currentPart == ExamPart.PART_1 || currentPart == ExamPart.PART_3 || currentPart == ExamPart.PART_2_SPEAKING) {
+                startUserSpeechRecognition()
+            }
             return
         }
         viewModelScope.launch {
@@ -520,49 +539,15 @@ class ExamViewModel @Inject constructor(
         }
     }
 
-    // Legacy function for backward compatibility (Parts 2 prep and other edge cases)
-    private fun getNextExamStep(userInput: String) {
-        _uiState.update { it.copy(isLoading = true, partialTranscription = "") }
-        questionCountInPart++
-
-        val request = com.typosbro.multilevel.data.remote.models.ExamStepRequest(
-            part = _uiState.value.currentPart.ordinal,
-            userInput = userInput,
-            transcriptContext = transcript.joinToString("\n") { "${it.speaker}: ${it.text}" },
-            questionCountInPart = questionCountInPart
-        )
-
-        processExamStepStream(request) { endData, fullText, ttsChunks ->
-            handleStateTransition(endData, fullText, ttsChunks)
-        }
-    }
-
-    private fun handleStateTransition(endData: ExamStreamEndData, fullText: String, ttsChunks: List<List<Int>>) {
-        if (fullText.isNotBlank()) {
-            transcript.add(TranscriptEntry("Examiner", fullText))
-        }
-        questionCountInPart = if (endData.next_part != _uiState.value.currentPart.ordinal) 0 else questionCountInPart
-        val nextPart = ExamPart.entries.getOrNull(endData.next_part) ?: _uiState.value.currentPart
-
-        _uiState.update {
-            it.copy(
-                isLoading = false,
-                currentPart = nextPart,
-                part2CueCard = endData.cue_card
-            )
-        }
-
-        when (nextPart) {
-            ExamPart.FINISHED -> analyzeExam()
-            else -> playAudioQueue(ttsChunks)
-        }
-    }
-
     private fun analyzeExam() {
         _uiState.update { it.copy(currentPart = ExamPart.ANALYSIS_COMPLETE, isLoading = true) }
         viewModelScope.launch {
             when (val result = chatRepository.analyzeFullExam(transcript)) {
-                is Result.Success -> _uiState.update { it.copy(isLoading = false, finalResultId = result.data.resultId) }
+                is Result.Success -> {
+                    _uiState.update { it.copy(isLoading = false) }
+                    delay(REDIRECT_DELAY_MS)
+                    _uiState.update { it.copy(finalResultId = result.data.resultId) }
+                }
                 is Result.Error -> _uiState.update { it.copy(isLoading = false, error = result.message) }
             }
         }
@@ -573,7 +558,6 @@ class ExamViewModel @Inject constructor(
         part2PrepTimerJob?.cancel()
         part2SpeakingTimerJob?.cancel()
         part3TimerJob?.cancel()
-        timerJob?.cancel()
     }
 
     private fun getAssetFile(assetName: String): File {

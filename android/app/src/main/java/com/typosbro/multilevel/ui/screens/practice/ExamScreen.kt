@@ -92,8 +92,14 @@ fun ExamScreen(
         permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
-    LaunchedEffect(uiState.finalResultId) {
-        uiState.finalResultId?.let { onNavigateToResults(it) }
+    // This effect handles the one-shot navigation event.
+    // It triggers when finalResultId is set, then consumes the event.
+    val finalResultId = uiState.finalResultId
+    LaunchedEffect(finalResultId) {
+        if (finalResultId != null) {
+            onNavigateToResults(finalResultId)
+            viewModel.onResultNavigationConsumed()
+        }
     }
 
     Scaffold(
@@ -305,14 +311,10 @@ fun Part2PrepView(uiState: ExamUiState) {
             Spacer(Modifier.height(16.dp))
             Text("Getting your topic...", style = MaterialTheme.typography.bodyLarge)
         } else {
+            // Display the instructions spoken by the examiner
             Text(
-                "You have one minute to prepare your talk.",
+                text = uiState.examinerMessage ?: "You have one minute to prepare your talk.",
                 style = MaterialTheme.typography.titleMedium,
-                textAlign = TextAlign.Center
-            )
-            Text(
-                "You can make notes during this time.",
-                style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
 
@@ -400,7 +402,7 @@ fun Part2SpeakingView(
             Spacer(Modifier.height(16.dp))
 
             // Show controls when recording (Part 2 auto-starts but user can stop)
-            AnimatedVisibility(visible = uiState.isRecording) {
+            AnimatedVisibility(visible = uiState.isReadyForUserInput || uiState.isRecording) {
                 RecognitionControls(
                     isRecording = uiState.isRecording,
                     onStartRecording = onStartRecording,
