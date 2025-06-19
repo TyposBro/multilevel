@@ -76,6 +76,8 @@ fun ProfileScreen(
 
     val privacyPolicyUrl =
         stringResource(R.string.url_privacy_policy) // Fetch the URL from resources
+    val faqUrl =
+        stringResource(R.string.url_faq) // Fetch the FAQ URL from resources
 
     // This effect handles the success of the account deletion by logging out.
     LaunchedEffect(uiState.deleteState) {
@@ -172,7 +174,9 @@ fun ProfileScreen(
                             contentDescription = "Help"
                         )
                     },
-                    modifier = Modifier.clickable { /* Navigate to Help screen */ }
+                    modifier = Modifier.clickable {
+                        openUrlInCustomTab(context, faqUrl)
+                    }
                 )
                 // --- PRIVACY POLICY ---
                 ListItem(
