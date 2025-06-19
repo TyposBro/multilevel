@@ -7,9 +7,9 @@ import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.data.remote.models.CueCard
 import com.typosbro.multilevel.data.remote.models.ExamStepRequest
 import com.typosbro.multilevel.data.remote.models.ExamStepResponse
+import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import com.typosbro.multilevel.data.repositories.ChatRepository
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.features.whisper.Recorder
 import com.typosbro.multilevel.features.whisper.engine.WhisperEngineNative
 import com.typosbro.multilevel.utils.AudioPlayer
@@ -66,6 +66,7 @@ class ExamViewModel @Inject constructor(
     private var part2SpeakingTimerJob: Job? = null
     private var part3TimerJob: Job? = null
     private var isExamFinishedByTimer = AtomicBoolean(false)
+    private var shouldForcePartTransition = AtomicBoolean(false)
 
     private val audioDataBuffer = mutableListOf<FloatArray>()
     private val transcript = mutableListOf<TranscriptEntry>()
@@ -158,18 +159,6 @@ class ExamViewModel @Inject constructor(
         handleTranscriptionResult(fullTranscription)
     }
 
-    private fun handleTranscriptionResult(transcription: String) {
-        if (isExamFinishedByTimer.get()) {
-            concludeExamAndAnalyze()
-            return
-        }
-        when (_uiState.value.currentPart) {
-            ExamPart.PART_1 -> continueWithPart1Questions(transcription)
-            ExamPart.PART_2_SPEAKING -> moveToPart3()
-            ExamPart.PART_3 -> continueWithPart3Questions(transcription)
-            else -> { /* Do nothing */ }
-        }
-    }
 
     fun startExam() {
         if (_uiState.value.isLoading) return
@@ -199,7 +188,13 @@ class ExamViewModel @Inject constructor(
                     }
                     playAudioQueue(listOfNotNull(response.inputIds))
                 }
-                is RepositoryResult.Error -> updateState("startExam_error") { it.copy(isLoading = false, error = result.message) }
+
+                is RepositoryResult.Error -> updateState("startExam_error") {
+                    it.copy(
+                        isLoading = false,
+                        error = result.message
+                    )
+                }
             }
         }
     }
@@ -211,14 +206,26 @@ class ExamViewModel @Inject constructor(
                 delay(1000)
             }
             if (_uiState.value.currentPart == ExamPart.PART_1) {
-                Log.d("ExamViewModel", "Part 1 timer finished. Moving to Part 2.")
-                if (_uiState.value.isRecording) recorder?.stop() else moveToPart2()
+                Log.d("ExamViewModel", "Part 1 timer finished. Forcing transition to Part 2.")
+                shouldForcePartTransition.set(true)
+                stopCurrentAudio() // Stop any pending audio
+                if (_uiState.value.isRecording) {
+                    recorder?.stop() // This will trigger onRecordingStopped -> handleTranscriptionResult
+                } else {
+                    moveToPart2()
+                }
             }
         }
     }
 
+
     private fun continueWithPart1Questions(userInput: String) {
-        updateState("continueWithPart1Questions") { it.copy(isLoading = true, partialTranscription = "") }
+        updateState("continueWithPart1Questions") {
+            it.copy(
+                isLoading = true,
+                partialTranscription = ""
+            )
+        }
         questionCountInPart++
         val request = ExamStepRequest(
             part = 1,
@@ -227,8 +234,18 @@ class ExamViewModel @Inject constructor(
             questionCountInPart = questionCountInPart
         )
         processExamStep(request) { response ->
-            if (response.examinerLine.isNotBlank()) transcript.add(TranscriptEntry("Examiner", response.examinerLine))
-            updateState("continueWithPart1Questions_success") { it.copy(isLoading = false, examinerMessage = response.examinerLine) }
+            if (response.examinerLine.isNotBlank()) transcript.add(
+                TranscriptEntry(
+                    "Examiner",
+                    response.examinerLine
+                )
+            )
+            updateState("continueWithPart1Questions_success") {
+                it.copy(
+                    isLoading = false,
+                    examinerMessage = response.examinerLine
+                )
+            }
             playAudioQueue(listOfNotNull(response.inputIds))
         }
     }
@@ -252,7 +269,12 @@ class ExamViewModel @Inject constructor(
                 questionCountInPart = 0
             )
             processExamStep(request) { response ->
-                if (response.examinerLine.isNotBlank()) transcript.add(TranscriptEntry("Examiner", response.examinerLine))
+                if (response.examinerLine.isNotBlank()) transcript.add(
+                    TranscriptEntry(
+                        "Examiner",
+                        response.examinerLine
+                    )
+                )
                 updateState("moveToPart2_success") {
                     it.copy(
                         isLoading = false,
@@ -291,7 +313,17 @@ class ExamViewModel @Inject constructor(
                 delay(1000)
             }
             if (_uiState.value.currentPart == ExamPart.PART_2_SPEAKING) {
-                if (_uiState.value.isRecording) recorder?.stop() else moveToPart3()
+                Log.d(
+                    "ExamViewModel",
+                    "Part 2 speaking timer finished. Forcing transition to Part 3."
+                )
+                shouldForcePartTransition.set(true)
+                stopCurrentAudio() // Stop any pending audio
+                if (_uiState.value.isRecording) {
+                    recorder?.stop() // This will trigger onRecordingStopped -> handleTranscriptionResult
+                } else {
+                    moveToPart3()
+                }
             }
         }
     }
@@ -317,8 +349,18 @@ class ExamViewModel @Inject constructor(
                 questionCountInPart = 0
             )
             processExamStep(request) { response ->
-                if (response.examinerLine.isNotBlank()) transcript.add(TranscriptEntry("Examiner", response.examinerLine))
-                updateState("moveToPart3_success") { it.copy(isLoading = false, examinerMessage = response.examinerLine) }
+                if (response.examinerLine.isNotBlank()) transcript.add(
+                    TranscriptEntry(
+                        "Examiner",
+                        response.examinerLine
+                    )
+                )
+                updateState("moveToPart3_success") {
+                    it.copy(
+                        isLoading = false,
+                        examinerMessage = response.examinerLine
+                    )
+                }
                 playAudioQueue(listOfNotNull(response.inputIds))
             }
         }
@@ -333,6 +375,8 @@ class ExamViewModel @Inject constructor(
             if (_uiState.value.currentPart == ExamPart.PART_3 && !isExamFinishedByTimer.get()) {
                 Log.d("ExamViewModel", "Part 3 timer finished. Stopping recording to finalize.")
                 isExamFinishedByTimer.set(true)
+                shouldForcePartTransition.set(true)
+                stopCurrentAudio() // Stop any pending audio
                 if (_uiState.value.isRecording) {
                     recorder?.stop()
                 } else {
@@ -344,7 +388,12 @@ class ExamViewModel @Inject constructor(
 
     private fun continueWithPart3Questions(userInput: String) {
         if (_uiState.value.currentPart >= ExamPart.FINISHED) return
-        updateState("continueWithPart3Questions") { it.copy(isLoading = true, partialTranscription = "") }
+        updateState("continueWithPart3Questions") {
+            it.copy(
+                isLoading = true,
+                partialTranscription = ""
+            )
+        }
         if (_uiState.value.timerValue <= FINAL_ANSWER_WINDOW_S) {
             Log.d("ExamViewModel", "Final answer received in time window. Concluding exam.")
             isExamFinishedByTimer.set(true)
@@ -359,8 +408,18 @@ class ExamViewModel @Inject constructor(
             questionCountInPart = questionCountInPart
         )
         processExamStep(request) { response ->
-            if (response.examinerLine.isNotBlank()) transcript.add(TranscriptEntry("Examiner", response.examinerLine))
-            updateState("continueWithPart3Questions_success") { it.copy(isLoading = false, examinerMessage = response.examinerLine) }
+            if (response.examinerLine.isNotBlank()) transcript.add(
+                TranscriptEntry(
+                    "Examiner",
+                    response.examinerLine
+                )
+            )
+            updateState("continueWithPart3Questions_success") {
+                it.copy(
+                    isLoading = false,
+                    examinerMessage = response.examinerLine
+                )
+            }
             playAudioQueue(listOfNotNull(response.inputIds))
         }
     }
@@ -368,7 +427,8 @@ class ExamViewModel @Inject constructor(
     private fun concludeExamAndAnalyze() {
         if (_uiState.value.currentPart >= ExamPart.FINISHED) return
         cancelAllTimers()
-        val finalMessage = "Thank you, that's the end of the IELTS Speaking Test. You will receive your results in a few moments."
+        val finalMessage =
+            "Thank you, that's the end of the IELTS Speaking Test. You will receive your results in a few moments."
         transcript.add(TranscriptEntry("Examiner", finalMessage))
         updateState("concludeExamAndAnalyze") {
             it.copy(
@@ -395,22 +455,39 @@ class ExamViewModel @Inject constructor(
                         )
                     }
                 }
+
                 is RepositoryResult.Error -> {
                     Log.e("ExamViewModel", "Analysis failed: ${result.message}")
                     updateState("analyzeExam_error") {
-                        it.copy(isLoading = false, error = "Analysis failed. Please try again later.")
+                        it.copy(
+                            isLoading = false,
+                            error = "Analysis failed. Please try again later."
+                        )
                     }
                 }
             }
         }
     }
 
-    private fun processExamStep(request: ExamStepRequest, onSuccess: (response: ExamStepResponse) -> Unit) {
+    private fun processExamStep(
+        request: ExamStepRequest,
+        onSuccess: (response: ExamStepResponse) -> Unit
+    ) {
         if (_uiState.value.currentPart >= ExamPart.FINISHED) return
         viewModelScope.launch {
             when (val result = chatRepository.getNextExamStep(request)) {
-                is RepositoryResult.Success -> { onSuccess(result.data) }
-                is RepositoryResult.Error -> { updateState("processExamStep_error") { it.copy(isLoading = false, error = result.message) } }
+                is RepositoryResult.Success -> {
+                    onSuccess(result.data)
+                }
+
+                is RepositoryResult.Error -> {
+                    updateState("processExamStep_error") {
+                        it.copy(
+                            isLoading = false,
+                            error = result.message
+                        )
+                    }
+                }
             }
         }
     }
@@ -418,7 +495,13 @@ class ExamViewModel @Inject constructor(
     fun startUserSpeechRecognition() {
         if (recorder?.isRecording == true || isPlayingAudio || _uiState.value.currentPart >= ExamPart.FINISHED) return
         audioDataBuffer.clear()
-        updateState("startUserSpeechRecognition") { it.copy(isRecording = true, partialTranscription = "", isReadyForUserInput = true) }
+        updateState("startUserSpeechRecognition") {
+            it.copy(
+                isRecording = true,
+                partialTranscription = "",
+                isReadyForUserInput = true
+            )
+        }
         recorder?.start()
     }
 
@@ -428,40 +511,15 @@ class ExamViewModel @Inject constructor(
             part2SpeakingTimerJob?.cancel()
         }
         recorder?.stop()
-        updateState("stopUserSpeechRecognition") { it.copy(isRecording = false, isReadyForUserInput = false, partialTranscription = "Processing...") }
+        updateState("stopUserSpeechRecognition") {
+            it.copy(
+                isRecording = false,
+                isReadyForUserInput = false,
+                partialTranscription = "Processing..."
+            )
+        }
     }
 
-    private fun playAudioQueue(ids: List<List<Int>>, onComplete: (() -> Unit)? = null) {
-        if (_uiState.value.currentPart >= ExamPart.FINISHED || ids.isEmpty() || ids.firstOrNull()?.isEmpty() == true) {
-            if (onComplete != null) {
-                onComplete()
-            } else if (_uiState.value.currentPart < ExamPart.FINISHED) {
-                startUserSpeechRecognition()
-            }
-            return
-        }
-        isPlayingAudio = true
-        updateState("playAudioQueue_start") { it.copy(isReadyForUserInput = false) }
-        audioQueue.clear()
-        audioQueue.addAll(ids)
-        playNextAudioInQueue(onComplete)
-    }
-
-    private fun playNextAudioInQueue(onComplete: (() -> Unit)? = null) {
-        if (audioQueue.isEmpty()) {
-            isPlayingAudio = false
-            if (onComplete != null) {
-                onComplete()
-            } else if (_uiState.value.currentPart < ExamPart.FINISHED) {
-                startUserSpeechRecognition()
-            }
-            return
-        }
-        viewModelScope.launch {
-            val audioBytes = AudioPlayer.createAudioAndConvertToWav(audioQueue.removeAt(0).map { it.toLong() }, context)
-            AudioPlayer.playAudio(context, audioBytes) { playNextAudioInQueue(onComplete) }
-        }
-    }
 
     private fun cancelAllTimers() {
         part1TimerJob?.cancel()
@@ -485,5 +543,116 @@ class ExamViewModel @Inject constructor(
         whisperEngine?.deinitialize()
         AudioPlayer.release()
         cancelAllTimers()
+    }
+
+
+    private fun stopCurrentAudio() {
+        if (isPlayingAudio) {
+            Log.d("ExamViewModel", "Stopping current audio playback due to timer expiration")
+            isPlayingAudio = false
+            audioQueue.clear()
+            AudioPlayer.release() // Stop any currently playing audio
+        }
+    }
+
+    // 4. Modify handleTranscriptionResult to respect forced transitions:
+    private fun handleTranscriptionResult(transcription: String) {
+        if (isExamFinishedByTimer.get()) {
+            concludeExamAndAnalyze()
+            return
+        }
+
+        // Check if we should force a transition regardless of transcription
+        if (shouldForcePartTransition.get()) {
+            shouldForcePartTransition.set(false)
+            when (_uiState.value.currentPart) {
+                ExamPart.PART_1 -> {
+                    Log.d("ExamViewModel", "Forced transition from Part 1 to Part 2")
+                    moveToPart2()
+                }
+
+                ExamPart.PART_2_SPEAKING -> {
+                    Log.d("ExamViewModel", "Forced transition from Part 2 to Part 3")
+                    moveToPart3()
+                }
+
+                ExamPart.PART_3 -> {
+                    Log.d("ExamViewModel", "Forced transition to exam conclusion")
+                    concludeExamAndAnalyze()
+                }
+
+                else -> { /* Handle other cases if needed */
+                }
+            }
+            return
+        }
+
+        // Normal flow continues here
+        when (_uiState.value.currentPart) {
+            ExamPart.PART_1 -> continueWithPart1Questions(transcription)
+            ExamPart.PART_2_SPEAKING -> moveToPart3()
+            ExamPart.PART_3 -> continueWithPart3Questions(transcription)
+            else -> { /* Do nothing */
+            }
+        }
+    }
+
+    // 5. Also modify playAudioQueue to check for forced transitions:
+    private fun playAudioQueue(ids: List<List<Int>>, onComplete: (() -> Unit)? = null) {
+        if (_uiState.value.currentPart >= ExamPart.FINISHED || ids.isEmpty() || ids.firstOrNull()
+                ?.isEmpty() == true
+        ) {
+            if (onComplete != null) {
+                onComplete()
+            } else if (_uiState.value.currentPart < ExamPart.FINISHED) {
+                startUserSpeechRecognition()
+            }
+            return
+        }
+
+        // Don't start audio if a forced transition is pending
+        if (shouldForcePartTransition.get()) {
+            if (onComplete != null) {
+                onComplete()
+            }
+            return
+        }
+
+        isPlayingAudio = true
+        updateState("playAudioQueue_start") { it.copy(isReadyForUserInput = false) }
+        audioQueue.clear()
+        audioQueue.addAll(ids)
+        playNextAudioInQueue(onComplete)
+    }
+
+    private fun playNextAudioInQueue(onComplete: (() -> Unit)? = null) {
+        // Check for forced transition before playing next audio
+        if (shouldForcePartTransition.get() || audioQueue.isEmpty()) {
+            isPlayingAudio = false
+            if (onComplete != null) {
+                onComplete()
+            } else if (_uiState.value.currentPart < ExamPart.FINISHED && !shouldForcePartTransition.get()) {
+                startUserSpeechRecognition()
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            val audioBytes = AudioPlayer.createAudioAndConvertToWav(
+                audioQueue.removeAt(0).map { it.toLong() },
+                context
+            )
+            AudioPlayer.playAudio(context, audioBytes) {
+                // Check again after audio finishes in case timer expired during playback
+                if (shouldForcePartTransition.get()) {
+                    isPlayingAudio = false
+                    if (onComplete != null) {
+                        onComplete()
+                    }
+                } else {
+                    playNextAudioInQueue(onComplete)
+                }
+            }
+        }
     }
 }
