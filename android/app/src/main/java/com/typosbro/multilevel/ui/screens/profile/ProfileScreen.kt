@@ -7,16 +7,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -33,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,28 +48,37 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 import com.typosbro.multilevel.ui.viewmodels.ProfileViewModel
+import com.typosbro.multilevel.ui.viewmodels.UiState
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    // --- CHANGE: Use Hilt to inject ViewModels directly ---
     profileViewModel: ProfileViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
-    // --- CHANGE: Read from the new ProfileUiState ---
     val uiState by profileViewModel.uiState.collectAsStateWithLifecycle()
-    val userProfile = uiState.userProfile // This is now a UserProfileViewData?
+    val userProfile = uiState.userProfile
 
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    // This effect handles the success of the account deletion by logging out.
+    LaunchedEffect(uiState.deleteState) {
+        if (uiState.deleteState is UiState.Success) {
+            coroutineScope.launch {
+                authViewModel.logout()
+                // Navigation will happen automatically.
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Profile & Settings") },
                 actions = {
-                    // --- NEW: Add a refresh button, tied to the ViewModel function ---
                     IconButton(
                         onClick = { profileViewModel.fetchUserProfile() },
                         enabled = !uiState.isLoading
@@ -80,11 +91,9 @@ fun ProfileScreen(
     ) { padding ->
 
         if (uiState.isLoading && userProfile == null) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding), contentAlignment = Alignment.Center
-            ) {
+            Box(Modifier
+                .fillMaxSize()
+                .padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
             return@Scaffold
@@ -98,8 +107,6 @@ fun ProfileScreen(
             // --- Account Section ---
             item {
                 SectionHeader("Account")
-
-                // --- CHANGE: Use data from the new userProfile object ---
                 ListItem(
                     headlineContent = { Text("Email") },
                     supportingContent = { Text(userProfile?.email ?: "...") },
@@ -139,23 +146,9 @@ fun ProfileScreen(
                 )
             }
 
+            // --- Support Section ---
             item {
-                SectionHeader("Settings")
-                ListItem(
-                    headlineContent = { Text("Theme") },
-                    supportingContent = { Text("Light/Dark (Coming Soon)") }, // Placeholder
-                    leadingContent = {
-                        Icon(
-                            Icons.Default.DarkMode,
-                            contentDescription = "Dark Mode"
-                        )
-                    }
-                )
-            }
-
-            // --- Support Section (Unchanged) ---
-            item {
-                SectionHeader("Support & Legal")
+                SectionHeader("Support")
                 ListItem(
                     headlineContent = { Text("Help & FAQ") },
                     leadingContent = {
@@ -178,27 +171,47 @@ fun ProfileScreen(
                 )
             }
 
-            // --- Logout Section ---
+            // --- Actions Section ---
             item {
-                Spacer(Modifier.height(32.dp))
+                SectionHeader("Actions")
+                // --- LOGOUT BUTTON ---
                 ListItem(
-                    headlineContent = { Text("Logout", color = MaterialTheme.colorScheme.error) },
+                    headlineContent = { Text("Logout") },
                     leadingContent = {
                         Icon(
                             Icons.AutoMirrored.Filled.ExitToApp,
-                            contentDescription = "Logout",
-                            tint = MaterialTheme.colorScheme.error
+                            contentDescription = "Logout"
                         )
                     },
                     modifier = Modifier.clickable { showLogoutDialog = true }
+                )
+                // --- DELETE ACCOUNT BUTTON ---
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            "Delete Account",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    supportingContent = { Text("This action is permanent") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = "Delete Account",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    modifier = Modifier.clickable { showDeleteDialog = true }
                 )
                 Spacer(Modifier.height(32.dp))
             }
         }
 
-        // --- Error Display ---
-        // A simple way to show errors from the backend at the bottom of the screen
-        uiState.error?.let {
+        val deleteError = (uiState.deleteState as? UiState.Error)?.message
+        val fetchError = uiState.error
+        val errorMessage = deleteError ?: fetchError
+
+        errorMessage?.let {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -210,22 +223,38 @@ fun ProfileScreen(
         }
     }
 
+    // --- DIALOGS ---
     if (showLogoutDialog) {
         LogoutConfirmationDialog(
             onConfirm = {
                 showLogoutDialog = false
-                // --- CHANGE: Call the suspend function from the AuthViewModel ---
                 coroutineScope.launch {
                     authViewModel.logout()
-                    // No need to call an onLogout callback. The AppNavigation will react automatically.
                 }
             },
             onDismiss = { showLogoutDialog = false }
         )
     }
+
+    if (showDeleteDialog) {
+        DeleteAccountConfirmationDialog(
+            isLoading = uiState.deleteState is UiState.Loading,
+            onConfirm = {
+                profileViewModel.deleteAccount()
+            },
+            onDismiss = {
+                if (uiState.deleteState !is UiState.Loading) {
+                    showDeleteDialog = false
+                    profileViewModel.resetDeleteState()
+                }
+            }
+        )
+    }
 }
 
-// The helper composables remain exactly the same.
+
+// --- HELPER COMPOSABLES ---
+
 @Composable
 private fun SectionHeader(title: String) {
     Column {
@@ -245,13 +274,49 @@ private fun LogoutConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Uni
         title = { Text("Confirm Logout") },
         text = { Text("Are you sure you want to log out?") },
         confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) { Text("Logout") }
+            Button(onClick = onConfirm) { Text("Logout") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+}
+
+@Composable
+private fun DeleteAccountConfirmationDialog(
+    isLoading: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Default.Warning,
+                contentDescription = "Warning",
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = { Text("Delete Your Account?") },
+        text = { Text("This action is permanent. All of your data will be deleted forever. This cannot be undone.\n\nAre you sure you want to proceed?") },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onError
+                    )
+                } else {
+                    Text("Delete Permanently")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isLoading) { Text("Cancel") }
         }
     )
 }

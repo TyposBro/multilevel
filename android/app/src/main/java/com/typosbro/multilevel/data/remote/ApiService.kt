@@ -1,11 +1,23 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/ApiService.kt
 package com.typosbro.multilevel.data.remote
 
-import com.typosbro.multilevel.data.remote.models.*
-import okhttp3.ResponseBody
-import retrofit2.Call
+import com.typosbro.multilevel.data.remote.models.AnalyzeExamRequest
+import com.typosbro.multilevel.data.remote.models.AnalyzeExamResponse
+import com.typosbro.multilevel.data.remote.models.AuthRequest
+import com.typosbro.multilevel.data.remote.models.AuthResponse
+import com.typosbro.multilevel.data.remote.models.ExamHistorySummaryResponse
+import com.typosbro.multilevel.data.remote.models.ExamResultResponse
+import com.typosbro.multilevel.data.remote.models.ExamStepRequest
+import com.typosbro.multilevel.data.remote.models.ExamStepResponse
+import com.typosbro.multilevel.data.remote.models.GenericSuccessResponse
+import com.typosbro.multilevel.data.remote.models.GoogleSignInRequest
+import com.typosbro.multilevel.data.remote.models.UserProfileResponse
 import retrofit2.Response
-import retrofit2.http.*
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Path
 
 
 interface ApiService {
@@ -28,37 +40,13 @@ interface ApiService {
     @GET("auth/profile")
     suspend fun getProfile(): Response<UserProfileResponse>
 
-    // --- Freestyle Chat Endpoints ---
-    @GET("chat/")
-    suspend fun getChatList(): Response<ChatListResponse>
-
-    @POST("chat/")
-    suspend fun createNewChat(@Body request: NewChatRequest): Response<NewChatResponse>
-
-    @GET("chat/{chatId}/history")
-    suspend fun getChatHistory(@Path("chatId") chatId: String): Response<ChatHistoryResponse>
-
-    @POST("chat/{chatId}/message")
-    @Streaming
-    fun sendMessageAndStream(
-        @Path("chatId") chatId: String,
-        @Body request: SendMessageRequest
-    ): Call<ResponseBody>
-
-    @DELETE("chat/{chatId}")
-    suspend fun deleteChat(@Path("chatId") chatId: String): Response<GenericSuccessResponse>
-
-    @PUT("chat/{chatId}/title")
-    suspend fun updateChatTitle(
-        @Path("chatId") chatId: String,
-        @Body request: TitleUpdateRequest
-    ): Response<GenericSuccessResponse>
+    @DELETE("auth/profile")
+    suspend fun deleteProfile(): Response<GenericSuccessResponse>
 
     // --- Structured Exam Endpoints ---
     @POST("exam/start")
     suspend fun startExam(): Response<ExamStepResponse>
 
-    // [FIX] Replaced the streaming endpoint with a simple suspend function
     @POST("exam/step")
     suspend fun getNextExamStep(@Body request: ExamStepRequest): Response<ExamStepResponse>
 

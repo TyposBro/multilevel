@@ -1,5 +1,6 @@
 // {PATH_TO_PROJECT}/api/controllers/authController.js
 const User = require("../models/UserModel");
+const ExamResult = require("../models/ExamResultModel");
 const generateToken = require("../utils/generateToken");
 const { OAuth2Client } = require("google-auth-library");
 
@@ -151,9 +152,41 @@ const googleSignIn = async (req, res) => {
   }
 };
 
+// @desc    Delete user profile and all associated data
+// @route   DELETE /api/auth/profile
+// @access  Private
+const deleteUserProfile = async (req, res) => {
+  try {
+    // req.user is attached by the 'protect' middleware. We get the user's ID from there.
+    const userId = req.user._id;
+
+    // 1. Delete all associated data first (cascading delete)
+    // This prevents orphaned data in your database.
+    // Adjust the field names ('userId') to match your schemas.
+    await ExamResult.deleteMany({ userId: userId });
+    // await Chat.deleteMany({ userId: userId }); // Uncomment when you have a Chat model
+    // Add any other models associated with the user here...
+
+    // 2. Find and delete the user themselves
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // 3. Respond with success
+    console.log(`User ${userId} and their data have been deleted successfully.`);
+    res.status(200).json({ message: "User account and all associated data deleted successfully." });
+  } catch (error) {
+    console.error("Delete User Error:", error);
+    res.status(500).json({ message: "Server error during account deletion." });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
   googleSignIn,
+  deleteUserProfile,
 };

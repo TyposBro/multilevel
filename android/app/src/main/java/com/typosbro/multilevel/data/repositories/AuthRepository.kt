@@ -4,6 +4,7 @@ package com.typosbro.multilevel.data.repositories
 import com.typosbro.multilevel.data.remote.ApiService
 import com.typosbro.multilevel.data.remote.models.AuthRequest
 import com.typosbro.multilevel.data.remote.models.AuthResponse
+import com.typosbro.multilevel.data.remote.models.GenericSuccessResponse
 import com.typosbro.multilevel.data.remote.models.GoogleSignInRequest
 import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.data.remote.models.UserProfileResponse
@@ -31,5 +32,10 @@ class AuthRepository(private val apiService: ApiService) {
     suspend fun getUserProfile(): RepositoryResult<UserProfileResponse> =
         withContext(Dispatchers.IO) {
             safeApiCall { apiService.getProfile() }
+        }
+
+    suspend fun deleteUserProfile(): RepositoryResult<GenericSuccessResponse> =
+        withContext(Dispatchers.IO) {
+            safeApiCall { apiService.deleteProfile() }
         }
 }

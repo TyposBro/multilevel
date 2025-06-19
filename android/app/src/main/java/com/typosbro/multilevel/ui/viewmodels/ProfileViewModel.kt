@@ -2,6 +2,7 @@ package com.typosbro.multilevel.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.typosbro.multilevel.data.remote.models.GenericSuccessResponse
 import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.data.remote.models.UserProfileResponse
 import com.typosbro.multilevel.data.repositories.AuthRepository
@@ -25,7 +26,8 @@ data class UserProfileViewData(
 data class ProfileUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
-    val userProfile: UserProfileViewData? = null
+    val userProfile: UserProfileViewData? = null,
+    val deleteState: UiState<GenericSuccessResponse> = UiState.Idle
 )
 
 @HiltViewModel
@@ -62,8 +64,26 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    // --- REMOVED `logout` and `onThemeChanged` for simplicity ---
-    // The UI will handle these concerns directly.
+    fun deleteAccount() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(deleteState = UiState.Loading) }
+            val result = authRepository.deleteUserProfile()
+            when (result) {
+                is RepositoryResult.Success -> {
+                    _uiState.update { it.copy(deleteState = UiState.Success(result.data)) }
+                }
+
+                is RepositoryResult.Error -> {
+                    _uiState.update { it.copy(deleteState = UiState.Error(result.message)) }
+                }
+            }
+        }
+    }
+
+    // Optional: A way to reset the delete state if needed
+    fun resetDeleteState() {
+        _uiState.update { it.copy(deleteState = UiState.Idle) }
+    }
 }
 
 // Helper extension function to format the data for the UI
