@@ -40,7 +40,6 @@ android {
         }
     }
 
-    // FIX: Add the externalNativeBuild block to link your C++ code via CMake.
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
@@ -58,6 +57,17 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    // DEBUG Keystore
+    signingConfigs {
+        getByName("debug") {
+            // Point to the debug keystore you committed to your project.
+            storeFile = file("keystores/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 }
 

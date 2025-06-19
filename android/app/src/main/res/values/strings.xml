@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">multilevel</string>
+    <string name="google_web_client_id" translatable="false">118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com</string>
 </resources>

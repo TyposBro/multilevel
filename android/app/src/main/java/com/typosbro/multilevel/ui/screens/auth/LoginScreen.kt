@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,6 +36,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
+import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 import com.typosbro.multilevel.ui.viewmodels.UiState
 
@@ -50,13 +52,14 @@ fun LoginScreen(
 
     val context = LocalContext.current
     val googleSignInState by authViewModel.googleSignInState.collectAsState()
+    val googleWebClientId = stringResource(R.string.google_web_client_id)
 
     // Configure Google Sign-In
     val gso = remember {
         GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             // Request the ID token. You must specify your web client ID.
             // DO NOT hardcode this. Put it in your build.gradle or a strings.xml file.
-            .requestIdToken("YOUR_WEB_CLIENT_ID.apps.googleusercontent.com")
+            .requestIdToken(googleWebClientId)
             .requestEmail()
             .build()
     }
