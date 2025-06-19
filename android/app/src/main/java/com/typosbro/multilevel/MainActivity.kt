@@ -2,26 +2,20 @@
 
 package com.typosbro.multilevel
 
-import ai.onnxruntime.OrtSession
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.core.content.ContextCompat
-import com.typosbro.multilevel.navigation.AppNavigation // Import your AppNavigation
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.typosbro.multilevel.navigation.AppNavigation
 import com.typosbro.multilevel.ui.theme.MultilevelTheme
+import com.typosbro.multilevel.ui.viewmodels.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -34,7 +28,10 @@ class MainActivity : ComponentActivity() {
         checkAndRequestAudioPermission()
 
         setContent {
-            MultilevelTheme {
+            val settingsViewModel: SettingsViewModel = hiltViewModel()
+            val isDarkTheme by settingsViewModel.isDarkTheme.collectAsState()
+
+            MultilevelTheme(darkTheme = isDarkTheme) {
                 AppNavigation() // Use the centralized navigation composable
             }
         }

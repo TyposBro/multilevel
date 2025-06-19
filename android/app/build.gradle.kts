@@ -138,4 +138,7 @@ dependencies {
 
     // Built-in Browser
     implementation(libs.androidx.browser)
+
+    // Jetpack DataStore for theme preferences
+    implementation(libs.androidx.datastore.preferences)
 }

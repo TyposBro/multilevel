@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PrivacyTip
@@ -31,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -52,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 import com.typosbro.multilevel.ui.viewmodels.ProfileViewModel
+import com.typosbro.multilevel.ui.viewmodels.SettingsViewModel
 import com.typosbro.multilevel.ui.viewmodels.UiState
 import com.typosbro.multilevel.utils.openUrlInCustomTab
 import kotlinx.coroutines.launch
@@ -60,11 +63,13 @@ import kotlinx.coroutines.launch
 @Composable
 fun ProfileScreen(
     profileViewModel: ProfileViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by profileViewModel.uiState.collectAsStateWithLifecycle()
     val userProfile = uiState.userProfile
 
+    val isDarkTheme by settingsViewModel.isDarkTheme.collectAsStateWithLifecycle()
 
     // --- State for Dialogs ---
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -160,6 +165,28 @@ fun ProfileScreen(
                         )
                     },
                     modifier = Modifier.clickable { /* Navigate to subscription screen */ }
+                )
+            }
+
+            item {
+                SectionHeader("Settings")
+                ListItem(
+                    headlineContent = { Text("Dark Mode") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.DarkMode,
+                            contentDescription = "Dark Mode"
+                        )
+                    },
+                    // The Switch is back and connected to the ViewModel
+                    trailingContent = {
+                        Switch(
+                            checked = isDarkTheme,
+                            onCheckedChange = { isChecked ->
+                                settingsViewModel.onThemeChanged(isChecked)
+                            }
+                        )
+                    }
                 )
             }
 
