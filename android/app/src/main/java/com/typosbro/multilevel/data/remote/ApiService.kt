@@ -7,7 +7,16 @@ import retrofit2.Call
 import retrofit2.Response
 import retrofit2.http.*
 
+
 interface ApiService {
+
+    // --- NEW: Social Auth Endpoints ---
+    @POST("auth/google-signin")
+    suspend fun googleSignIn(@Body request: GoogleSignInRequest): Response<AuthResponse>
+
+    // You would add one for Apple here too
+    // @POST("auth/apple-signin")
+    // suspend fun appleSignIn(@Body request: AppleSignInRequest): Response<AuthResponse>
 
     // --- Auth Endpoints ---
     @POST("auth/register")

@@ -1,4 +1,3 @@
-// {PATH_TO_PROJECT}/api/models/UserModel.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -9,7 +8,6 @@ const userSchema = new mongoose.Schema({
     unique: true,
     lowercase: true,
     match: [
-      // Basic email validation regex
       /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
       "Please provide a valid email address",
     ],
@@ -17,9 +15,17 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: [true, "Please provide a password"],
+    // --- CHANGE: Password is no longer universally required ---
+    // required: [true, "Please provide a password"], // REMOVE THIS LINE
     minlength: 6,
-    select: false, // Don't send password back by default in queries
+    select: false,
+  },
+  // --- NEW: Add a field to track the auth method ---
+  authProvider: {
+    type: String,
+    required: true,
+    enum: ["email", "google"], // Only allow these values
+    default: "email",
   },
   createdAt: {
     type: Date,
@@ -29,9 +35,10 @@ const userSchema = new mongoose.Schema({
 
 // --- Mongoose Middleware ---
 
-// Hash password before saving (only if modified)
+// Hash password before saving (only if it exists and is modified)
 userSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) {
+  // --- CHANGE: Only hash if provider is 'email' and password is set
+  if (this.authProvider !== "email" || !this.isModified("password")) {
     return next();
   }
   const salt = await bcrypt.genSalt(10);
@@ -41,6 +48,7 @@ userSchema.pre("save", async function (next) {
 
 // Method to compare entered password with hashed password
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  // This method remains the same, it will only be called for 'email' users
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

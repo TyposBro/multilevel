@@ -7,6 +7,9 @@ import com.google.gson.annotations.SerializedName
 data class AuthRequest(val email: String, val password: String)
 data class AuthResponse(val _id: String, val email: String, val token: String)
 
+// --- Social Auth ---
+data class GoogleSignInRequest(val idToken: String)
+
 data class UserProfileResponse(
     @SerializedName("_id") val id: String,
     @SerializedName("email") val email: String,

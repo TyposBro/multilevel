@@ -101,6 +101,7 @@ dependencies {
 
     // Room (Local Database)
     implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.benchmark.common)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
 
@@ -121,4 +122,7 @@ dependencies {
     // Firebase Analytics
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+
+    // Google  Sign-In
+    implementation(libs.play.services.auth)
 }
