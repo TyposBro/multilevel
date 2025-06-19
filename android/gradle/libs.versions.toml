@@ -58,8 +58,8 @@ androidx-room-testing = { module = "androidx.room:room-testing", version.ref = "
 androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
 converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "converterGson" }
-firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

@@ -81,7 +81,6 @@ dependencies {
     // ViewModels
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     // Networking
     implementation(libs.retrofit)
@@ -120,6 +119,6 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
 
     // Firebase Analytics
-    implementation(libs.firebase.bom)
+    implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
 }
