@@ -1,4 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ProfileViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
@@ -11,38 +10,49 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Locale
 import javax.inject.Inject
 
-// Updated UI State to handle loading, errors, and the actual profile data
+// We can enhance the user profile with a formatted date
+data class UserProfileViewData(
+    val id: String,
+    val email: String,
+    val registeredDate: String
+)
+
+// The UI State for the Profile Screen
 data class ProfileUiState(
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
     val error: String? = null,
-    val userProfile: UserProfileResponse = UserProfileResponse("", "Loading...", ""),
-    val isDarkTheme: Boolean = false // Placeholder for theme logic
+    val userProfile: UserProfileViewData? = null
 )
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
-    private val authRepository: AuthRepository // Inject AuthRepository instead of TokenManager
-) : ViewModel(){
+    private val authRepository: AuthRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProfileUiState())
     val uiState = _uiState.asStateFlow()
 
     init {
-        // This function will now make a real network call
         fetchUserProfile()
     }
 
     fun fetchUserProfile() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
+            _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = authRepository.getUserProfile()) {
                 is RepositoryResult.Success -> {
                     _uiState.update {
-                        it.copy(isLoading = false, userProfile = result.data, error = null)
+                        it.copy(
+                            isLoading = false,
+                            userProfile = result.data.toViewData() // Map to a display-friendly model
+                        )
                     }
                 }
+
                 is RepositoryResult.Error -> {
                     _uiState.update {
                         it.copy(isLoading = false, error = result.message)
@@ -52,13 +62,22 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    fun onThemeChanged(isDark: Boolean) {
-        _uiState.update { it.copy(isDarkTheme = isDark) }
-        // In a real app, you would save this to DataStore
-    }
+    // --- REMOVED `logout` and `onThemeChanged` for simplicity ---
+    // The UI will handle these concerns directly.
+}
 
-    // The logout logic remains the same, delegating to the shared AuthViewModel
-    fun logout(authViewModel: AuthViewModel) {
-        authViewModel.logout()
+// Helper extension function to format the data for the UI
+private fun UserProfileResponse.toViewData(): UserProfileViewData {
+    val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+    val formatter = SimpleDateFormat("dd MMMM yyyy", Locale.getDefault())
+    val date = try {
+        parser.parse(this.createdAt)
+    } catch (e: Exception) {
+        null
     }
+    return UserProfileViewData(
+        id = this.id,
+        email = this.email,
+        registeredDate = date?.let { formatter.format(it) } ?: "N/A"
+    )
 }

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -19,7 +20,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,13 +30,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
 import com.typosbro.multilevel.R
+import com.typosbro.multilevel.ui.component.DividerWithText
+import com.typosbro.multilevel.ui.component.GoogleSignInButton
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 import com.typosbro.multilevel.ui.viewmodels.UiState
 
@@ -45,51 +47,44 @@ fun LoginScreen(
     onNavigateToRegister: () -> Unit,
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
+    // --- State Management ---
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    val isLoading by authViewModel.isLoading.collectAsStateWithLifecycle()
-    val error by authViewModel.error.collectAsStateWithLifecycle()
 
-    val context = LocalContext.current
+    // It's better to unify the UI state in the ViewModel, but for now we'll combine them here.
+    val emailLoginState by authViewModel.loginState.collectAsState()
     val googleSignInState by authViewModel.googleSignInState.collectAsState()
+
+    // Determine overall loading state
+    val isLoading = emailLoginState is UiState.Loading || googleSignInState is UiState.Loading
+    val isFormEnabled = !isLoading
+
+    // --- Google Sign-In Setup ---
+    val context = LocalContext.current
     val googleWebClientId = stringResource(R.string.google_web_client_id)
 
-    // Configure Google Sign-In
-    val gso = remember {
-        GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            // Request the ID token. You must specify your web client ID.
-            // DO NOT hardcode this. Put it in your build.gradle or a strings.xml file.
+    val googleSignInClient = remember {
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestIdToken(googleWebClientId)
             .requestEmail()
             .build()
+        GoogleSignIn.getClient(context, gso)
     }
-    val googleSignInClient = remember { GoogleSignIn.getClient(context, gso) }
 
-    // Create the ActivityResultLauncher
     val googleSignInLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
         val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
         try {
             val account = task.getResult(ApiException::class.java)
-            val idToken = account.idToken
-            if (idToken != null) {
-                // SUCCESS: We have the token, send it to our backend via the ViewModel
-                authViewModel.signInWithGoogle(idToken)
-            } else {
-                // Handle error: ID token is null
-            }
+            account.idToken?.let { authViewModel.signInWithGoogle(it) }
         } catch (e: ApiException) {
-            // Handle error: Google Sign-In failed
             Log.w("LoginScreen", "Google sign in failed", e)
+            authViewModel.setGoogleSignInError("Google sign in failed. Please try again.")
         }
     }
-    LaunchedEffect(error) {
-        // Optional: Show snackbar or dialog for errors
-        // Consider clearing the error in ViewModel after showing
-    }
 
-
+    // --- UI ---
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -97,19 +92,28 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(horizontal = 24.dp), // More horizontal padding
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Login", style = MaterialTheme.typography.headlineMedium)
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
+            Text("Welcome Back", style = MaterialTheme.typography.headlineLarge)
+            Text(
+                "Sign in to continue",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // --- Email & Password Form ---
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
                 modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+                singleLine = true,
+                enabled = isFormEnabled
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -119,52 +123,72 @@ fun LoginScreen(
                 label = { Text("Password") },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation(),
-                singleLine = true
+                singleLine = true,
+                enabled = isFormEnabled
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            if (isLoading) {
-                CircularProgressIndicator()
-            } else {
-                Button(
-                    onClick = { authViewModel.login(email, password) },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = email.isNotBlank() && password.isNotBlank()
-                ) {
+            // --- Login Button ---
+            Button(
+                onClick = { authViewModel.login(email, password) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                enabled = email.isNotBlank() && password.isNotBlank() && isFormEnabled
+            ) {
+                if (emailLoginState is UiState.Loading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
                     Text("Login")
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = {
-                // Launch the Google Sign-In flow
-                googleSignInLauncher.launch(googleSignInClient.signInIntent)
-            }) {
-                Text("Sign in with Google")
+            // --- Divider ---
+            DividerWithText(
+                text = "OR",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // --- Google Sign-In Button ---
+            GoogleSignInButton(
+                isLoading = googleSignInState is UiState.Loading,
+                onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
+            )
+
+            // --- Error Display ---
+            val emailError = (emailLoginState as? UiState.Error)?.message
+            val googleError = (googleSignInState as? UiState.Error)?.message
+            val errorMessage = emailError ?: googleError
+
+            if (errorMessage != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = errorMessage,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.Center
+                )
             }
 
-            // You can observe the state to show a loading indicator or error message
-            when (val state = googleSignInState) {
-                is UiState.Loading -> {
-                    CircularProgressIndicator()
-                }
+            Spacer(modifier = Modifier.weight(1f)) // Pushes the register button down
 
-                is UiState.Error -> {
-                    Text(text = state.message, color = MaterialTheme.colorScheme.error)
-                }
-                // Success is handled by the AppNavigation's LaunchedEffect that observes the token
-                else -> {}
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-
-            TextButton(onClick = onNavigateToRegister) {
+            // --- Register Button ---
+            TextButton(onClick = onNavigateToRegister, enabled = isFormEnabled) {
                 Text("Don't have an account? Register")
             }
-
-            error?.let {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(it, color = MaterialTheme.colorScheme.error)
-            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
-
 }
+
+// In your AuthViewModel, you might need a way to set an error from the LoginScreen
+// fun setGoogleSignInError(message: String) {
+//     _googleSignInState.value = UiState.Error(message)
+// }

@@ -18,8 +18,6 @@ import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.ui.screens.MainScreen
 import com.typosbro.multilevel.ui.screens.auth.LoginScreen
 import com.typosbro.multilevel.ui.screens.auth.RegisterScreen
-import com.typosbro.multilevel.ui.screens.chat.ChatDetailScreen
-import com.typosbro.multilevel.ui.screens.chat.ChatListScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamResultScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamScreen
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
@@ -31,10 +29,6 @@ object AppDestinations {
     const val MAIN_HUB_ROUTE = "main_hub"
     const val EXAM_SCREEN_ROUTE = "exam_screen"
     const val EXAM_RESULT_ROUTE = "exam_result/{resultId}"
-    const val CHAT_LIST_ROUTE = "chat_list"
-    const val CHAT_DETAIL_ROUTE = "chat_detail"
-    const val CHAT_ID_ARG = "chatId"
-    const val CHAT_DETAIL_ROUTE_WITH_ARGS = "$CHAT_DETAIL_ROUTE/{$CHAT_ID_ARG}"
 }
 
 @Composable
@@ -95,9 +89,6 @@ fun AppNavigation(
                 onNavigateToExamResult = { resultId ->
                     navController.navigate("exam_result/$resultId")
                 },
-                onNavigateToChat = { chatId ->
-                    navController.navigate("${AppDestinations.CHAT_DETAIL_ROUTE}/$chatId")
-                }
             )
         }
 
@@ -115,29 +106,6 @@ fun AppNavigation(
             arguments = listOf(navArgument("resultId") { type = NavType.StringType })
         ) {
             ExamResultScreen(onNavigateBack = { navController.popBackStack() })
-        }
-
-        // OLD MVP ROUTES
-        composable(AppDestinations.CHAT_LIST_ROUTE) {
-            ChatListScreen(
-                onNavigateToChat = { chatId ->
-                    navController.navigate("${AppDestinations.CHAT_DETAIL_ROUTE}/$chatId")
-                },
-                onLogout = {
-                    // The logout button in ProfileViewModel now calls sessionManager.logout(),
-                    // which is handled by our new LaunchedEffect.
-                }
-            )
-        }
-        composable(
-            route = AppDestinations.CHAT_DETAIL_ROUTE_WITH_ARGS,
-            arguments = listOf(navArgument(AppDestinations.CHAT_ID_ARG) {
-                type = NavType.StringType
-            })
-        ) {
-            ChatDetailScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
         }
     }
 }
