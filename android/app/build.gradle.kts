@@ -135,4 +135,7 @@ dependencies {
 
     // Google  Sign-In
     implementation(libs.play.services.auth)
+
+    // Built-in Browser
+    implementation(libs.androidx.browser)
 }

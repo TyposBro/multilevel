@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -42,13 +43,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 import com.typosbro.multilevel.ui.viewmodels.ProfileViewModel
 import com.typosbro.multilevel.ui.viewmodels.UiState
+import com.typosbro.multilevel.utils.openUrlInCustomTab
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -60,9 +65,17 @@ fun ProfileScreen(
     val uiState by profileViewModel.uiState.collectAsStateWithLifecycle()
     val userProfile = uiState.userProfile
 
+
+    // --- State for Dialogs ---
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) } // NEW state for About dialog
+
     val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current // Get context for the URL launcher
+
+    val privacyPolicyUrl =
+        stringResource(R.string.url_privacy_policy) // Fetch the URL from resources
 
     // This effect handles the success of the account deletion by logging out.
     LaunchedEffect(uiState.deleteState) {
@@ -91,9 +104,11 @@ fun ProfileScreen(
     ) { padding ->
 
         if (uiState.isLoading && userProfile == null) {
-            Box(Modifier
-                .fillMaxSize()
-                .padding(padding), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding), contentAlignment = Alignment.Center
+            ) {
                 CircularProgressIndicator()
             }
             return@Scaffold
@@ -148,7 +163,7 @@ fun ProfileScreen(
 
             // --- Support Section ---
             item {
-                SectionHeader("Support")
+                SectionHeader("Support & About")
                 ListItem(
                     headlineContent = { Text("Help & FAQ") },
                     leadingContent = {
@@ -159,6 +174,7 @@ fun ProfileScreen(
                     },
                     modifier = Modifier.clickable { /* Navigate to Help screen */ }
                 )
+                // --- PRIVACY POLICY ---
                 ListItem(
                     headlineContent = { Text("Privacy Policy") },
                     leadingContent = {
@@ -167,7 +183,15 @@ fun ProfileScreen(
                             contentDescription = "Privacy Policy"
                         )
                     },
-                    modifier = Modifier.clickable { /* Open URL */ }
+                    modifier = Modifier.clickable {
+                        openUrlInCustomTab(context, privacyPolicyUrl)
+                    }
+                )
+                // --- ABOUT APP ---
+                ListItem(
+                    headlineContent = { Text("About This App") },
+                    leadingContent = { Icon(Icons.Default.Info, contentDescription = "About") },
+                    modifier = Modifier.clickable { showAboutDialog = true } // Show the dialog
                 )
             }
 
@@ -249,6 +273,10 @@ fun ProfileScreen(
                 }
             }
         )
+    }
+
+    if (showAboutDialog) {
+        AboutAppDialog(onDismiss = { showAboutDialog = false })
     }
 }
 
