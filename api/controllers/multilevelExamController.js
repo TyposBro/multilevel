@@ -108,7 +108,7 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
       return res.status(500).json({ message: "AI failed to generate a valid analysis." });
     }
 
-    const newExamResult = new ExamResult({
+    const newExamResult = new MultilevelExamResult({
       userId,
       transcript,
       totalScore: analysisData.totalScore,

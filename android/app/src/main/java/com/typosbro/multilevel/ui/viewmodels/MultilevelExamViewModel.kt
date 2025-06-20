@@ -26,21 +26,9 @@ import javax.inject.Inject
 
 // --- State Definitions (Unchanged) ---
 enum class MultilevelExamStage {
-    NOT_STARTED,
-    LOADING,
-    INTRO,
-    PART1_1_QUESTION,
-    PART1_2_INTRO,
-    PART1_2_COMPARE,
-    PART1_2_FOLLOWUP,
-    PART2_INTRO,
-    PART2_PREP,
-    PART2_SPEAKING,
-    PART3_INTRO,
-    PART3_PREP,
-    PART3_SPEAKING,
-    ANALYZING,
-    FINISHED_ERROR
+    NOT_STARTED, LOADING, INTRO, PART1_1_QUESTION, PART1_2_INTRO, PART1_2_COMPARE,
+    PART1_2_FOLLOWUP, PART2_INTRO, PART2_PREP, PART2_SPEAKING, PART3_INTRO,
+    PART3_PREP, PART3_SPEAKING, ANALYZING, FINISHED_ERROR
 }
 
 data class MultilevelUiState(
@@ -56,7 +44,7 @@ data class MultilevelUiState(
     val finalResultId: String? = null
 )
 
-// --- ViewModel Implementation ---
+// --- ViewModel Implementation (Final Corrected Version) ---
 
 @HiltViewModel
 class MultilevelExamViewModel @Inject constructor(
@@ -84,9 +72,8 @@ class MultilevelExamViewModel @Inject constructor(
                             stage = MultilevelExamStage.INTRO
                         )
                     }
-                    playInstructionAndWait(R.raw.multilevel_part1_intro) {
-                        startPart1_1()
-                    }
+                    playInstructionAndWait(R.raw.multilevel_part1_intro)
+                    startPart1_1()
                 }
 
                 is RepositoryResult.Error -> {
@@ -102,122 +89,140 @@ class MultilevelExamViewModel @Inject constructor(
     }
 
     private fun startPart1_1() {
-        val content = _uiState.value.examContent?.part1_1 ?: return
-        val index = _uiState.value.part1_1_QuestionIndex
-        if (index >= content.size) {
-            startPart1_2()
-            return
-        }
-
-        val question = content[index]
-        _uiState.update {
-            it.copy(
-                stage = MultilevelExamStage.PART1_1_QUESTION,
-                currentQuestionText = question.questionText
-            )
-        }
-        addTranscript("Examiner", question.questionText)
-
-        AudioPlayer.playFromUrl(context, question.audioUrl) {
-            startAnswerTimer(prepTime = 5, answerTime = 30) {
-                _uiState.update { it.copy(part1_1_QuestionIndex = index + 1) }
-                startPart1_1()
+        viewModelScope.launch {
+            val content = _uiState.value.examContent?.part1_1 ?: return@launch
+            val index = _uiState.value.part1_1_QuestionIndex
+            if (index >= content.size) {
+                startPart1_2()
+                return@launch
             }
+
+            val question = content[index]
+            _uiState.update {
+                it.copy(
+                    stage = MultilevelExamStage.PART1_1_QUESTION,
+                    currentQuestionText = question.questionText
+                )
+            }
+            addTranscript("Examiner", question.questionText)
+
+            // 1. Wait for question audio to finish
+            AudioPlayer.playFromUrlAndWait(context, question.audioUrl)
+
+            // 2. Wait for the entire prep/answer timer sequence to finish
+            startAnswerTimer(prepTime = 5, answerTime = 30)
+
+            // 3. This code only runs AFTER the user has finished answering
+            _uiState.update { it.copy(part1_1_QuestionIndex = index + 1) }
+            startPart1_1() // Move to the next question
         }
     }
 
     private fun startPart1_2() {
-        _uiState.update { it.copy(stage = MultilevelExamStage.PART1_2_INTRO) }
-        playInstructionAndWait(R.raw.multilevel_part1_2_intro) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(stage = MultilevelExamStage.PART1_2_INTRO) }
+            playInstructionAndWait(R.raw.multilevel_part1_2_intro)
+
             processPart1_2_Question()
         }
     }
 
     private fun processPart1_2_Question() {
-        val set = _uiState.value.examContent?.part1_2 ?: return
-        val index = _uiState.value.part1_2_QuestionIndex
-        if (index >= set.questions.size) {
-            startPart2()
-            return
-        }
-
-        val question = set.questions[index]
-        val currentStage =
-            if (index == 0) MultilevelExamStage.PART1_2_COMPARE else MultilevelExamStage.PART1_2_FOLLOWUP
-        val prepTime = if (index == 0) 10 else 5
-        val answerTime = if (index == 0) 45 else 30
-
-        _uiState.update { it.copy(stage = currentStage, currentQuestionText = question.text) }
-        addTranscript("Examiner", question.text)
-
-        AudioPlayer.playFromUrl(context, question.audioUrl) {
-            startAnswerTimer(prepTime = prepTime, answerTime = answerTime) {
-                _uiState.update { it.copy(part1_2_QuestionIndex = index + 1) }
-                processPart1_2_Question()
+        viewModelScope.launch {
+            val set = _uiState.value.examContent?.part1_2 ?: return@launch
+            val index = _uiState.value.part1_2_QuestionIndex
+            if (index >= set.questions.size) {
+                startPart2()
+                return@launch
             }
+
+            val question = set.questions[index]
+            val currentStage =
+                if (index == 0) MultilevelExamStage.PART1_2_COMPARE else MultilevelExamStage.PART1_2_FOLLOWUP
+            val prepTime = if (index == 0) 10 else 5
+            val answerTime = if (index == 0) 45 else 30
+
+            _uiState.update { it.copy(stage = currentStage, currentQuestionText = question.text) }
+            addTranscript("Examiner", question.text)
+
+            AudioPlayer.playFromUrlAndWait(context, question.audioUrl)
+            startAnswerTimer(prepTime = prepTime, answerTime = answerTime)
+
+            _uiState.update { it.copy(part1_2_QuestionIndex = index + 1) }
+            processPart1_2_Question()
         }
     }
 
     private fun startPart2() {
-        _uiState.update { it.copy(stage = MultilevelExamStage.PART2_INTRO) }
-        playInstructionAndWait(R.raw.multilevel_part2_intro) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(stage = MultilevelExamStage.PART2_INTRO) }
+            playInstructionAndWait(R.raw.multilevel_part2_intro)
             startPart2_Prep()
         }
     }
 
     private fun startPart2_Prep() {
-        val set = _uiState.value.examContent?.part2 ?: return
-        val fullQuestionText = set.questions.joinToString("\n") { it.text }
+        viewModelScope.launch {
+            val set = _uiState.value.examContent?.part2 ?: return@launch
+            val fullQuestionText = set.questions.joinToString("\n") { it.text }
 
-        _uiState.update {
-            it.copy(
-                stage = MultilevelExamStage.PART2_PREP,
-                currentQuestionText = fullQuestionText
-            )
-        }
-        addTranscript("Examiner", fullQuestionText)
-
-        val combinedAudioUrl = set.questions.firstOrNull()?.audioUrl ?: ""
-        AudioPlayer.playFromUrl(context, combinedAudioUrl) {
-            startTimer(duration = 60, stageOnFinish = MultilevelExamStage.PART2_SPEAKING) {
-                startPart2_Speaking()
+            _uiState.update {
+                it.copy(
+                    stage = MultilevelExamStage.PART2_PREP,
+                    currentQuestionText = fullQuestionText
+                )
             }
+            addTranscript("Examiner", fullQuestionText)
+
+            val combinedAudioUrl = set.questions.firstOrNull()?.audioUrl ?: ""
+            AudioPlayer.playFromUrlAndWait(context, combinedAudioUrl)
+
+            startTimer(duration = 60, stageOnFinish = MultilevelExamStage.PART2_SPEAKING)
+            startPart2_Speaking()
         }
     }
 
     private fun startPart2_Speaking() {
-        playInstructionAndWait(R.raw.start_speaking_sound) {
+        viewModelScope.launch {
+            playStartSpeakingSound()
             recorder.start()
             _uiState.update { it.copy(isRecording = true) }
-            startTimer(duration = 120, stageOnFinish = MultilevelExamStage.PART3_INTRO) {
-                recorder.stop()
-                startPart3()
-            }
+
+            startTimer(duration = 120, stageOnFinish = MultilevelExamStage.PART3_INTRO)
+
+            recorder.stop()
+            startPart3()
         }
     }
 
     private fun startPart3() {
-        _uiState.update { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
-        playInstructionAndWait(R.raw.multilevel_part3_intro) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
+            playInstructionAndWait(R.raw.multilevel_part3_intro)
             startPart3_Prep()
         }
     }
 
     private fun startPart3_Prep() {
-        _uiState.update { it.copy(stage = MultilevelExamStage.PART3_PREP) }
-        startTimer(duration = 60, stageOnFinish = MultilevelExamStage.PART3_SPEAKING) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(stage = MultilevelExamStage.PART3_PREP) }
+
+            startTimer(duration = 60, stageOnFinish = MultilevelExamStage.PART3_SPEAKING)
+
             startPart3_Speaking()
         }
     }
 
     private fun startPart3_Speaking() {
-        playInstructionAndWait(R.raw.start_speaking_sound) {
+        viewModelScope.launch {
+            playStartSpeakingSound()
             recorder.start()
             _uiState.update { it.copy(isRecording = true) }
-            startTimer(duration = 120, stageOnFinish = MultilevelExamStage.ANALYZING) {
-                recorder.stop()
-                concludeAndAnalyze()
-            }
+
+            startTimer(duration = 120, stageOnFinish = MultilevelExamStage.ANALYZING)
+
+            recorder.stop()
+            concludeAndAnalyze()
         }
     }
 
@@ -250,59 +255,52 @@ class MultilevelExamViewModel @Inject constructor(
         }
     }
 
-    // --- CORRECTED FUNCTION ---
-    private fun startAnswerTimer(prepTime: Int, answerTime: Int, onFinished: () -> Unit) {
+    // --- CORRECTED SUSPENDABLE TIMER FUNCTION ---
+    private suspend fun startAnswerTimer(prepTime: Int, answerTime: Int) {
         timerJob?.cancel()
-        timerJob = viewModelScope.launch { // Launch a single coroutine to manage the whole sequence
-            // 1. Prep countdown (this is a suspend block)
+        val newTimerJob = viewModelScope.launch {
+            _uiState.update { it.copy(isRecording = false) }
             for (i in prepTime downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
             _uiState.update { it.copy(timerValue = 0) }
-
-            // 2. Play the start sound. The onCompletion lambda does not need to be a coroutine.
-            playInstructionAndWait(R.raw.start_speaking_sound) {
-                // This part is NOT a coroutine, so we just update state and start the recorder.
-                // The timer logic continues in the parent coroutine.
-                _uiState.update { it.copy(isRecording = true) }
-                recorder.start()
-            }
-
-            // 3. Answer countdown (this is also a suspend block)
+            playStartSpeakingSound()
+            _uiState.update { it.copy(isRecording = true) }
+            recorder.start()
             for (i in answerTime downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
-
-            // 4. Timer finished: stop recorder and call the onFinished lambda
+            _uiState.update { it.copy(timerValue = 0, isRecording = false) }
             recorder.stop()
-            // onRecordingStopped will be called, which handles transcription.
-
-            // Allow a brief moment for transcription to potentially finish before moving on
-            delay(200)
-            onFinished()
         }
+        timerJob = newTimerJob
+        newTimerJob.join() // Wait for the entire sequence to complete
     }
 
-    private fun startTimer(
-        duration: Int,
-        stageOnFinish: MultilevelExamStage,
-        onFinished: () -> Unit
-    ) {
+    // --- CORRECTED SUSPENDABLE GENERIC TIMER ---
+    private suspend fun startTimer(duration: Int, stageOnFinish: MultilevelExamStage) {
         timerJob?.cancel()
-        timerJob = viewModelScope.launch {
+        val newTimerJob = viewModelScope.launch {
             for (i in duration downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
             _uiState.update { it.copy(timerValue = 0, stage = stageOnFinish) }
-            onFinished()
         }
+        timerJob = newTimerJob
+        newTimerJob.join() // Wait for the timer to complete
     }
 
-    private fun playInstructionAndWait(@RawRes resId: Int, onCompletion: () -> Unit) {
-        AudioPlayer.playFromRaw(context, resId, onCompletion)
+    private suspend fun playInstructionAndWait(@RawRes resId: Int) {
+        try {
+            AudioPlayer.playFromRawAndWait(context, resId)
+            playStartSpeakingSound()
+        } catch (e: Exception) {
+            Log.e("ExamVM", "Instruction audio failed to play", e)
+            _uiState.update { it.copy(error = "Audio playback failed. Please try again.") }
+        }
     }
 
     private fun addTranscript(speaker: String, text: String) {
@@ -311,26 +309,25 @@ class MultilevelExamViewModel @Inject constructor(
     }
 
     override fun onDataReceived(samples: FloatArray) {
-        synchronized(audioDataBuffer) {
-            audioDataBuffer.add(samples)
-        }
+        synchronized(audioDataBuffer) { audioDataBuffer.add(samples) }
     }
 
     override fun onRecordingStopped() {
         _uiState.update { it.copy(isRecording = false) }
         viewModelScope.launch {
-            // Your Whisper transcription logic goes here.
             val transcribedText = "[User speech recorded. Replace with actual transcription.]"
             Log.d("ExamVM", "Recording stopped. Transcribed: '$transcribedText'")
             if (transcribedText.isNotBlank()) {
                 addTranscript("User", transcribedText)
             }
-
-            synchronized(audioDataBuffer) {
-                audioDataBuffer.clear()
-            }
+            synchronized(audioDataBuffer) { audioDataBuffer.clear() }
         }
     }
+
+    suspend fun playStartSpeakingSound() {
+        AudioPlayer.playFromRawAndWait(context, R.raw.start_speaking_sound)
+    }
+
 
     override fun onCleared() {
         super.onCleared()
