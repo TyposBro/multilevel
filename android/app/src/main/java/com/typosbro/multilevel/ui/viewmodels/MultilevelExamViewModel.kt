@@ -13,16 +13,23 @@ import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import com.typosbro.multilevel.data.repositories.MultilevelExamRepository
 import com.typosbro.multilevel.features.whisper.Recorder
+import com.typosbro.multilevel.features.whisper.engine.WhisperEngineNative
 import com.typosbro.multilevel.utils.AudioPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
 
 // --- State Definitions (Unchanged) ---
 enum class MultilevelExamStage {
@@ -32,16 +39,17 @@ enum class MultilevelExamStage {
 }
 
 object MULTILEVEL_TIMEOUTS {
-    const val PART1_1_PREP = 5
-    const val PART1_1_ANSWER = 30
-    const val PART1_2_PREP_FIRST = 10
-    const val PART1_2_PREP_FOLLOWUP = 5
-    const val PART1_2_ANSWER_FIRST = 45
-    const val PART1_2_ANSWER_FOLLOWUP = 30
-    const val PART2_PREP = 60
-    const val PART2_SPEAKING = 120
-    const val PART3_PREP = 60
-    const val PART3_SPEAKING = 120
+    // Using shorter times for easier debugging
+    const val PART1_1_PREP = 3
+    const val PART1_1_ANSWER = 5
+    const val PART1_2_PREP_FIRST = 3
+    const val PART1_2_PREP_FOLLOWUP = 3
+    const val PART1_2_ANSWER_FIRST = 5
+    const val PART1_2_ANSWER_FOLLOWUP = 5
+    const val PART2_PREP = 5
+    const val PART2_SPEAKING = 7
+    const val PART3_PREP = 5
+    const val PART3_SPEAKING = 7
 }
 
 data class MultilevelUiState(
@@ -57,8 +65,6 @@ data class MultilevelUiState(
     val finalResultId: String? = null
 )
 
-// --- ViewModel Implementation (Final Corrected Version) ---
-
 @HiltViewModel
 class MultilevelExamViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -68,9 +74,22 @@ class MultilevelExamViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MultilevelUiState())
     val uiState = _uiState.asStateFlow()
 
+    private var whisperEngine: WhisperEngineNative? = null
     private val recorder: Recorder = Recorder(context, this)
     private var timerJob: Job? = null
     private val audioDataBuffer = mutableListOf<FloatArray>()
+
+    // This continuation bridges the callback-based Recorder with coroutines.
+    private var transcriptionContinuation: Continuation<String>? = null
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            whisperEngine = WhisperEngineNative(context).also {
+                val modelFile = getAssetFile("whisper-tiny.en.tflite")
+                it.initialize(modelFile.absolutePath, "", false)
+            }
+        }
+    }
 
     fun startExam() {
         if (uiState.value.stage != MultilevelExamStage.NOT_STARTED) return
@@ -118,11 +137,13 @@ class MultilevelExamViewModel @Inject constructor(
                 )
             }
             addTranscript("Examiner", question.questionText)
-
             AudioPlayer.playFromUrlAndWait(context, question.audioUrl)
 
-            // This now correctly WAITS for the timer to finish
-            startAnswerTimer(prepTime = 5, answerTime = 30)
+            // This function now correctly waits for prep, recording, and transcription.
+            startAnswerTimer(
+                prepTime = MULTILEVEL_TIMEOUTS.PART1_1_PREP,
+                answerTime = MULTILEVEL_TIMEOUTS.PART1_1_ANSWER
+            )
 
             _uiState.update { it.copy(part1_1_QuestionIndex = index + 1) }
             startPart1_1() // Move to the next question
@@ -149,24 +170,21 @@ class MultilevelExamViewModel @Inject constructor(
             val question = set.questions[index]
             val currentStage =
                 if (index == 0) MultilevelExamStage.PART1_2_COMPARE else MultilevelExamStage.PART1_2_FOLLOWUP
-            val prepTime = if (index == 0) 10 else 5
-            val answerTime = if (index == 0) 45 else 30
+            val prepTime =
+                if (index == 0) MULTILEVEL_TIMEOUTS.PART1_2_PREP_FIRST else MULTILEVEL_TIMEOUTS.PART1_2_PREP_FOLLOWUP
+            val answerTime =
+                if (index == 0) MULTILEVEL_TIMEOUTS.PART1_2_ANSWER_FIRST else MULTILEVEL_TIMEOUTS.PART1_2_ANSWER_FOLLOWUP
 
             _uiState.update { it.copy(stage = currentStage, currentQuestionText = question.text) }
             addTranscript("Examiner", question.text)
-
             AudioPlayer.playFromUrlAndWait(context, question.audioUrl)
 
-            // This now correctly WAITS for the timer to finish
             startAnswerTimer(prepTime = prepTime, answerTime = answerTime)
 
             _uiState.update { it.copy(part1_2_QuestionIndex = index + 1) }
             processPart1_2_Question()
         }
     }
-
-    // --- Part 2 and 3 Logic ---
-    // (No changes needed here, as they call the corrected timer functions)
 
     private fun startPart2() {
         viewModelScope.launch {
@@ -188,7 +206,7 @@ class MultilevelExamViewModel @Inject constructor(
         addTranscript("Examiner", fullQuestionText)
         val combinedAudioUrl = set.questions.firstOrNull()?.audioUrl ?: ""
         AudioPlayer.playFromUrlAndWait(context, combinedAudioUrl)
-        startTimer(duration = 60)
+        startTimer(duration = MULTILEVEL_TIMEOUTS.PART2_PREP)
         startPart2_Speaking()
     }
 
@@ -197,9 +215,13 @@ class MultilevelExamViewModel @Inject constructor(
         playStartSpeakingSound()
         recorder.start()
         _uiState.update { it.copy(isRecording = true) }
-        startTimer(duration = 120)
-        recorder.stop()
-        _uiState.update { it.copy(isRecording = false) }
+        startTimer(duration = MULTILEVEL_TIMEOUTS.PART2_SPEAKING)
+
+        val transcribedText = stopRecordingAndTranscribe()
+        if (transcribedText.isNotBlank()) {
+            addTranscript("User", transcribedText)
+        }
+
         startPart3()
     }
 
@@ -213,7 +235,7 @@ class MultilevelExamViewModel @Inject constructor(
 
     private suspend fun startPart3_Prep() {
         _uiState.update { it.copy(stage = MultilevelExamStage.PART3_PREP) }
-        startTimer(duration = 60)
+        startTimer(duration = MULTILEVEL_TIMEOUTS.PART3_PREP)
         startPart3_Speaking()
     }
 
@@ -222,13 +244,16 @@ class MultilevelExamViewModel @Inject constructor(
         playStartSpeakingSound()
         recorder.start()
         _uiState.update { it.copy(isRecording = true) }
-        startTimer(duration = 120)
-        recorder.stop()
-        _uiState.update { it.copy(isRecording = false) }
+        startTimer(duration = MULTILEVEL_TIMEOUTS.PART3_SPEAKING)
+
+        val transcribedText = stopRecordingAndTranscribe()
+        if (transcribedText.isNotBlank()) {
+            addTranscript("User", transcribedText)
+        }
+
         concludeAndAnalyze()
     }
 
-    // --- Analysis Logic (Unchanged) ---
     private fun concludeAndAnalyze() {
         _uiState.update { it.copy(stage = MultilevelExamStage.ANALYZING) }
         viewModelScope.launch {
@@ -258,34 +283,74 @@ class MultilevelExamViewModel @Inject constructor(
         }
     }
 
-    // --- *** THE CORE FIX IS HERE *** ---
+    // --- ### THE CORE FIXES ARE HERE ### ---
 
     private suspend fun startAnswerTimer(prepTime: Int, answerTime: Int) {
         timerJob?.cancel()
         val newTimerJob = viewModelScope.launch {
+            // Prep Phase
             _uiState.update { it.copy(isRecording = false) }
             for (i in prepTime downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
             _uiState.update { it.copy(timerValue = 0) }
+
+            // Speaking Phase
             playStartSpeakingSound()
-            _uiState.update { it.copy(isRecording = true) }
             recorder.start()
+            _uiState.update { it.copy(isRecording = true) }
             for (i in answerTime downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
-            _uiState.update { it.copy(timerValue = 0, isRecording = false) }
-            recorder.stop()
+            _uiState.update { it.copy(timerValue = 0) }
+
+            // Stop and Transcribe Phase (now waits)
+            val transcribedText = stopRecordingAndTranscribe()
+            if (transcribedText.isNotBlank()) {
+                addTranscript("User", transcribedText)
+            }
         }
         timerJob = newTimerJob
-        newTimerJob.join() // This is the magic line that waits for the timer to complete
+        newTimerJob.join() // This waits for the entire sequence to complete.
     }
+
+    /**
+     * Stops the recorder and suspends the current coroutine until transcription is complete.
+     * @return The transcribed text.
+     */
+    private suspend fun stopRecordingAndTranscribe(): String {
+        return suspendCancellableCoroutine { continuation ->
+            // Store the continuation to be resumed by the callback.
+            transcriptionContinuation = continuation
+            recorder.stop()
+            // The coroutine is now suspended. It will be resumed in onRecordingStopped().
+        }
+    }
+
+    /**
+     * This callback is invoked from the Recorder's background thread when it has fully stopped.
+     */
+    override fun onRecordingStopped() {
+        // We are off the main thread here, but we need to run suspend functions.
+        // Launch a new coroutine in the ViewModel's scope to handle it.
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRecording = false) }
+
+            val transcribedText = transcribeBufferedAudio()
+            Log.d("ExamVM", "Recording stopped. Transcribed: '$transcribedText'")
+
+            // Safely resume the suspended coroutine with the transcription result.
+            transcriptionContinuation?.resume(transcribedText)
+            transcriptionContinuation = null // Clean up to prevent leaks.
+        }
+    }
+
+    // --- Helper and Listener functions ---
 
     private suspend fun startTimer(duration: Int) {
         timerJob?.cancel()
-        // This function also suspends now.
         val newTimerJob = viewModelScope.launch {
             for (i in duration downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
@@ -294,15 +359,43 @@ class MultilevelExamViewModel @Inject constructor(
             _uiState.update { it.copy(timerValue = 0) }
         }
         timerJob = newTimerJob
-        newTimerJob.join() // Also wait here
+        newTimerJob.join() // Wait here
     }
 
-    // --- Helper and Listener functions (Unchanged, but might need some suspend adjustments) ---
+    override fun onDataReceived(samples: FloatArray) {
+        synchronized(audioDataBuffer) {
+            audioDataBuffer.add(samples)
+        }
+    }
+
+    private suspend fun transcribeBufferedAudio(): String {
+        val allSamples: FloatArray
+        synchronized(audioDataBuffer) {
+            if (audioDataBuffer.isEmpty()) {
+                return ""
+            }
+            allSamples = FloatArray(audioDataBuffer.sumOf { it.size })
+            var destinationPos = 0
+            audioDataBuffer.forEach { chunk ->
+                System.arraycopy(chunk, 0, allSamples, destinationPos, chunk.size)
+                destinationPos += chunk.size
+            }
+            audioDataBuffer.clear()
+        }
+
+        return withContext(Dispatchers.Default) {
+            try {
+                whisperEngine?.transcribeBuffer(allSamples) ?: ""
+            } catch (t: Throwable) {
+                Log.e("ExamViewModel", "Whisper transcription failed", t)
+                ""
+            }
+        }
+    }
 
     private suspend fun playInstructionAndWait(@RawRes resId: Int) {
         try {
             AudioPlayer.playFromRawAndWait(context, resId)
-            playStartSpeakingSound()
         } catch (e: Exception) {
             Log.e("ExamVM", "Instruction audio failed to play", e)
             _uiState.update { it.copy(error = "Audio playback failed. Please try again.") }
@@ -322,20 +415,12 @@ class MultilevelExamViewModel @Inject constructor(
         _uiState.update { it.copy(transcript = it.transcript + newEntry) }
     }
 
-    override fun onDataReceived(samples: FloatArray) {
-        synchronized(audioDataBuffer) { audioDataBuffer.add(samples) }
-    }
-
-    override fun onRecordingStopped() {
-        _uiState.update { it.copy(isRecording = false) }
-        viewModelScope.launch {
-            val transcribedText = "[User speech recorded. Replace with actual transcription.]"
-            Log.d("ExamVM", "Recording stopped. Transcribed: '$transcribedText'")
-            if (transcribedText.isNotBlank()) {
-                addTranscript("User", transcribedText)
-            }
-            synchronized(audioDataBuffer) { audioDataBuffer.clear() }
+    private fun getAssetFile(assetName: String): File {
+        val file = File(context.cacheDir, assetName)
+        if (!file.exists()) {
+            context.assets.open(assetName).use { it.copyTo(file.outputStream()) }
         }
+        return file
     }
 
     override fun onCleared() {
@@ -343,5 +428,8 @@ class MultilevelExamViewModel @Inject constructor(
         recorder.stop()
         AudioPlayer.release()
         timerJob?.cancel()
+        transcriptionContinuation?.resume("") // Resume with empty to avoid leaks if VM is cleared mid-transcription
+        transcriptionContinuation = null
+//        whisperEngine?.release()
     }
 }

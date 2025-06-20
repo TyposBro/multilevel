@@ -1,4 +1,5 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/features/whisper/Recorder.java
+
 package com.typosbro.multilevel.features.whisper;
 
 import android.Manifest;
@@ -8,23 +9,19 @@ import android.media.AudioFormat;
 import android.media.AudioRecord;
 import android.media.MediaRecorder;
 import android.util.Log;
+
 import androidx.core.app.ActivityCompat;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class Recorder {
 
-    // A simpler listener that only provides audio data.
-    public interface RecorderListener {
-        void onDataReceived(float[] samples);
-        void onRecordingStopped(); // Add a callback for when recording actually stops
-    }
-
     private static final String TAG = "Recorder";
     private final Context mContext;
     private final AtomicBoolean mIsRecording = new AtomicBoolean(false);
-    private RecorderListener mListener;
+    private final RecorderListener mListener;
     private Thread recordingThread;
 
     public Recorder(Context context, RecorderListener listener) {
@@ -48,26 +45,26 @@ public class Recorder {
 
     public void stop() {
         if (!mIsRecording.get()) return;
-        mIsRecording.set(false); // Signal the thread to stop
+        mIsRecording.set(false);
     }
 
     private void recordAudio() {
         if (ActivityCompat.checkSelfPermission(mContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Log.e(TAG, "Permission not granted for recording");
             mIsRecording.set(false);
-            if (mListener != null) mListener.onRecordingStopped();
+            if (mListener != null) mListener.onRecordingStopped(); // Notify listener on error
             return;
         }
 
         Log.d(TAG, "Starting audio recording thread.");
-        int sampleRateInHz = 16000;
-        int channelConfig = AudioFormat.CHANNEL_IN_MONO;
-        int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
-
-        int bufferSizeInBytes = AudioRecord.getMinBufferSize(sampleRateInHz, channelConfig, audioFormat);
-        AudioRecord audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);
-
+        AudioRecord audioRecord = null;
         try {
+            int sampleRateInHz = 16000;
+            int channelConfig = AudioFormat.CHANNEL_IN_MONO;
+            int audioFormat = AudioFormat.ENCODING_PCM_16BIT;
+            int bufferSizeInBytes = AudioRecord.getMinBufferSize(sampleRateInHz, channelConfig, audioFormat);
+            audioRecord = new AudioRecord(MediaRecorder.AudioSource.MIC, sampleRateInHz, channelConfig, audioFormat, bufferSizeInBytes);
+
             audioRecord.startRecording();
             byte[] audioData = new byte[bufferSizeInBytes];
 
@@ -85,9 +82,15 @@ public class Recorder {
             Log.e(TAG, "Exception during recording", e);
         } finally {
             Log.d(TAG, "Stopping audio recording thread.");
-            mIsRecording.set(false); // Ensure state is false
-            audioRecord.stop();
-            audioRecord.release();
+            mIsRecording.set(false);
+            if (audioRecord != null) {
+                if (audioRecord.getRecordingState() == AudioRecord.RECORDSTATE_RECORDING) {
+                    audioRecord.stop();
+                }
+                audioRecord.release();
+            }
+            // --- THIS IS THE KEY ---
+            // Ensure the listener is always called when the thread finishes.
             if (mListener != null) {
                 mListener.onRecordingStopped();
             }
@@ -101,5 +104,11 @@ public class Recorder {
             samples[i] = buffer.getShort() / 32768.0f;
         }
         return samples;
+    }
+
+    public interface RecorderListener {
+        void onDataReceived(float[] samples);
+
+        void onRecordingStopped();
     }
 }
