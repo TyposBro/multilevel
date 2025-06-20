@@ -90,12 +90,16 @@ fun AppNavigation(
                 onNavigateToIELTS = {
                     navController.navigate(AppDestinations.EXAM_SCREEN_ROUTE)
                 },
-                onNavigateToMultilevel = { // New navigation action
+                onNavigateToMultilevel = {
                     navController.navigate(AppDestinations.MULTILEVEL_EXAM_ROUTE)
                 },
-                onNavigateToExamResult = { resultId ->
+                // Define the specific navigation actions for each result type here
+                onNavigateToIeltsResult = { resultId ->
                     navController.navigate("exam_result/$resultId")
                 },
+                onNavigateToMultilevelResult = { resultId ->
+                    navController.navigate("multilevel_result/$resultId")
+                }
             )
         }
 

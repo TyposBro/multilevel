@@ -39,7 +39,7 @@ fun PracticeHubScreen(
             ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(
-                        "Full Multilevel Speaking Mock Exam",
+                        "Multilevel Speaking",
                         style = MaterialTheme.typography.headlineSmall
                     )
                     Text(
@@ -57,7 +57,7 @@ fun PracticeHubScreen(
             ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(
-                        "Full IELTS Speaking Mock Exam",
+                        "IELTS Speaking",
                         style = MaterialTheme.typography.headlineSmall
                     )
                     Text(

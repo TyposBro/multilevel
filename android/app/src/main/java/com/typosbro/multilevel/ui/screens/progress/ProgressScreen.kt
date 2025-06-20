@@ -1,14 +1,33 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/progress/ProgressScreen.kt
+
 package com.typosbro.multilevel.ui.screens.progress
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -22,70 +41,97 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.typosbro.multilevel.data.remote.models.ExamResultSummary
+import com.typosbro.multilevel.ui.viewmodels.ExamType
+import com.typosbro.multilevel.ui.viewmodels.GenericExamResultSummary
 import com.typosbro.multilevel.ui.viewmodels.ProgressViewModel
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressScreen(
-    // In a real app, you'd navigate to the full result screen
-    onNavigateToResult: (resultId: String) -> Unit,
+    onNavigateToIeltsResult: (resultId: String) -> Unit,
+    onNavigateToMultilevelResult: (resultId: String) -> Unit,
     viewModel: ProgressViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // Determine which list of results to show based on the selected tab
+    val currentHistory = when (uiState.selectedTab) {
+        ExamType.IELTS -> uiState.ieltsHistory
+        ExamType.MULTILEVEL -> uiState.multilevelHistory
+    }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text("My Progress") }) }
     ) { padding ->
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        } else if (uiState.history.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No exam history yet. Take a test to see your progress!")
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(padding)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                // --- Chart Section ---
-                item {
-                    Text(
-                        "Score Over Time",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    ScoreHistoryChart(
-                        scores = uiState.history.map { it.overallBand },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(200.dp)
-                            .padding(16.dp)
-                    )
-                }
+        Column(modifier = Modifier.padding(padding)) {
+            ExamTypeSwitcher(
+                selectedType = uiState.selectedTab,
+                onTypeSelected = { viewModel.selectTab(it) },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-                // --- History List Section ---
-                item {
+            if (uiState.isLoading) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (currentHistory.isEmpty()) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        "Exam History",
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
+                        "No ${uiState.selectedTab.name} exam history yet.",
+                        modifier = Modifier.padding(16.dp)
                     )
                 }
-                items(uiState.history.reversed()) { result ->
-                    ExamHistoryItem(
-                        result = result,
-                        onClick = { onNavigateToResult(result.id) }
-                    )
-                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 16.dp)
+                ) {
+                    item {
+                        Text(
+                            "Score Over Time",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        ScoreHistoryChart(
+                            scores = currentHistory.map { it.score },
+                            // Max score can be different for different exams
+                            yMax = if (uiState.selectedTab == ExamType.IELTS) 9.0 else 100.0,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .padding(16.dp)
+                        )
+                    }
+
+                    item {
+                        Text(
+                            "Exam History",
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 24.dp,
+                                bottom = 8.dp
+                            )
+                        )
+                    }
+                    items(currentHistory) { result ->
+                        ExamHistoryItem(
+                            result = result,
+                            onClick = {
+                                // Navigate to the correct result screen based on the type
+                                when (result.type) {
+                                    ExamType.IELTS -> onNavigateToIeltsResult(result.id)
+                                    ExamType.MULTILEVEL -> onNavigateToMultilevelResult(result.id)
+                                }
+                            }
+                        )
+                        HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    }
                 }
             }
         }
@@ -93,23 +139,53 @@ fun ProgressScreen(
 }
 
 @Composable
-fun ExamHistoryItem(result: ExamResultSummary, onClick: () -> Unit) {
+fun ExamTypeSwitcher(
+    selectedType: ExamType,
+    onTypeSelected: (ExamType) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    SingleChoiceSegmentedButtonRow(
+        modifier = modifier.padding(
+            horizontal = 16.dp,
+            vertical = 8.dp
+        )
+    ) {
+        SegmentedButton(
+            selected = selectedType == ExamType.MULTILEVEL,
+            onClick = { onTypeSelected(ExamType.MULTILEVEL) },
+            shape = SegmentedButtonDefaults.baseShape
+        ) {
+            Text("Multilevel")
+        }
+        SegmentedButton(
+            selected = selectedType == ExamType.IELTS,
+            onClick = { onTypeSelected(ExamType.IELTS) },
+            shape = SegmentedButtonDefaults.baseShape
+        ) {
+            Text("IELTS")
+        }
+    }
+}
+
+@Composable
+fun ExamHistoryItem(result: GenericExamResultSummary, onClick: () -> Unit) {
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
 
     ListItem(
-        headlineContent = { Text("Overall Band: ${result.overallBand}", fontWeight = FontWeight.SemiBold) },
+        headlineContent = { Text(result.scoreLabel, fontWeight = FontWeight.SemiBold) },
         supportingContent = { Text(dateFormatter.format(Date(result.examDate))) },
-        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "View Details") },
+        trailingContent = {
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "View Details"
+            )
+        },
         modifier = Modifier.clickable(onClick = onClick)
     )
 }
 
-/**
- * A simple placeholder line chart.
- * For a real app, consider a library like Vico or MPAndroidChart.
- */
 @Composable
-fun ScoreHistoryChart(scores: List<Double>, modifier: Modifier = Modifier) {
+fun ScoreHistoryChart(scores: List<Double>, yMax: Double, modifier: Modifier = Modifier) {
     if (scores.size < 2) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text("Take at least two tests to see a chart.")
@@ -120,23 +196,21 @@ fun ScoreHistoryChart(scores: List<Double>, modifier: Modifier = Modifier) {
     val primaryColor = MaterialTheme.colorScheme.primary
 
     Canvas(modifier = modifier) {
-        val xStep = size.width / (scores.size - 1)
-        // IELTS scores range from 0 to 9. We'll map this to the canvas height.
+        val xStep = if (scores.size > 1) size.width / (scores.size - 1) else 0f
         val yMin = 0.0
-        val yMax = 9.0
 
         val path = Path()
-        scores.forEachIndexed { index, score ->
+        scores.reversed().forEachIndexed { index, score -> // a bit easier to process recent first
             val x = index * xStep
             val y = size.height - ((score - yMin) / (yMax - yMin) * size.height).toFloat()
+            val clampedY = y.coerceIn(0f, size.height)
 
             if (index == 0) {
-                path.moveTo(x, y.coerceIn(0f, size.height))
+                path.moveTo(x, clampedY)
             } else {
-                path.lineTo(x, y.coerceIn(0f, size.height))
+                path.lineTo(x, clampedY)
             }
-            // Draw a circle for each data point
-            drawCircle(color = primaryColor, radius = 8f, center = Offset(x, y.coerceIn(0f, size.height)))
+            drawCircle(color = primaryColor, radius = 8f, center = Offset(x, clampedY))
         }
 
         drawPath(

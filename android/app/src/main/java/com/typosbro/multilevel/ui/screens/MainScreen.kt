@@ -45,7 +45,8 @@ object WordBankDestinations {
 fun MainScreen(
     onNavigateToIELTS: () -> Unit,
     onNavigateToMultilevel: () -> Unit,
-    onNavigateToExamResult: (resultId: String) -> Unit,
+    onNavigateToIeltsResult: (resultId: String) -> Unit, // New
+    onNavigateToMultilevelResult: (resultId: String) -> Unit, // New
 ) {
     val mainNavController = rememberNavController()
     Scaffold(
@@ -86,7 +87,11 @@ fun MainScreen(
                 }
             }
             composable(MainDestinations.PROGRESS_ROUTE) {
-                ProgressScreen(onNavigateToResult = onNavigateToExamResult)
+                // Pass the two specific navigation actions down to the ProgressScreen
+                ProgressScreen(
+                    onNavigateToIeltsResult = onNavigateToIeltsResult,
+                    onNavigateToMultilevelResult = onNavigateToMultilevelResult
+                )
             }
             composable(MainDestinations.PROFILE_ROUTE) {
                 ProfileScreen()
