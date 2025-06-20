@@ -1,4 +1,6 @@
-const ExamResult = require("../models/ExamResultModel.js");
+// {PATH_TO_PROJECT}/api/models/ieltsExamController
+
+const ExamResult = require("../models/ieltsExamResultModel.js");
 const { generateText, safeJsonParse } = require("../utils/gemini.js");
 const { getKokoroInputIds } = require("../utils/kokoro.js");
 

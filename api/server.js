@@ -4,7 +4,7 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
-const examRoutes = require("./routes/examRoutes");
+const examRoutes = require("./routes/ieltsExamRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 
 // Load environment variables

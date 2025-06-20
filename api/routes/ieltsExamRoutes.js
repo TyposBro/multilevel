@@ -1,4 +1,4 @@
-// {PATH_TO_PROJECT}/api/routes/examRoutes.js
+// {PATH_TO_PROJECT}/api/routes/ieltsExamRoutes.js
 const express = require("express");
 const {
   startExam,
@@ -6,7 +6,7 @@ const {
   analyzeExam,
   getExamHistory,
   getExamResultDetails,
-} = require("../controllers/examController");
+} = require("../controllers/ieltsExamController");
 const { protect } = require("../middleware/authMiddleware");
 
 const router = express.Router();
