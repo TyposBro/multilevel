@@ -536,15 +536,6 @@ class ExamViewModel @Inject constructor(
         return file
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        Log.d("ExamViewModel", "onCleared: Releasing all resources.")
-        recorder?.stop()
-        whisperEngine?.deinitialize()
-        AudioPlayer.release()
-        cancelAllTimers()
-    }
-
 
     private fun stopCurrentAudio() {
         if (isPlayingAudio) {
@@ -654,5 +645,37 @@ class ExamViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    fun stopExam() {
+        if (uiState.value.currentPart >= ExamPart.FINISHED) {
+            return // Already finished or stopped
+        }
+        Log.w("ExamViewModel", "Stopping exam forcefully due to interruption.")
+
+        // 1. Cancel all active timers
+        cancelAllTimers()
+
+        // 2. Stop recorder and audio playback
+        recorder?.stop()
+        stopCurrentAudio() // This helper already handles AudioPlayer
+
+        // 3. Update the UI to an interrupted state
+        updateState("stopExam") {
+            it.copy(
+                currentPart = ExamPart.FINISHED, // Go to the final screen
+                error = "The exam was interrupted.",
+                isRecording = false,
+                isLoading = false,
+                isReadyForUserInput = false
+            )
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        Log.d("ExamViewModel", "onCleared: Releasing all resources.")
+        stopExam()
+        whisperEngine?.deinitialize()
     }
 }

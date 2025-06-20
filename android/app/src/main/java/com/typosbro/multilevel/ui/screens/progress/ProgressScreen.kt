@@ -1,5 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/progress/ProgressScreen.kt
-
 package com.typosbro.multilevel.ui.screens.progress
 
 import androidx.compose.foundation.Canvas
@@ -57,7 +55,6 @@ fun ProgressScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Determine which list of results to show based on the selected tab
     val currentHistory = when (uiState.selectedTab) {
         ExamType.IELTS -> uiState.ieltsHistory
         ExamType.MULTILEVEL -> uiState.multilevelHistory
@@ -98,7 +95,6 @@ fun ProgressScreen(
                         Spacer(Modifier.height(8.dp))
                         ScoreHistoryChart(
                             scores = currentHistory.map { it.score },
-                            // Max score can be different for different exams
                             yMax = if (uiState.selectedTab == ExamType.IELTS) 9.0 else 100.0,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -123,7 +119,6 @@ fun ProgressScreen(
                         ExamHistoryItem(
                             result = result,
                             onClick = {
-                                // Navigate to the correct result screen based on the type
                                 when (result.type) {
                                     ExamType.IELTS -> onNavigateToIeltsResult(result.id)
                                     ExamType.MULTILEVEL -> onNavigateToMultilevelResult(result.id)
@@ -153,15 +148,16 @@ fun ExamTypeSwitcher(
         SegmentedButton(
             selected = selectedType == ExamType.MULTILEVEL,
             onClick = { onTypeSelected(ExamType.MULTILEVEL) },
-            shape = SegmentedButtonDefaults.baseShape
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
         ) {
             Text("Multilevel")
         }
         SegmentedButton(
             selected = selectedType == ExamType.IELTS,
             onClick = { onTypeSelected(ExamType.IELTS) },
-            shape = SegmentedButtonDefaults.baseShape
-        ) {
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+
+            ) {
             Text("IELTS")
         }
     }
@@ -200,7 +196,7 @@ fun ScoreHistoryChart(scores: List<Double>, yMax: Double, modifier: Modifier = M
         val yMin = 0.0
 
         val path = Path()
-        scores.reversed().forEachIndexed { index, score -> // a bit easier to process recent first
+        scores.reversed().forEachIndexed { index, score ->
             val x = index * xStep
             val y = size.height - ((score - yMin) / (yMax - yMin) * size.height).toFloat()
             val clampedY = y.coerceIn(0f, size.height)

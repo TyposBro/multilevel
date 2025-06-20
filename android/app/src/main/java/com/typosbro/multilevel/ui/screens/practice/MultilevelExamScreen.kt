@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -49,7 +50,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.typosbro.multilevel.R
 import com.typosbro.multilevel.data.remote.models.Part3Topic
+import com.typosbro.multilevel.ui.component.HandleAppLifecycle
 import com.typosbro.multilevel.ui.component.ImageLoader
 import com.typosbro.multilevel.ui.viewmodels.MultilevelExamStage
 import com.typosbro.multilevel.ui.viewmodels.MultilevelExamViewModel
@@ -65,6 +68,7 @@ fun MultilevelExamScreen(
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
 
+    HandleAppLifecycle(onStop = viewModel::stopExam)
     // --- PERMISSION HANDLING ---
     var hasAudioPermission by remember {
         mutableStateOf(
@@ -111,10 +115,26 @@ fun MultilevelExamScreen(
                     })
 
                     MultilevelExamStage.LOADING -> LoadingView("Downloading exam content...")
-                    MultilevelExamStage.INTRO,
-                    MultilevelExamStage.PART1_2_INTRO,
-                    MultilevelExamStage.PART2_INTRO,
-                    MultilevelExamStage.PART3_INTRO -> InstructionView(uiState)
+                    MultilevelExamStage.INTRO -> InstructionView(
+                        instruction = stringResource(R.string.PART1_1_INTRO),
+                        header = stringResource(R.string.PART1_HEADER)
+                    )
+
+                    MultilevelExamStage.PART1_2_INTRO -> InstructionView(
+                        instruction = stringResource(
+                            R.string.PART1_2_INTRO
+                        )
+                    )
+
+                    MultilevelExamStage.PART2_INTRO -> InstructionView(
+                        instruction = stringResource(R.string.PART2_INTRO),
+                        header = stringResource(R.string.PART2_HEADER)
+                    )
+
+                    MultilevelExamStage.PART3_INTRO -> InstructionView(
+                        instruction = stringResource(R.string.PART3_INTRO),
+                        header = stringResource(R.string.PART3_HEADER)
+                    )
 
                     MultilevelExamStage.PART1_1_QUESTION -> Part1_1_View(uiState)
                     MultilevelExamStage.PART1_2_COMPARE,
@@ -183,12 +203,18 @@ fun ErrorView(error: String) {
 
 
 @Composable
-fun InstructionView(uiState: MultilevelUiState) {
+fun InstructionView(instruction: String, header: String? = null) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-        CircularProgressIndicator()
-        Spacer(Modifier.height(16.dp))
+        if (header != null) {
+            Text(
+                header,
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(16.dp))
+        }
         Text(
-            text = "Playing instructions...",
+            text = instruction,
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center
         )

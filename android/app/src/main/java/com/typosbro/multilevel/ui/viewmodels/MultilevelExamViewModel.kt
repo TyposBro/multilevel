@@ -337,7 +337,7 @@ class MultilevelExamViewModel @Inject constructor(
         // Launch a new coroutine in the ViewModel's scope to handle it.
         viewModelScope.launch {
             _uiState.update { it.copy(isRecording = false) }
-
+            playStartSpeakingSound()
             val transcribedText = transcribeBufferedAudio()
             Log.d("ExamVM", "Recording stopped. Transcribed: '$transcribedText'")
 
@@ -396,6 +396,7 @@ class MultilevelExamViewModel @Inject constructor(
     private suspend fun playInstructionAndWait(@RawRes resId: Int) {
         try {
             AudioPlayer.playFromRawAndWait(context, resId)
+            playStartSpeakingSound()
         } catch (e: Exception) {
             Log.e("ExamVM", "Instruction audio failed to play", e)
             _uiState.update { it.copy(error = "Audio playback failed. Please try again.") }
@@ -423,13 +424,43 @@ class MultilevelExamViewModel @Inject constructor(
         return file
     }
 
-    override fun onCleared() {
-        super.onCleared()
+    fun stopExam() {
+        val currentStage = uiState.value.stage
+        if (currentStage == MultilevelExamStage.NOT_STARTED ||
+            currentStage == MultilevelExamStage.LOADING ||
+            currentStage == MultilevelExamStage.FINISHED_ERROR ||
+            currentStage == MultilevelExamStage.ANALYZING
+        ) {
+            return // No need to stop if not actively running or already finished
+        }
+        Log.w("ExamVM", "Stopping exam forcefully due to interruption.")
+
+        // 1. Cancel any active timer
+        timerJob?.cancel()
+
+        // 2. Stop the recorder and audio player
         recorder.stop()
         AudioPlayer.release()
-        timerJob?.cancel()
-        transcriptionContinuation?.resume("") // Resume with empty to avoid leaks if VM is cleared mid-transcription
+
+        // 3. Prevent memory leaks from pending coroutine continuations
+        transcriptionContinuation?.resume("")
         transcriptionContinuation = null
-//        whisperEngine?.release()
+
+        // 4. Update the UI to show that the exam was interrupted
+        _uiState.update {
+            it.copy(
+                stage = MultilevelExamStage.FINISHED_ERROR,
+                error = "The exam was interrupted.",
+                isRecording = false,
+                timerValue = 0
+            )
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        stopExam()
+        whisperEngine?.deinitialize()
+
     }
 }

@@ -46,6 +46,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.data.remote.models.CueCard
+import com.typosbro.multilevel.ui.component.HandleAppLifecycle
 import com.typosbro.multilevel.ui.component.RecognitionControls
 import com.typosbro.multilevel.ui.viewmodels.ExamPart
 import com.typosbro.multilevel.ui.viewmodels.ExamUiState
@@ -63,6 +64,8 @@ fun ExamScreen(
     val snackBarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
+
+    HandleAppLifecycle(onStop = viewModel::stopExam)
     // --- PERMISSION HANDLING LOGIC ---
     var hasAudioPermission by remember {
         mutableStateOf(
@@ -191,6 +194,7 @@ fun ExamScreen(
         }
     }
 }
+
 @Composable
 fun NotStartedView(onStart: () -> Unit) {
     Column(
@@ -276,8 +280,8 @@ fun ExaminerInteractionView(
         // Bottom section with user transcription and controls
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = uiState.partialTranscription.takeIf { it.isNotBlank() } ?:
-                if (uiState.isReadyForUserInput) "You can speak now..." else "",
+                text = uiState.partialTranscription.takeIf { it.isNotBlank() }
+                    ?: if (uiState.isReadyForUserInput) "You can speak now..." else "",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.heightIn(min = 48.dp),
                 textAlign = TextAlign.Center,
@@ -385,7 +389,8 @@ fun Part2SpeakingView(
 
             // Show examiner message or instruction
             Text(
-                text = uiState.examinerMessage ?: "Please speak about your topic for up to 2 minutes.",
+                text = uiState.examinerMessage
+                    ?: "Please speak about your topic for up to 2 minutes.",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center
             )
@@ -401,8 +406,8 @@ fun Part2SpeakingView(
         // Bottom section with user transcription and controls
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = uiState.partialTranscription.takeIf { it.isNotBlank() } ?:
-                if (uiState.isRecording) "Listening..." else "",
+                text = uiState.partialTranscription.takeIf { it.isNotBlank() }
+                    ?: if (uiState.isRecording) "Listening..." else "",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.heightIn(min = 48.dp),
                 textAlign = TextAlign.Center,
