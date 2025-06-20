@@ -43,7 +43,8 @@ object WordBankDestinations {
 
 @Composable
 fun MainScreen(
-    onNavigateToExam: () -> Unit,
+    onNavigateToIELTS: () -> Unit,
+    onNavigateToMultilevel: () -> Unit,
     onNavigateToExamResult: (resultId: String) -> Unit,
 ) {
     val mainNavController = rememberNavController()
@@ -59,7 +60,10 @@ fun MainScreen(
         ) {
             composable(MainDestinations.PRACTICE_ROUTE) {
                 // Pass the navigation action down to the PracticeHubScreen
-                PracticeHubScreen(onNavigateToExam = onNavigateToExam)
+                PracticeHubScreen(
+                    onNavigateToIELTS = onNavigateToIELTS,
+                    onNavigateToMultilevel = onNavigateToMultilevel
+                )
             }
             // This defines a nested navigation graph for the Word Bank tab
             navigation(

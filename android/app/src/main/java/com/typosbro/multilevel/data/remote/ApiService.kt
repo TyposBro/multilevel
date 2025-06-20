@@ -11,6 +11,10 @@ import com.typosbro.multilevel.data.remote.models.ExamStepRequest
 import com.typosbro.multilevel.data.remote.models.ExamStepResponse
 import com.typosbro.multilevel.data.remote.models.GenericSuccessResponse
 import com.typosbro.multilevel.data.remote.models.GoogleSignInRequest
+import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
+import com.typosbro.multilevel.data.remote.models.MultilevelExamHistorySummaryResponse
+import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
+import com.typosbro.multilevel.data.remote.models.MultilevelExamResultResponse
 import com.typosbro.multilevel.data.remote.models.UserProfileResponse
 import retrofit2.Response
 import retrofit2.http.Body
@@ -58,4 +62,17 @@ interface ApiService {
 
     @GET("exam/result/{resultId}")
     suspend fun getExamResult(@Path("resultId") resultId: String): Response<ExamResultResponse>
+
+    // --- NEW: Multilevel Exam Endpoints ---
+    @GET("exam/multilevel/new")
+    suspend fun getNewMultilevelExam(): Response<MultilevelExamResponse>
+
+    @POST("exam/multilevel/analyze")
+    suspend fun analyzeMultilevelExam(@Body request: MultilevelAnalyzeRequest): Response<AnalyzeExamResponse> // Response can be reused
+
+    @GET("exam/multilevel/history")
+    suspend fun getMultilevelExamHistory(): Response<MultilevelExamHistorySummaryResponse>
+
+    @GET("exam/multilevel/result/{resultId}")
+    suspend fun getMultilevelExamResult(@Path("resultId") resultId: String): Response<MultilevelExamResultResponse>
 }

@@ -18,7 +18,10 @@ import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PracticeHubScreen(onNavigateToExam: () -> Unit) {
+fun PracticeHubScreen(
+    onNavigateToIELTS: () -> Unit,
+    onNavigateToMultilevel: () -> Unit
+) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("Speaking Practice") }) }
     ) { padding ->
@@ -32,7 +35,25 @@ fun PracticeHubScreen(onNavigateToExam: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                onClick = onNavigateToExam // Navigate to the full exam
+                onClick = onNavigateToMultilevel // Navigate to the full exam
+            ) {
+                Column(Modifier.padding(24.dp)) {
+                    Text(
+                        "Full Multilevel Speaking Mock Exam",
+                        style = MaterialTheme.typography.headlineSmall
+                    )
+                    Text(
+                        "Simulate a full 11-14 minute test.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                onClick = onNavigateToIELTS // Navigate to the full exam
             ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(

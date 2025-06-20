@@ -139,6 +139,9 @@ dependencies {
     // Built-in Browser
     implementation(libs.androidx.browser)
 
-    // Jetpack DataStore for theme preferences
+    // Jetpack DataStore for Theme Preferences
     implementation(libs.androidx.datastore.preferences)
+
+    // Coil for Image Loading
+    implementation(libs.coil.compose)
 }

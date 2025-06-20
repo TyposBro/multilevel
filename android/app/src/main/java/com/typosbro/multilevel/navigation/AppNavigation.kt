@@ -20,6 +20,8 @@ import com.typosbro.multilevel.ui.screens.auth.LoginScreen
 import com.typosbro.multilevel.ui.screens.auth.RegisterScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamResultScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamScreen
+import com.typosbro.multilevel.ui.screens.practice.MultilevelExamScreen
+import com.typosbro.multilevel.ui.screens.practice.MultilevelResultScreen
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 
 // Define navigation routes
@@ -29,6 +31,8 @@ object AppDestinations {
     const val MAIN_HUB_ROUTE = "main_hub"
     const val EXAM_SCREEN_ROUTE = "exam_screen"
     const val EXAM_RESULT_ROUTE = "exam_result/{resultId}"
+    const val MULTILEVEL_EXAM_ROUTE = "multilevel_exam"
+    const val MULTILEVEL_RESULT_ROUTE = "multilevel_result/{resultId}"
 }
 
 @Composable
@@ -83,8 +87,11 @@ fun AppNavigation(
 
         composable(AppDestinations.MAIN_HUB_ROUTE) {
             MainScreen(
-                onNavigateToExam = {
+                onNavigateToIELTS = {
                     navController.navigate(AppDestinations.EXAM_SCREEN_ROUTE)
+                },
+                onNavigateToMultilevel = { // New navigation action
+                    navController.navigate(AppDestinations.MULTILEVEL_EXAM_ROUTE)
                 },
                 onNavigateToExamResult = { resultId ->
                     navController.navigate("exam_result/$resultId")
@@ -106,6 +113,22 @@ fun AppNavigation(
             arguments = listOf(navArgument("resultId") { type = NavType.StringType })
         ) {
             ExamResultScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable(AppDestinations.MULTILEVEL_EXAM_ROUTE) {
+            MultilevelExamScreen(
+                onNavigateToResults = { resultId ->
+                    navController.navigate("multilevel_result/$resultId") {
+                        popUpTo(AppDestinations.MULTILEVEL_EXAM_ROUTE) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(
+            route = AppDestinations.MULTILEVEL_RESULT_ROUTE,
+            arguments = listOf(navArgument("resultId") { type = NavType.StringType })
+        ) {
+            MultilevelResultScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }
