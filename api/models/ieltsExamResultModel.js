@@ -1,4 +1,4 @@
-// {PATH_TO_PROJECT}/api/models/ExamResultModel.js
+// {PATH_TO_PROJECT}/api/models/ieltsExamResultModel.js
 const mongoose = require("mongoose");
 
 const transcriptEntrySchema = new mongoose.Schema(
@@ -55,4 +55,4 @@ const examResultSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("ExamResult", examResultSchema);
+module.exports = mongoose.model("IeltsExamResult", examResultSchema);
