@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -50,8 +49,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.compose.AsyncImage
 import com.typosbro.multilevel.data.remote.models.Part3Topic
+import com.typosbro.multilevel.ui.component.ImageLoader
 import com.typosbro.multilevel.ui.viewmodels.MultilevelExamStage
 import com.typosbro.multilevel.ui.viewmodels.MultilevelExamViewModel
 import com.typosbro.multilevel.ui.viewmodels.MultilevelUiState
@@ -214,28 +213,29 @@ fun Part1_1_View(uiState: MultilevelUiState) {
 @Composable
 fun Part1_2_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part1_2
+
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
         Text("Part 1: Picture Comparison", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(16.dp))
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            AsyncImage(
-                model = content?.image1Url,
+            ImageLoader(
+                content?.image1Url,
                 contentDescription = "Image 1",
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
             )
-            AsyncImage(
-                model = content?.image2Url,
+            ImageLoader(
+                content?.image2Url,
                 contentDescription = "Image 2",
                 modifier = Modifier
                     .weight(1f)
                     .clip(RoundedCornerShape(8.dp)),
-                contentScale = ContentScale.Crop
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -252,6 +252,8 @@ fun Part1_2_View(uiState: MultilevelUiState) {
 @Composable
 fun Part2_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part2
+
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -261,14 +263,13 @@ fun Part2_View(uiState: MultilevelUiState) {
     ) {
         Text("Part 2: Monologue", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(16.dp))
-        AsyncImage(
-            model = content?.imageUrl,
+        ImageLoader(
+            content?.imageUrl,
             contentDescription = "Part 2 Image",
             modifier = Modifier
                 .fillMaxWidth()
                 .height(200.dp)
                 .clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Crop
         )
         Spacer(Modifier.height(24.dp))
         Text(
