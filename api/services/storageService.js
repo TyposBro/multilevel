@@ -39,7 +39,7 @@ const uploadToSupabase = async (file, destinationPath) => {
 
   const fileName = `${Date.now()}-${file.originalname.replace(/\s/g, "_")}`;
   const filePath = `${destinationPath}/${fileName}`;
-  const bucketName = "exam-assets"; // Your bucket name in Supabase
+  const bucketName = "multilevel"; // Your bucket name in Supabase
 
   const { data, error } = await supabase.storage.from(bucketName).upload(filePath, file.buffer, {
     contentType: file.mimetype,

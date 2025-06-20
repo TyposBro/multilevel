@@ -118,7 +118,7 @@ class MultilevelExamViewModel @Inject constructor(
         }
         addTranscript("Examiner", question.questionText)
 
-        AudioPlayer.playFromUrl(question.audioUrl) {
+        AudioPlayer.playFromUrl(context, question.audioUrl) {
             startAnswerTimer(prepTime = 5, answerTime = 30) {
                 _uiState.update { it.copy(part1_1_QuestionIndex = index + 1) }
                 startPart1_1()
@@ -150,7 +150,7 @@ class MultilevelExamViewModel @Inject constructor(
         _uiState.update { it.copy(stage = currentStage, currentQuestionText = question.text) }
         addTranscript("Examiner", question.text)
 
-        AudioPlayer.playFromUrl(question.audioUrl) {
+        AudioPlayer.playFromUrl(context, question.audioUrl) {
             startAnswerTimer(prepTime = prepTime, answerTime = answerTime) {
                 _uiState.update { it.copy(part1_2_QuestionIndex = index + 1) }
                 processPart1_2_Question()
@@ -178,7 +178,7 @@ class MultilevelExamViewModel @Inject constructor(
         addTranscript("Examiner", fullQuestionText)
 
         val combinedAudioUrl = set.questions.firstOrNull()?.audioUrl ?: ""
-        AudioPlayer.playFromUrl(combinedAudioUrl) {
+        AudioPlayer.playFromUrl(context, combinedAudioUrl) {
             startTimer(duration = 60, stageOnFinish = MultilevelExamStage.PART2_SPEAKING) {
                 startPart2_Speaking()
             }

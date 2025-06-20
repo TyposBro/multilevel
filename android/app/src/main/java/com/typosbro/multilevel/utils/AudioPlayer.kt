@@ -66,7 +66,7 @@ object AudioPlayer {
         }
     }
 
-    
+
     private fun prepareAndPlay(context: Context, uri: Uri, onCompletion: (() -> Unit)?) {
         mediaPlayer = MediaPlayer().apply {
             setAudioAttributes(
@@ -124,16 +124,52 @@ object AudioPlayer {
      * Plays audio from a network URL.
      * This is the primary method for playing examiner questions in the multilevel exam.
      */
-    fun playFromUrl(url: String, onCompletion: () -> Unit) {
+    fun playFromUrl(context: Context, url: String, onCompletion: () -> Unit) {
         Log.d("AudioPlayer", "Attempting to play from URL: $url")
         stopPlayback()
         onCompletionListener = onCompletion
-        val uri = Uri.parse(url)
-        prepareAndPlay(uri, isLocalFile = false)
+
+        try {
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .build()
+                )
+
+                // For remote URLs, use setDataSource(String) directly, not setDataSource(Context, Uri)
+                setDataSource(url)
+
+                setOnPreparedListener { mp ->
+                    Log.d("AudioPlayer", "MediaPlayer prepared, starting playback from URL.")
+                    mp.start()
+                }
+                setOnCompletionListener {
+                    Log.d("AudioPlayer", "MediaPlayer playback completed.")
+                    onCompletionListener?.invoke()
+                    cleanUp()
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.e(
+                        "AudioPlayer",
+                        "MediaPlayer error: what=$what, extra=$extra for URL: $url"
+                    )
+                    onCompletionListener?.invoke()
+                    cleanUp()
+                    true
+                }
+                prepareAsync()
+            }
+        } catch (e: Exception) {
+            Log.e("AudioPlayer", "Error preparing MediaPlayer for URL: $url", e)
+            onCompletionListener?.invoke()
+            cleanUp()
+        }
     }
 
     /**
-     * Plays audio from a local raw resource (e.g., res/raw/intro.mp3).
+     * Plays audio from a local raw resource (e.g., res/raw/intro.wav).
      * Used for playing standard instructions.
      */
     fun playFromRaw(context: Context, @RawRes rawResId: Int, onCompletion: () -> Unit) {
@@ -141,9 +177,44 @@ object AudioPlayer {
         stopPlayback()
         onCompletionListener = onCompletion
         val uri = Uri.parse("android.resource://${context.packageName}/$rawResId")
-        prepareAndPlay(uri, isLocalFile = true)
+        try {
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .build()
+                )
+                setDataSource(context, uri)
+                setOnPreparedListener { mp ->
+                    Log.d(
+                        "AudioPlayer",
+                        "MediaPlayer prepared, starting playback from raw resource."
+                    )
+                    mp.start()
+                }
+                setOnCompletionListener {
+                    Log.d("AudioPlayer", "MediaPlayer playback completed.")
+                    onCompletionListener?.invoke()
+                    cleanUp()
+                }
+                setOnErrorListener { _, what, extra ->
+                    Log.e(
+                        "AudioPlayer",
+                        "MediaPlayer error: what=$what, extra=$extra for raw resource: $rawResId"
+                    )
+                    onCompletionListener?.invoke()
+                    cleanUp()
+                    true
+                }
+                prepareAsync()
+            }
+        } catch (e: Exception) {
+            Log.e("AudioPlayer", "Error preparing MediaPlayer for raw resource: $rawResId", e)
+            onCompletionListener?.invoke()
+            cleanUp()
+        }
     }
-
     // --- EXISTING: Functions for Client-Side TTS (IELTS Flow) ---
 
     /**
