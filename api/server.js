@@ -3,9 +3,10 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
-const ieltsExamRoutes = require("./routes/ieltsExamRoutes"); // Renamed
-const multilevelExamRoutes = require("./routes/multilevelExamRoutes"); // New
+const ieltsExamRoutes = require("./routes/ieltsExamRoutes");
+const multilevelExamRoutes = require("./routes/multilevelExamRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
+const adminRoutes = require("./routes/adminRoutes");
 
 dotenv.config();
 connectDB();
@@ -26,6 +27,7 @@ app.use("/api/auth", authRoutes);
 // --- Mount both exam routes under separate namespaces ---
 app.use("/api/exam/ielts", ieltsExamRoutes);
 app.use("/api/exam/multilevel", multilevelExamRoutes);
+app.use("/api/admin", adminRoutes);
 // ---
 
 app.use(notFound);
