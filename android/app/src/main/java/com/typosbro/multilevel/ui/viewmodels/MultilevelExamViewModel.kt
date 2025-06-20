@@ -6,16 +6,22 @@ import androidx.annotation.RawRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.R
-import com.typosbro.multilevel.data.remote.models.*
+import com.typosbro.multilevel.data.remote.models.ExamContentIds
+import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
+import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
+import com.typosbro.multilevel.data.remote.models.RepositoryResult
+import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import com.typosbro.multilevel.data.repositories.MultilevelExamRepository
 import com.typosbro.multilevel.features.whisper.Recorder
 import com.typosbro.multilevel.utils.AudioPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 // --- State Definitions (Unchanged) ---
@@ -56,21 +62,14 @@ data class MultilevelUiState(
 class MultilevelExamViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: MultilevelExamRepository,
-    // --- Recorder is NO LONGER injected here ---
 ) : ViewModel(), Recorder.RecorderListener {
 
     private val _uiState = MutableStateFlow(MultilevelUiState())
     val uiState = _uiState.asStateFlow()
 
-    // --- Manually instantiated Recorder ---
     private val recorder: Recorder = Recorder(context, this)
-
     private var timerJob: Job? = null
     private val audioDataBuffer = mutableListOf<FloatArray>()
-
-    // --- THE REST OF THE VIEWMODEL LOGIC IS IDENTICAL TO THE PREVIOUS FULL VERSION ---
-    // No other changes are needed because the recorder's public API (start(), stop())
-    // is being called correctly. The only change is *how* the recorder instance is created.
 
     fun startExam() {
         if (uiState.value.stage != MultilevelExamStage.NOT_STARTED) return
@@ -178,8 +177,6 @@ class MultilevelExamViewModel @Inject constructor(
         }
         addTranscript("Examiner", fullQuestionText)
 
-        // In Part 2, audio for all questions is combined into one file.
-        // We'll assume the URL is on the first question object.
         val combinedAudioUrl = set.questions.firstOrNull()?.audioUrl ?: ""
         AudioPlayer.playFromUrl(combinedAudioUrl) {
             startTimer(duration = 60, stageOnFinish = MultilevelExamStage.PART2_SPEAKING) {
@@ -193,8 +190,7 @@ class MultilevelExamViewModel @Inject constructor(
             recorder.start()
             _uiState.update { it.copy(isRecording = true) }
             startTimer(duration = 120, stageOnFinish = MultilevelExamStage.PART3_INTRO) {
-                recorder.stop() // The onRecordingStopped callback will handle transcription
-                // The onFinished lambda of the timer will then trigger the next part
+                recorder.stop()
                 startPart3()
             }
         }
@@ -254,35 +250,37 @@ class MultilevelExamViewModel @Inject constructor(
         }
     }
 
+    // --- CORRECTED FUNCTION ---
     private fun startAnswerTimer(prepTime: Int, answerTime: Int, onFinished: () -> Unit) {
         timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            // Prep countdown
+        timerJob = viewModelScope.launch { // Launch a single coroutine to manage the whole sequence
+            // 1. Prep countdown (this is a suspend block)
             for (i in prepTime downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
                 delay(1000)
             }
             _uiState.update { it.copy(timerValue = 0) }
 
-            // Play sound, start recording, and begin answer countdown
+            // 2. Play the start sound. The onCompletion lambda does not need to be a coroutine.
             playInstruction(R.raw.start_speaking_sound) {
-                recorder.start()
+                // This part is NOT a coroutine, so we just update state and start the recorder.
+                // The timer logic continues in the parent coroutine.
                 _uiState.update { it.copy(isRecording = true) }
-
-                for (i in answerTime downTo 1) {
-                    _uiState.update { it.copy(timerValue = i) }
-                    delay(1000)
-                }
-
-                // Timer finished
-                recorder.stop()
+                recorder.start()
             }
-        }
 
-        // This job handles what happens AFTER the timer finishes.
-        // It relies on the onRecordingStopped callback to add the transcript.
-        viewModelScope.launch {
-            delay((prepTime + answerTime) * 1000L + 500) // Wait for timer and a bit more
+            // 3. Answer countdown (this is also a suspend block)
+            for (i in answerTime downTo 1) {
+                _uiState.update { it.copy(timerValue = i) }
+                delay(1000)
+            }
+
+            // 4. Timer finished: stop recorder and call the onFinished lambda
+            recorder.stop()
+            // onRecordingStopped will be called, which handles transcription.
+
+            // Allow a brief moment for transcription to potentially finish before moving on
+            delay(200)
             onFinished()
         }
     }
@@ -322,11 +320,11 @@ class MultilevelExamViewModel @Inject constructor(
         _uiState.update { it.copy(isRecording = false) }
         viewModelScope.launch {
             // Your Whisper transcription logic goes here.
-            // It should process the `audioDataBuffer` and return a String.
-            // For now, we'll simulate it.
             val transcribedText = "[User speech recorded. Replace with actual transcription.]"
             Log.d("ExamVM", "Recording stopped. Transcribed: '$transcribedText'")
-            addTranscript("User", transcribedText)
+            if (transcribedText.isNotBlank()) {
+                addTranscript("User", transcribedText)
+            }
 
             synchronized(audioDataBuffer) {
                 audioDataBuffer.clear()

@@ -48,19 +48,19 @@ interface ApiService {
     suspend fun deleteProfile(): Response<GenericSuccessResponse>
 
     // --- Structured Exam Endpoints ---
-    @POST("exam/start")
+    @POST("exam/ielts/start")
     suspend fun startExam(): Response<ExamStepResponse>
 
-    @POST("exam/step")
+    @POST("exam/ielts/step")
     suspend fun getNextExamStep(@Body request: ExamStepRequest): Response<ExamStepResponse>
 
-    @POST("exam/analyze")
+    @POST("exam/ielts/analyze")
     suspend fun analyzeExam(@Body request: AnalyzeExamRequest): Response<AnalyzeExamResponse>
 
-    @GET("exam/history")
+    @GET("exam/ielts/history")
     suspend fun getExamHistory(): Response<ExamHistorySummaryResponse>
 
-    @GET("exam/result/{resultId}")
+    @GET("exam/ielts/result/{resultId}")
     suspend fun getExamResult(@Path("resultId") resultId: String): Response<ExamResultResponse>
 
     // --- NEW: Multilevel Exam Endpoints ---
