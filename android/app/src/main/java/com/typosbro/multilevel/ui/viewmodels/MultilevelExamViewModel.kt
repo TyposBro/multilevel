@@ -84,7 +84,7 @@ class MultilevelExamViewModel @Inject constructor(
                             stage = MultilevelExamStage.INTRO
                         )
                     }
-                    playInstruction(R.raw.multilevel_part1_intro) {
+                    playInstructionAndWait(R.raw.multilevel_part1_intro) {
                         startPart1_1()
                     }
                 }
@@ -128,7 +128,7 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart1_2() {
         _uiState.update { it.copy(stage = MultilevelExamStage.PART1_2_INTRO) }
-        playInstruction(R.raw.multilevel_part1_2_intro) {
+        playInstructionAndWait(R.raw.multilevel_part1_2_intro) {
             processPart1_2_Question()
         }
     }
@@ -160,7 +160,7 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart2() {
         _uiState.update { it.copy(stage = MultilevelExamStage.PART2_INTRO) }
-        playInstruction(R.raw.multilevel_part2_intro) {
+        playInstructionAndWait(R.raw.multilevel_part2_intro) {
             startPart2_Prep()
         }
     }
@@ -186,7 +186,7 @@ class MultilevelExamViewModel @Inject constructor(
     }
 
     private fun startPart2_Speaking() {
-        playInstruction(R.raw.start_speaking_sound) {
+        playInstructionAndWait(R.raw.start_speaking_sound) {
             recorder.start()
             _uiState.update { it.copy(isRecording = true) }
             startTimer(duration = 120, stageOnFinish = MultilevelExamStage.PART3_INTRO) {
@@ -198,7 +198,7 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart3() {
         _uiState.update { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
-        playInstruction(R.raw.multilevel_part3_intro) {
+        playInstructionAndWait(R.raw.multilevel_part3_intro) {
             startPart3_Prep()
         }
     }
@@ -211,7 +211,7 @@ class MultilevelExamViewModel @Inject constructor(
     }
 
     private fun startPart3_Speaking() {
-        playInstruction(R.raw.start_speaking_sound) {
+        playInstructionAndWait(R.raw.start_speaking_sound) {
             recorder.start()
             _uiState.update { it.copy(isRecording = true) }
             startTimer(duration = 120, stageOnFinish = MultilevelExamStage.ANALYZING) {
@@ -262,7 +262,7 @@ class MultilevelExamViewModel @Inject constructor(
             _uiState.update { it.copy(timerValue = 0) }
 
             // 2. Play the start sound. The onCompletion lambda does not need to be a coroutine.
-            playInstruction(R.raw.start_speaking_sound) {
+            playInstructionAndWait(R.raw.start_speaking_sound) {
                 // This part is NOT a coroutine, so we just update state and start the recorder.
                 // The timer logic continues in the parent coroutine.
                 _uiState.update { it.copy(isRecording = true) }
@@ -301,7 +301,7 @@ class MultilevelExamViewModel @Inject constructor(
         }
     }
 
-    private fun playInstruction(@RawRes resId: Int, onCompletion: () -> Unit) {
+    private fun playInstructionAndWait(@RawRes resId: Int, onCompletion: () -> Unit) {
         AudioPlayer.playFromRaw(context, resId, onCompletion)
     }
 
