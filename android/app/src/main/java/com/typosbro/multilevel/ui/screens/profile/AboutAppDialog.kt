@@ -48,7 +48,7 @@ fun AboutAppDialog(
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    text = "© 2024 TyposBro",
+                    text = "© 2025 TyposBro",
                     style = MaterialTheme.typography.bodySmall
                 )
             }

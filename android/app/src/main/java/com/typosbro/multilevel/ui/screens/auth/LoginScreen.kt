@@ -62,6 +62,7 @@ fun LoginScreen(
     // --- Google Sign-In Setup ---
     val context = LocalContext.current
     val googleWebClientId = stringResource(R.string.google_web_client_id)
+    val googleErrorText = stringResource(id = R.string.login_google_error)
 
     val googleSignInClient = remember {
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
@@ -80,9 +81,10 @@ fun LoginScreen(
             account.idToken?.let { authViewModel.signInWithGoogle(it) }
         } catch (e: ApiException) {
             Log.w("LoginScreen", "Google sign in failed", e)
-            authViewModel.setGoogleSignInError("Google sign in failed. Please try again.")
+            authViewModel.setGoogleSignInError(googleErrorText)
         }
     }
+
 
     // --- UI ---
     Surface(
@@ -98,9 +100,12 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.weight(1f))
 
-            Text("Welcome Back", style = MaterialTheme.typography.headlineLarge)
             Text(
-                "Sign in to continue",
+                text = stringResource(id = R.string.login_title),
+                style = MaterialTheme.typography.headlineLarge
+            )
+            Text(
+                text = stringResource(id = R.string.login_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -110,7 +115,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("Email") },
+                label = { Text(text = stringResource(id = R.string.login_email)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = isFormEnabled
@@ -120,7 +125,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                label = { Text(text = stringResource(id = R.string.login_pwd)) },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
@@ -142,14 +147,14 @@ fun LoginScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("Login")
+                    Text(text = stringResource(id = R.string.login_button))
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
 
             // --- Divider ---
             DividerWithText(
-                text = "OR",
+                text = stringResource(id = R.string.login_or),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
@@ -181,14 +186,9 @@ fun LoginScreen(
 
             // --- Register Button ---
             TextButton(onClick = onNavigateToRegister, enabled = isFormEnabled) {
-                Text("Don't have an account? Register")
+                Text(text = stringResource(id = R.string.login_question))
             }
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
-
-// In your AuthViewModel, you might need a way to set an error from the LoginScreen
-// fun setGoogleSignInError(message: String) {
-//     _googleSignInState.value = UiState.Error(message)
-// }

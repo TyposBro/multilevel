@@ -14,7 +14,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.typosbro.multilevel.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,7 +25,7 @@ fun PracticeHubScreen(
     onNavigateToMultilevel: () -> Unit
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Speaking Practice") }) }
+        topBar = { TopAppBar(title = { Text(text = stringResource(id = R.string.practice_hub_title)) }) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -39,11 +41,11 @@ fun PracticeHubScreen(
             ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(
-                        "Multilevel Speaking",
+                        text = stringResource(id = R.string.practice_hub_multilevel),
                         style = MaterialTheme.typography.headlineSmall
                     )
                     Text(
-                        "Simulate a full 11-14 minute test.",
+                        text = stringResource(id = R.string.practice_hub_multilevel_description),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -57,11 +59,11 @@ fun PracticeHubScreen(
             ) {
                 Column(Modifier.padding(24.dp)) {
                     Text(
-                        "IELTS Speaking",
+                        text = stringResource(id = R.string.practice_hub_ielts),
                         style = MaterialTheme.typography.headlineSmall
                     )
                     Text(
-                        "Simulate a full 11-14 minute test.",
+                        text = stringResource(id = R.string.practice_hub_ielts_description),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }

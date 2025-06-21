@@ -23,10 +23,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 import com.typosbro.multilevel.ui.viewmodels.UiState
 
@@ -47,6 +49,9 @@ fun RegisterScreen(
     val isLoading = registrationState is UiState.Loading
     val isFormEnabled = !isLoading
 
+
+    val pwdErrorString = stringResource(id = R.string.register_pwd_error)
+    val pwdConfirmErrorString = stringResource(id = R.string.register_pwd_confirm_error)
     // --- UI ---
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -59,9 +64,12 @@ fun RegisterScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("Create Account", style = MaterialTheme.typography.headlineLarge)
             Text(
-                "Get started by filling out the form below",
+                text = stringResource(id = R.string.register_title),
+                style = MaterialTheme.typography.headlineLarge
+            )
+            Text(
+                text = stringResource(id = R.string.register_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -71,7 +79,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it; localError = null }, // Clear error on change
-                label = { Text("Email") },
+                label = { Text(text = stringResource(id = R.string.login_email)) },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
                 enabled = isFormEnabled
@@ -81,7 +89,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; localError = null },
-                label = { Text("Password") },
+                label = { Text(text = stringResource(id = R.string.login_pwd)) },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
@@ -92,7 +100,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it; localError = null },
-                label = { Text("Confirm Password") },
+                label = { Text(text = stringResource(id = R.string.register_pwd_confirm)) },
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = PasswordVisualTransformation(),
                 singleLine = true,
@@ -107,11 +115,11 @@ fun RegisterScreen(
                 onClick = {
                     // --- Client-side validation before calling ViewModel ---
                     if (password != confirmPassword) {
-                        localError = "Passwords do not match."
+                        localError = pwdErrorString
                         return@Button
                     }
                     if (password.length < 6) {
-                        localError = "Password must be at least 6 characters."
+                        localError = pwdConfirmErrorString
                         return@Button
                     }
                     // If validation passes, clear local error and call ViewModel
@@ -129,7 +137,7 @@ fun RegisterScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("Create Account")
+                    Text(text = stringResource(id = R.string.register_button))
                 }
             }
 
@@ -152,7 +160,7 @@ fun RegisterScreen(
 
             // --- Login Button ---
             TextButton(onClick = onNavigateToLogin, enabled = isFormEnabled) {
-                Text("Already have an account? Login")
+                Text(text = stringResource(id = R.string.register_question))
             }
             Spacer(modifier = Modifier.height(16.dp))
         }

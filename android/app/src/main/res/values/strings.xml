@@ -3,12 +3,89 @@
     <string name="google_web_client_id" translatable="false">118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com</string>
     <string name="url_privacy_policy" translatable="false">https://typosbro.github.io/multilevel-public/#/privacy</string>
     <string name="url_faq" translatable="false">https://typosbro.github.io/multilevel-public/#/faq</string>
-    <string name="PART1_HEADER">Part 1</string>
-    <string name="PART1_1_INTRO">In this part I\'m going to ask you three short questions about yourself and your interests. And then, you will see some photos and answer some questions about them. You will have 30 seconds to reply to each question. Begin speaking when you hear this sound.</string>
-    <string name="PART1_2_INTRO">Now I\'m going to ask you to compare two pictures and I will ask you two questions about them</string>
-    <string name="PART2_HEADER">Part 2</string>
-    <string name="PART2_INTRO">In this part, I\'m going to show you a picture and ask you 3 questions. You will have one minute to think about your answers before you start speaking. You will have two minutes to answer all three questions. Begin speaking when you hear this sound.</string>
-    <string name="PART3_HEADER">Part 3</string>
-    <string name="PART3_INTRO">In this part, you are going to speak on a topic for two minutes. You can see the topic on the screen and two lists of points - for and against - related to the topic. Choose two items from each list and give a balanced argument to represent both sides of the topic. You have one minute to prepare your argument. You will then have two minutes to speak. Begin speaking when you hear this sound.</string>
+    <string name="PART1_HEADER" translatable="false">Part 1</string>
+    <string name="PART1_1_INTRO" translatable="false">In this part I\'m going to ask you three short questions about yourself and your interests. And then, you will see some photos and answer some questions about them. You will have 30 seconds to reply to each question. Begin speaking when you hear this sound.</string>
+    <string name="PART1_2_INTRO" translatable="false">Now I\'m going to ask you to compare two pictures and I will ask you two questions about them</string>
+    <string name="PART2_HEADER" translatable="false">Part 2</string>
+    <string name="PART2_INTRO" translatable="false">In this part, I\'m going to show you a picture and ask you 3 questions. You will have one minute to think about your answers before you start speaking. You will have two minutes to answer all three questions. Begin speaking when you hear this sound.</string>
+    <string name="PART3_HEADER" translatable="false">Part 3</string>
+    <string name="PART3_INTRO" translatable="false">In this part, you are going to speak on a topic for two minutes. You can see the topic on the screen and two lists of points - for and against - related to the topic. Choose two items from each list and give a balanced argument to represent both sides of the topic. You have one minute to prepare your argument. You will then have two minutes to speak. Begin speaking when you hear this sound.</string>
+
+    <!--  LOGIN SCREEN  -->
+    <string name="login_google">Sign in with Google</string>
+    <string name="login_google_error">Google sign in failed. Please try again.</string>
+    <string name="login_title">Welcome Back</string>
+    <string name="login_subtitle">Sign in to continue</string>
+    <string name="login_email">Email</string>
+    <string name="login_pwd">Password</string>
+    <string name="login_button">Login</string>
+    <string name="login_or">Or</string>
+    <string name="login_question">Don\'t have an account? Register</string>
+
+    <!--  REGISTRATION SCREEN  -->
+    <string name="register_title">Create Account</string>
+    <string name="register_subtitle">Get started by filling out the form below</string>
+    <string name="register_pwd_confirm">Confirm Password</string>
+    <string name="register_pwd_error">Confirm Password</string>
+    <string name="register_pwd_confirm_error">Confirm Password</string>
+    <string name="register_button">Create Account</string>
+    <string name="register_question">Already have an account? Login</string>
+
+    <!--  EXAM RESULT SCREEN  -->
+    <string name="exam_result_title">Exam Result</string>
+    <string name="exam_result_feedback">Feedback</string>
+    <string name="exam_result_transcript">Transcript</string>
+    <string name="exam_result_overall">Overall Band Score</string>
+    <string name="exam_result_suggestion">Examples and Suggestions</string>
+    <string name="exam_result_suggestion_description">Suggestion</string>
+
+    <!--  PRACTICE HUB SCREEN  -->
+    <string name="practice_hub_title">Practice Hub</string>
+    <string name="practice_hub_multilevel">Multilevel Speaking</string>
+    <string name="practice_hub_multilevel_description">Simulate a full 11–14 minute test.</string>
+    <string name="practice_hub_ielts">IELTS Speaking</string>
+    <string name="practice_hub_ielts_description">Simulate a full 11–14 minute test.</string>
+
+    <!--  PROFILE SCREEN  -->
+    <string name="profile_title">Profile &amp; Settings</string>
+    <string name="profile_section_title_account">Account</string>
+    <string name="profile_section_title_support">Support &amp; About</string>
+    <string name="profile_section_title_settings">Settings</string>
+    <string name="profile_section_title_action">Actions</string>
+
+    <string name="profile_item_membership">Member Since</string>
+    <string name="profile_item_subscription">Subscription</string>
+    <string name="profile_item_dark_mode">Dark Mode</string>
+    <string name="profile_item_help">Help</string>
+    <string name="profile_item_privacy">Privacy Policy</string>
+    <string name="profile_item_about">About This App</string>
+    <string name="profile_item_delete">Delete Account</string>
+    <string name="profile_item_subtitle_permanent">This action is permanent</string>
+
+    <!--  PROGRESS SCREEN  -->
+
+    <!--  RECORDING COMPONENT  -->
+    <string name="recording_start">Start recording</string>
+    <string name="recording_stop">Strop recording</string>
+
+    <!--  ABOUT COMPONENT  -->
+
+    <!--  REUSABLE  -->
+    <string name="error_message">Error: %s</string>
+    <string name="button_back">Back button</string>
+    <string name="button_logout">Logout</string>
+    <string name="button_cancel">Cancel</string>
+    <string name="button_warning">Warning</string>
+    <string name="button_refresh">Refresh</string>
+    <string name="delete_permanent">Delete Permanently</string>
+    <string name="tier_free">Free Tier</string>
+    <string name="tier_premium">Premium Tier</string>
+    <string name="logout_confirm_title">Confirm Logout</string>
+    <string name="logout_confirm_subtitle">Are you sure you want to log out?</string>
+    <string name="delete_confirm_title">Delete Your Account?</string>
+    <string name="delete_confirm_subtitle">This action is permanent. All of your data will be deleted forever. This cannot be undone. Are you sure you want to proceed?</string>
+    <string name="logo_google_description">Google logo</string>
+    <string name="permission_record_audio">Microphone permission is required to take the exam.</string>
+    <string name="notice_english_only">⚠️ Please note: All exam instructions and questions will be in English, just like the official Speaking Test.</string>
 
 </resources>

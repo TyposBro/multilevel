@@ -97,13 +97,16 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Profile & Settings") },
+                title = { Text(text = stringResource(id = R.string.profile_title)) },
                 actions = {
                     IconButton(
                         onClick = { profileViewModel.fetchUserProfile() },
                         enabled = !uiState.isLoading
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh Profile")
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(id = R.string.button_refresh)
+                        )
                     }
                 }
             )
@@ -128,34 +131,39 @@ fun ProfileScreen(
         ) {
             // --- Account Section ---
             item {
-                SectionHeader("Account")
+                SectionHeader(title = stringResource(id = R.string.profile_section_title_account))
                 ListItem(
-                    headlineContent = { Text("Email") },
+                    headlineContent = { Text(text = stringResource(id = R.string.login_email)) },
                     supportingContent = { Text(userProfile?.email ?: "...") },
                     leadingContent = {
                         Icon(
                             Icons.Default.AccountCircle,
-                            contentDescription = "Email"
+                            contentDescription = stringResource(id = R.string.login_email)
                         )
                     }
                 )
                 ListItem(
-                    headlineContent = { Text("Member Since") },
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_membership)) },
                     supportingContent = { Text(userProfile?.registeredDate ?: "...") },
                     leadingContent = {
                         Icon(
                             Icons.Default.Event,
-                            contentDescription = "Member Since"
+                            contentDescription = stringResource(id = R.string.profile_item_membership)
                         )
                     }
                 )
                 ListItem(
-                    headlineContent = { Text("Subscription", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Free Tier") },
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.profile_item_subscription),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    supportingContent = { Text(text = stringResource(id = R.string.tier_free)) },
                     leadingContent = {
                         Icon(
                             Icons.Default.WorkspacePremium,
-                            contentDescription = "Subscription"
+                            contentDescription = stringResource(id = R.string.profile_item_subscription)
                         )
                     },
                     trailingContent = {
@@ -169,13 +177,13 @@ fun ProfileScreen(
             }
 
             item {
-                SectionHeader("Settings")
+                SectionHeader(title = stringResource(id = R.string.profile_section_title_settings))
                 ListItem(
-                    headlineContent = { Text("Dark Mode") },
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_dark_mode)) },
                     leadingContent = {
                         Icon(
                             Icons.Default.DarkMode,
-                            contentDescription = "Dark Mode"
+                            contentDescription = stringResource(id = R.string.profile_item_dark_mode)
                         )
                     },
                     // The Switch is back and connected to the ViewModel
@@ -192,13 +200,13 @@ fun ProfileScreen(
 
             // --- Support Section ---
             item {
-                SectionHeader("Support & About")
+                SectionHeader(title = stringResource(id = R.string.profile_section_title_support))
                 ListItem(
-                    headlineContent = { Text("Help & FAQ") },
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_help)) },
                     leadingContent = {
                         Icon(
                             Icons.AutoMirrored.Filled.HelpOutline,
-                            contentDescription = "Help"
+                            contentDescription = stringResource(id = R.string.profile_item_help)
                         )
                     },
                     modifier = Modifier.clickable {
@@ -207,11 +215,11 @@ fun ProfileScreen(
                 )
                 // --- PRIVACY POLICY ---
                 ListItem(
-                    headlineContent = { Text("Privacy Policy") },
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_privacy)) },
                     leadingContent = {
                         Icon(
                             Icons.Default.PrivacyTip,
-                            contentDescription = "Privacy Policy"
+                            contentDescription = stringResource(id = R.string.profile_item_privacy)
                         )
                     },
                     modifier = Modifier.clickable {
@@ -220,22 +228,27 @@ fun ProfileScreen(
                 )
                 // --- ABOUT APP ---
                 ListItem(
-                    headlineContent = { Text("About This App") },
-                    leadingContent = { Icon(Icons.Default.Info, contentDescription = "About") },
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_about)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = stringResource(id = R.string.profile_item_about)
+                        )
+                    },
                     modifier = Modifier.clickable { showAboutDialog = true } // Show the dialog
                 )
             }
 
             // --- Actions Section ---
             item {
-                SectionHeader("Actions")
+                SectionHeader(title = stringResource(id = R.string.profile_section_title_action))
                 // --- LOGOUT BUTTON ---
                 ListItem(
-                    headlineContent = { Text("Logout") },
+                    headlineContent = { Text(text = stringResource(id = R.string.button_logout)) },
                     leadingContent = {
                         Icon(
                             Icons.AutoMirrored.Filled.ExitToApp,
-                            contentDescription = "Logout"
+                            contentDescription = stringResource(id = R.string.button_logout)
                         )
                     },
                     modifier = Modifier.clickable { showLogoutDialog = true }
@@ -244,15 +257,15 @@ fun ProfileScreen(
                 ListItem(
                     headlineContent = {
                         Text(
-                            "Delete Account",
+                            text = stringResource(id = R.string.profile_item_delete),
                             color = MaterialTheme.colorScheme.error
                         )
                     },
-                    supportingContent = { Text("This action is permanent") },
+                    supportingContent = { Text(text = stringResource(id = R.string.profile_item_subtitle_permanent)) },
                     leadingContent = {
                         Icon(
                             Icons.Default.Warning,
-                            contentDescription = "Delete Account",
+                            contentDescription = stringResource(id = R.string.profile_item_delete),
                             tint = MaterialTheme.colorScheme.error
                         )
                     },
@@ -312,8 +325,7 @@ fun ProfileScreen(
 }
 
 
-// --- HELPER COMPOSABLES ---
-
+// --- HELPER COMPOSABLE ---
 @Composable
 private fun SectionHeader(title: String) {
     Column {
@@ -330,13 +342,13 @@ private fun SectionHeader(title: String) {
 private fun LogoutConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Confirm Logout") },
-        text = { Text("Are you sure you want to log out?") },
+        title = { Text(text = stringResource(id = R.string.logout_confirm_title)) },
+        text = { Text(text = stringResource(id = R.string.logout_confirm_subtitle)) },
         confirmButton = {
-            Button(onClick = onConfirm) { Text("Logout") }
+            Button(onClick = onConfirm) { Text(text = stringResource(id = R.string.button_logout)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(text = stringResource(id = R.string.button_cancel)) }
         }
     )
 }
@@ -352,12 +364,12 @@ private fun DeleteAccountConfirmationDialog(
         icon = {
             Icon(
                 Icons.Default.Warning,
-                contentDescription = "Warning",
+                contentDescription = stringResource(id = R.string.button_warning),
                 tint = MaterialTheme.colorScheme.error
             )
         },
-        title = { Text("Delete Your Account?") },
-        text = { Text("This action is permanent. All of your data will be deleted forever. This cannot be undone.\n\nAre you sure you want to proceed?") },
+        title = { Text(text = stringResource(id = R.string.delete_confirm_title)) },
+        text = { Text(text = stringResource(id = R.string.delete_confirm_subtitle)) },
         confirmButton = {
             Button(
                 onClick = onConfirm,
@@ -370,12 +382,15 @@ private fun DeleteAccountConfirmationDialog(
                         color = MaterialTheme.colorScheme.onError
                     )
                 } else {
-                    Text("Delete Permanently")
+                    Text(text = stringResource(id = R.string.delete_permanent))
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isLoading) { Text("Cancel") }
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) { Text(text = stringResource(id = R.string.button_cancel)) }
         }
     )
 }

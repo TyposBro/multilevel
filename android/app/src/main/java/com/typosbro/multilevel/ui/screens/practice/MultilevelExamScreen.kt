@@ -172,12 +172,20 @@ fun ExamStartView(onStart: () -> Unit) {
             style = MaterialTheme.typography.bodyLarge,
             textAlign = TextAlign.Center
         )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = stringResource(id = R.string.notice_english_only),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.primary
+        )
         Spacer(Modifier.height(32.dp))
         Button(onClick = onStart) {
             Text("Start Exam")
         }
     }
 }
+
 
 @Composable
 fun LoadingView(text: String) {
