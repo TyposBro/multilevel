@@ -35,7 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.typosbro.multilevel.ui.viewmodels.ApiWord
+import com.typosbro.multilevel.data.remote.models.ApiWord
 import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)

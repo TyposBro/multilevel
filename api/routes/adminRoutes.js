@@ -9,6 +9,7 @@ const {
   uploadPart1_2,
   uploadPart2,
   uploadPart3,
+  uploadWordBankWord,
 } = require("../controllers/adminContentController");
 
 const router = express.Router();
@@ -82,5 +83,16 @@ router.post(
  *          - An optional single file field named `image`
  */
 router.post("/content/part3", upload.single("image"), uploadPart3);
+
+
+/**
+ * @route   POST /api/admin/wordbank/add
+ * @desc    Uploads a new word for the Word Bank
+ * @access  Private (Admin only)
+ * @expects A `multipart/form-data` request with text fields.
+ *          `upload.none()` is used because we are only expecting text fields,
+ *          but they are sent as form-data from the frontend.
+ */
+router.post("/wordbank/add", upload.none(), uploadWordBankWord);
 
 module.exports = router;

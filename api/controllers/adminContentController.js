@@ -3,6 +3,7 @@ const Part1_2_Set = require("../models/content/Part1_2_SetModel");
 const Part2_Set = require("../models/content/Part2_SetModel");
 const Part3_Topic = require("../models/content/Part3_TopicModel");
 const { uploadToCDN } = require("../services/storageService");
+const Word = require("../models/wordModel");
 
 // Default provider if none is specified in the request body. Can be 'firebase' or 'supabase'.
 const DEFAULT_PROVIDER = "supabase"; // Change this to 'firebase' if needed
@@ -176,9 +177,68 @@ const uploadPart3 = async (req, res) => {
   }
 };
 
+
+/**
+ * @desc    Uploads a new word to the Word Bank
+ * @route   POST /api/admin/wordbank/add
+ * @access  Private (Admin only)
+ * @expects A `multipart/form-data` request with text fields:
+ *          - word, translation, cefrLevel, topic (all required)
+ *          - example1, example1Translation, example2, example2Translation (all optional)
+ */
+const uploadWordBankWord = async (req, res) => {
+  const {
+    word,
+    translation,
+    cefrLevel,
+    topic,
+    example1,
+    example1Translation,
+    example2,
+    example2Translation,
+  } = req.body;
+
+  // 1. Basic Validation
+  if (!word || !translation || !cefrLevel || !topic) {
+    return res.status(400).json({ message: "Please fill all required fields: word, translation, cefrLevel, and topic." });
+  }
+
+  try {
+    // 2. Create a new word instance
+    const newWord = new Word({
+      word,
+      translation,
+      cefrLevel,
+      topic,
+      example1: example1 || null,
+      example1Translation: example1Translation || null,
+      example2: example2 || null,
+      example2Translation: example2Translation || null,
+    });
+
+    // 3. Save to the database
+    const createdWord = await newWord.save();
+
+    // 4. Send success response
+    res.status(201).json({
+      message: "Word successfully added to the Word Bank.",
+      word: createdWord,
+    });
+  } catch (error) {
+    // Handle potential errors, such as a duplicate word
+    if (error.code === 11000) {
+      return res.status(409).json({ message: `Error: The word "${word}" already exists.` });
+    }
+    console.error("Word Bank Upload Error:", error);
+    res.status(500).json({ message: "Server error while adding the word." });
+  }
+};
+
+
 module.exports = {
   uploadPart1_1,
   uploadPart1_2,
   uploadPart2,
   uploadPart3,
+  uploadWordBankWord,
 };
