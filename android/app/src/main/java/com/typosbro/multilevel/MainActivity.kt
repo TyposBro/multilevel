@@ -1,24 +1,26 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/MainActivity.kt
-
 package com.typosbro.multilevel
 
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.core.os.LocaleListCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.navigation.AppNavigation
 import com.typosbro.multilevel.ui.theme.MultilevelTheme
 import com.typosbro.multilevel.ui.viewmodels.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
+
+    private val settingsViewModel: SettingsViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,11 +30,22 @@ class MainActivity : ComponentActivity() {
         checkAndRequestAudioPermission()
 
         setContent {
-            val settingsViewModel: SettingsViewModel = hiltViewModel()
-            val isDarkTheme by settingsViewModel.isDarkTheme.collectAsState()
+
+            val isDarkTheme =
+                settingsViewModel.isDarkTheme.collectAsStateWithLifecycle(initialValue = false).value
+            val languageCode =
+                settingsViewModel.currentLanguageCode.collectAsStateWithLifecycle().value
+
+
+            LaunchedEffect(languageCode) {
+                if (!languageCode.isNullOrEmpty()) {
+                    val appLocale = LocaleListCompat.forLanguageTags(languageCode)
+                    AppCompatDelegate.setApplicationLocales(appLocale)
+                }
+            }
 
             MultilevelTheme(darkTheme = isDarkTheme) {
-                AppNavigation() // Use the centralized navigation composable
+                AppNavigation()
             }
         }
     }
@@ -54,6 +67,4 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
 }
-

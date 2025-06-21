@@ -3,6 +3,7 @@ package com.typosbro.multilevel.ui.screens.profile
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -30,6 +32,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -45,6 +48,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -70,12 +74,13 @@ fun ProfileScreen(
     val userProfile = uiState.userProfile
 
     val isDarkTheme by settingsViewModel.isDarkTheme.collectAsStateWithLifecycle()
+    val currentLanguageCode by settingsViewModel.currentLanguageCode.collectAsStateWithLifecycle()
 
     // --- State for Dialogs ---
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
-    var showAboutDialog by remember { mutableStateOf(false) } // NEW state for About dialog
-
+    var showAboutDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val context = LocalContext.current // Get context for the URL launcher
 
@@ -178,6 +183,7 @@ fun ProfileScreen(
 
             item {
                 SectionHeader(title = stringResource(id = R.string.profile_section_title_settings))
+                // --- DARK MODE ---
                 ListItem(
                     headlineContent = { Text(text = stringResource(id = R.string.profile_item_dark_mode)) },
                     leadingContent = {
@@ -195,6 +201,31 @@ fun ProfileScreen(
                             }
                         )
                     }
+                )
+                // --- LANGUAGE SELECTOR ---
+                ListItem(
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_language)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Language,
+                            contentDescription = stringResource(id = R.string.profile_item_language)
+                        )
+                    },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = (currentLanguageCode ?: "en").uppercase(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    modifier = Modifier.clickable { showLanguageDialog = true }
                 )
             }
 
@@ -322,6 +353,20 @@ fun ProfileScreen(
     if (showAboutDialog) {
         AboutAppDialog(onDismiss = { showAboutDialog = false })
     }
+
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            onLanguageSelected = { languageCode ->
+                settingsViewModel.onLanguageChanged(languageCode)
+                showLanguageDialog = false
+            },
+            onDismiss = { showLanguageDialog = false }
+        )
+    }
+
+    if (showAboutDialog) {
+        AboutAppDialog(onDismiss = { showAboutDialog = false })
+    }
 }
 
 
@@ -391,6 +436,40 @@ private fun DeleteAccountConfirmationDialog(
                 onClick = onDismiss,
                 enabled = !isLoading
             ) { Text(text = stringResource(id = R.string.button_cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun LanguageSelectionDialog(
+    onLanguageSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    // Define the list of supported languages
+    val supportedLanguages = mapOf(
+        "en" to "English",
+        "ru" to "Русский",
+        "uz" to "O'zbekcha"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(id = R.string.language_dialog_title)) },
+        text = {
+            Column {
+                supportedLanguages.forEach { (code, name) ->
+                    ListItem(
+                        headlineContent = { Text(name) },
+                        modifier = Modifier.clickable { onLanguageSelected(code) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(id = R.string.button_cancel))
+            }
         }
     )
 }

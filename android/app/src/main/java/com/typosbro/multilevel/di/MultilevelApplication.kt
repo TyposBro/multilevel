@@ -15,11 +15,12 @@ class MultilevelApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        
+
         // Launch the initialization on a background thread so it doesn't block
         // the main thread during app startup.
         applicationScope.launch {
             OnnxRuntimeManager.initialize(this@MultilevelApplication)
         }
     }
+
 }

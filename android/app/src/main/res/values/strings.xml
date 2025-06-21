@@ -3,6 +3,8 @@
     <string name="google_web_client_id" translatable="false">118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com</string>
     <string name="url_privacy_policy" translatable="false">https://typosbro.github.io/multilevel-public/#/privacy</string>
     <string name="url_faq" translatable="false">https://typosbro.github.io/multilevel-public/#/faq</string>
+
+    <!--  MULTILEVEL INSTRUCTIONS  -->
     <string name="PART1_HEADER" translatable="false">Part 1</string>
     <string name="PART1_1_INTRO" translatable="false">In this part I\'m going to ask you three short questions about yourself and your interests. And then, you will see some photos and answer some questions about them. You will have 30 seconds to reply to each question. Begin speaking when you hear this sound.</string>
     <string name="PART1_2_INTRO" translatable="false">Now I\'m going to ask you to compare two pictures and I will ask you two questions about them</string>
@@ -10,6 +12,13 @@
     <string name="PART2_INTRO" translatable="false">In this part, I\'m going to show you a picture and ask you 3 questions. You will have one minute to think about your answers before you start speaking. You will have two minutes to answer all three questions. Begin speaking when you hear this sound.</string>
     <string name="PART3_HEADER" translatable="false">Part 3</string>
     <string name="PART3_INTRO" translatable="false">In this part, you are going to speak on a topic for two minutes. You can see the topic on the screen and two lists of points - for and against - related to the topic. Choose two items from each list and give a balanced argument to represent both sides of the topic. You have one minute to prepare your argument. You will then have two minutes to speak. Begin speaking when you hear this sound.</string>
+
+    <!--  NAV BAR  -->
+    <string name="navbar_practice">Practice</string>
+    <string name="navbar_progress">Progress</string>
+    <string name="navbar_vocabulary">Vocabulary</string>
+    <string name="navbar_profile">Profile</string>
+
 
     <!--  LOGIN SCREEN  -->
     <string name="login_google">Sign in with Google</string>
@@ -61,7 +70,8 @@
     <string name="profile_item_about">About This App</string>
     <string name="profile_item_delete">Delete Account</string>
     <string name="profile_item_subtitle_permanent">This action is permanent</string>
-
+    <string name="profile_item_language">Language</string>
+    <string name="language_dialog_title">Select Language</string>
     <!--  PROGRESS SCREEN  -->
     <string name="progress_title">Progress</string>
     <string name="progress_empty">No %s exam history yet.</string>

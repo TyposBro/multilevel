@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -14,6 +15,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -22,6 +24,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navigation
+import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.screens.practice.PracticeHubScreen
 import com.typosbro.multilevel.ui.screens.profile.ProfileScreen
 import com.typosbro.multilevel.ui.screens.progress.ProgressScreen
@@ -102,11 +105,17 @@ fun MainScreen(
 
 @Composable
 fun BottomNavigationBar(navController: NavHostController) {
+
+    val practiceString = stringResource(id = R.string.navbar_practice)
+    val vocabularyString = stringResource(id = R.string.navbar_vocabulary)
+    val progressString = stringResource(id = R.string.navbar_progress)
+    val profileString = stringResource(id = R.string.navbar_profile)
+
     val items = listOf(
-        Triple("Practice", Icons.Default.Home, MainDestinations.PRACTICE_ROUTE),
-//        Triple("Word Bank", Icons.Default.Style, MainDestinations.WORDBANK_ROUTE),
-        Triple("Progress", Icons.Default.History, MainDestinations.PROGRESS_ROUTE),
-        Triple("Profile", Icons.Default.Person, MainDestinations.PROFILE_ROUTE)
+        Triple(practiceString, Icons.Default.Home, MainDestinations.PRACTICE_ROUTE),
+        Triple(vocabularyString, Icons.Default.MenuBook, MainDestinations.WORDBANK_ROUTE),
+        Triple(progressString, Icons.Default.History, MainDestinations.PROGRESS_ROUTE),
+        Triple(profileString, Icons.Default.Person, MainDestinations.PROFILE_ROUTE)
     )
 
     NavigationBar {
