@@ -5,6 +5,9 @@ const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
 const ieltsExamRoutes = require("./routes/ieltsExamRoutes");
 const multilevelExamRoutes = require("./routes/multilevelExamRoutes");
+// --- Start of new code ---
+const wordBankRoutes = require("./routes/wordBankRoutes"); 
+// --- End of new code ---
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const adminRoutes = require("./routes/adminRoutes");
 
@@ -27,6 +30,9 @@ app.use("/api/auth", authRoutes);
 // --- Mount both exam routes under separate namespaces ---
 app.use("/api/exam/ielts", ieltsExamRoutes);
 app.use("/api/exam/multilevel", multilevelExamRoutes);
+// --- Start of new code ---
+app.use("/api/wordbank", wordBankRoutes);
+// --- End of new code ---
 app.use("/api/admin", adminRoutes);
 // ---
 

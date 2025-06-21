@@ -1,26 +1,28 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/wordbank/WordReviewScreen.kt
 package com.typosbro.multilevel.ui.screens.wordbank
 
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.typosbro.multilevel.data.local.WordEntity
 import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -29,17 +31,19 @@ fun WordReviewScreen(
     viewModel: WordBankViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentWord = uiState.currentWord
+
+    LaunchedEffect(Unit) {
+        viewModel.startReviewSession()
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Review Session") },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        viewModel.endReviewSession()
-                        onNavigateBack()
-                    }) {
-                        Icon(Icons.Default.ArrowBack, "Back")
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -52,98 +56,145 @@ fun WordReviewScreen(
             contentAlignment = Alignment.Center
         ) {
             if (uiState.isSessionFinished) {
-                SessionFinishedView(onNavigateBack)
-            } else if (uiState.currentWord != null) {
-                AnimatedContent(
-                    targetState = uiState.currentWord,
-                    transitionSpec = {
-                        fadeIn(animationSpec = tween(220, delayMillis = 90)) togetherWith
-                                fadeOut(animationSpec = tween(90))
+                SessionComplete(onNavigateBack)
+            } else if (currentWord != null) {
+                SwipeableWordCard(
+                    word = currentWord,
+                    onSwipe = { knewIt ->
+                        viewModel.handleReview(currentWord, knewIt)
                     }
-                ) { targetWord ->
-                    Flashcard(
-                        word = targetWord!!,
-                        onKnewIt = { viewModel.handleReview(targetWord, knewIt = true) },
-                        onDidNotKnowIt = { viewModel.handleReview(targetWord, knewIt = false) }
-                    )
-                }
+                )
+            } else if (uiState.isSessionActive) {
+                CircularProgressIndicator() // Loading words
             } else {
-                CircularProgressIndicator() // Or a "no words" message if it starts empty
+                Text(
+                    "No words to review right now. Come back later!",
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(16.dp)
+                )
             }
         }
     }
 }
 
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun Flashcard(
+fun SwipeableWordCard(
     word: WordEntity,
-    onKnewIt: () -> Unit,
-    onDidNotKnowIt: () -> Unit
+    onSwipe: (knewIt: Boolean) -> Unit
 ) {
-    var isFlipped by remember(word) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val offsetX = remember { Animatable(0f) }
+    var isRevealed by remember { mutableStateOf(false) }
+    val configuration = LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.dp.value
 
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.SpaceBetween,
-        horizontalAlignment = Alignment.CenterHorizontally
+    val rotation = (offsetX.value / screenWidth) * 15f
+    val cardAlpha = 1f - (abs(offsetX.value) / screenWidth / 2)
+
+    val swipeThreshold = screenWidth * 0.4f
+
+    Card(
+        onClick = { isRevealed = !isRevealed },
+        modifier = Modifier
+            .fillMaxWidth(0.9f)
+            .aspectRatio(3f / 4f)
+            .graphicsLayer(
+                translationX = offsetX.value,
+                rotationZ = rotation
+            )
+            .alpha(cardAlpha)
+            .pointerInput(word.word) { // Relaunch when the word changes
+                detectDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            when {
+                                offsetX.targetValue > swipeThreshold -> {
+                                    offsetX.animateTo(screenWidth * 1.5f, tween(300))
+                                    onSwipe(true) // Knew it
+                                }
+
+                                offsetX.targetValue < -swipeThreshold -> {
+                                    offsetX.animateTo(-screenWidth * 1.5f, tween(300))
+                                    onSwipe(false) // Didn't know
+                                }
+
+                                else -> {
+                                    offsetX.animateTo(0f, tween(300))
+                                }
+                            }
+                        }
+                    },
+                    onDrag = { change, dragAmount ->
+                        change.consume()
+                        scope.launch {
+                            offsetX.snapTo(offsetX.targetValue + dragAmount.x)
+                        }
+                    }
+                )
+            }
     ) {
-        // The card itself
-        Card(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1.5f) // Rectangular card
-                .padding(32.dp)
-                .clickable { isFlipped = !isFlipped },
-            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                if (!isFlipped) {
-                    // Front of the card
-                    Text(word.text, style = MaterialTheme.typography.displayMedium)
-                } else {
-                    // Back of the card
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(word.definition, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
-                        Spacer(Modifier.height(16.dp))
-                        Text(word.example, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+            Text(
+                text = word.word,
+                style = MaterialTheme.typography.displayMedium,
+                textAlign = TextAlign.Center
+            )
+
+            if (isRevealed) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = word.translation,
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    word.example1?.let {
+                        Text(
+                            text = "e.g. $it",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center
+                        )
+                        word.example1Translation?.let { trans ->
+                            Text(
+                                text = trans,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.Gray,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Control Buttons
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(32.dp),
-            horizontalArrangement = Arrangement.SpaceAround
-        ) {
-            Button(
-                onClick = onDidNotKnowIt,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) { Text("Don't Know") }
-
-            Button(
-                onClick = onKnewIt,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-            ) { Text("I Knew It") }
+            Text(
+                text = if (isRevealed) "" else "Tap to reveal",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
         }
     }
 }
 
 @Composable
-fun SessionFinishedView(onNavigateBack: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text("All done for now!", style = MaterialTheme.typography.headlineMedium)
-        Text("Come back later for new reviews.", style = MaterialTheme.typography.bodyLarge)
-        Spacer(Modifier.height(32.dp))
-        Button(onClick = onNavigateBack) { Text("Back to Word Bank") }
+fun SessionComplete(onNavigateBack: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier.padding(32.dp)
+    ) {
+        Text("Great job!", style = MaterialTheme.typography.headlineLarge)
+        Text("You've finished your review session.", style = MaterialTheme.typography.bodyLarge)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onNavigateBack) {
+            Text("Go back")
+        }
     }
 }

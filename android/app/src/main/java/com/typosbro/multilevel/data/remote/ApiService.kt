@@ -3,6 +3,7 @@ package com.typosbro.multilevel.data.remote
 
 import com.typosbro.multilevel.data.remote.models.AnalyzeExamRequest
 import com.typosbro.multilevel.data.remote.models.AnalyzeExamResponse
+import com.typosbro.multilevel.data.remote.models.ApiWord
 import com.typosbro.multilevel.data.remote.models.AuthRequest
 import com.typosbro.multilevel.data.remote.models.AuthResponse
 import com.typosbro.multilevel.data.remote.models.ExamHistorySummaryResponse
@@ -22,6 +23,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 
 interface ApiService {
@@ -75,4 +77,18 @@ interface ApiService {
 
     @GET("exam/multilevel/result/{resultId}")
     suspend fun getMultilevelExamResult(@Path("resultId") resultId: String): Response<MultilevelExamResultResponse>
+
+
+    //    NEW: WORDBANK Endpoints
+    @GET("wordbank/levels")
+    suspend fun getWordLevels(): Response<List<String>>
+
+    @GET("wordbank/topics")
+    suspend fun getWordTopics(@Query("level") level: String): Response<List<String>>
+
+    @GET("wordbank/words")
+    suspend fun getWords(
+        @Query("level") level: String,
+        @Query("topic") topic: String
+    ): Response<List<ApiWord>>
 }

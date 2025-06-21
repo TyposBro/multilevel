@@ -10,15 +10,15 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WordDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE) // Use IGNORE to prevent crashes on unique constraint
     suspend fun insert(word: WordEntity)
 
     @Update
     suspend fun update(word: WordEntity)
 
     /**
-     * Gets all words that are due for review (their review time is in the past).
-     * Returns a Flow so the UI can react to changes automatically.
+     * Gets all words that are due for review.
+     * Returns a Flow for reactive updates.
      */
     @Query("SELECT * FROM words WHERE nextReviewTimestamp <= :currentTime ORDER BY nextReviewTimestamp ASC")
     fun getDueWords(currentTime: Long): Flow<List<WordEntity>>
@@ -28,4 +28,12 @@ interface WordDao {
      */
     @Query("SELECT COUNT(id) FROM words WHERE nextReviewTimestamp <= :currentTime")
     fun getDueWordsCount(currentTime: Long): Flow<Int>
+
+    /**
+     * --- ADDED: This function was missing ---
+     * Gets all words for a specific level and topic.
+     * This is a suspend function as it's a one-time check, not a continuous stream.
+     */
+    @Query("SELECT * FROM words WHERE cefrLevel = :level AND topic = :topic")
+    suspend fun getWordsByTopicAndLevel(level: String, topic: String): List<WordEntity>
 }

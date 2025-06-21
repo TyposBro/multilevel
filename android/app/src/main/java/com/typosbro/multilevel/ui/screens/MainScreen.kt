@@ -1,4 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/MainScreen.kt
 package com.typosbro.multilevel.ui.screens
 
 import androidx.compose.foundation.layout.padding
@@ -19,17 +18,23 @@ import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.screens.practice.PracticeHubScreen
 import com.typosbro.multilevel.ui.screens.profile.ProfileScreen
 import com.typosbro.multilevel.ui.screens.progress.ProgressScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordBankScreen
+import com.typosbro.multilevel.ui.screens.wordbank.WordLevelScreen
+import com.typosbro.multilevel.ui.screens.wordbank.WordListScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordReviewScreen
+import com.typosbro.multilevel.ui.screens.wordbank.WordTopicScreen
+
 
 // Define routes for the main tabs
 object MainDestinations {
@@ -39,10 +44,15 @@ object MainDestinations {
     const val PROFILE_ROUTE = "profile"
 }
 
+// --- Start of new code ---
 object WordBankDestinations {
     const val HUB_ROUTE = "wordbank_hub"
     const val REVIEW_ROUTE = "wordbank_review"
+    const val LEVEL_SELECT_ROUTE = "wordbank_level_select"
+    const val TOPIC_SELECT_ROUTE = "wordbank_topic_select/{level}"
+    const val WORD_LIST_ROUTE = "wordbank_word_list/{level}/{topic}"
 }
+// --- End of new code ---
 
 @Composable
 fun MainScreen(
@@ -69,6 +79,7 @@ fun MainScreen(
                     onNavigateToMultilevel = onNavigateToMultilevel
                 )
             }
+            // --- Start of modified code ---
             // This defines a nested navigation graph for the Word Bank tab
             navigation(
                 startDestination = WordBankDestinations.HUB_ROUTE,
@@ -78,6 +89,9 @@ fun MainScreen(
                     WordBankScreen(
                         onNavigateToReview = {
                             mainNavController.navigate(WordBankDestinations.REVIEW_ROUTE)
+                        },
+                        onNavigateToDiscovery = {
+                            mainNavController.navigate(WordBankDestinations.LEVEL_SELECT_ROUTE)
                         }
                     )
                 }
@@ -88,7 +102,40 @@ fun MainScreen(
                         }
                     )
                 }
+                composable(WordBankDestinations.LEVEL_SELECT_ROUTE) {
+                    WordLevelScreen(
+                        onLevelSelected = { level ->
+                            mainNavController.navigate("wordbank_topic_select/$level")
+                        },
+                        onNavigateBack = { mainNavController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = WordBankDestinations.TOPIC_SELECT_ROUTE,
+                    arguments = listOf(navArgument("level") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    val level = backStackEntry.arguments?.getString("level") ?: ""
+                    WordTopicScreen(
+                        level = level,
+                        onTopicSelected = { topic ->
+                            mainNavController.navigate("wordbank_word_list/$level/$topic")
+                        },
+                        onNavigateBack = { mainNavController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = WordBankDestinations.WORD_LIST_ROUTE,
+                    arguments = listOf(
+                        navArgument("level") { type = NavType.StringType },
+                        navArgument("topic") { type = NavType.StringType }
+                    )
+                ) {
+                    WordListScreen(
+                        onNavigateBack = { mainNavController.popBackStack() }
+                    )
+                }
             }
+            // --- End of modified code ---
             composable(MainDestinations.PROGRESS_ROUTE) {
                 // Pass the two specific navigation actions down to the ProgressScreen
                 ProgressScreen(
