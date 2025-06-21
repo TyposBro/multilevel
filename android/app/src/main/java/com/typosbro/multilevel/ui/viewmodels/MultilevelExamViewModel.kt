@@ -38,19 +38,33 @@ enum class MultilevelExamStage {
     PART3_PREP, PART3_SPEAKING, ANALYZING, FINISHED_ERROR
 }
 
+
 object MULTILEVEL_TIMEOUTS {
-    // Using shorter times for easier debugging
-    const val PART1_1_PREP = 3
-    const val PART1_1_ANSWER = 5
-    const val PART1_2_PREP_FIRST = 3
-    const val PART1_2_PREP_FOLLOWUP = 3
-    const val PART1_2_ANSWER_FIRST = 5
-    const val PART1_2_ANSWER_FOLLOWUP = 5
-    const val PART2_PREP = 5
-    const val PART2_SPEAKING = 7
-    const val PART3_PREP = 5
-    const val PART3_SPEAKING = 7
+    const val PART1_1_PREP = 5
+    const val PART1_1_ANSWER = 30
+    const val PART1_2_PREP_FIRST = 10
+    const val PART1_2_PREP_FOLLOWUP = 5
+    const val PART1_2_ANSWER_FIRST = 45
+    const val PART1_2_ANSWER_FOLLOWUP = 30
+    const val PART2_PREP = 60
+    const val PART2_SPEAKING = 120
+    const val PART3_PREP = 60
+    const val PART3_SPEAKING = 120
 }
+
+//object MULTILEVEL_TIMEOUTS {
+//    // Using shorter times for easier debugging
+//    const val PART1_1_PREP = 3
+//    const val PART1_1_ANSWER = 5
+//    const val PART1_2_PREP_FIRST = 3
+//    const val PART1_2_PREP_FOLLOWUP = 3
+//    const val PART1_2_ANSWER_FIRST = 5
+//    const val PART1_2_ANSWER_FOLLOWUP = 5
+//    const val PART2_PREP = 5
+//    const val PART2_SPEAKING = 7
+//    const val PART3_PREP = 5
+//    const val PART3_SPEAKING = 7
+//}
 
 data class MultilevelUiState(
     val stage: MultilevelExamStage = MultilevelExamStage.NOT_STARTED,
@@ -333,17 +347,29 @@ class MultilevelExamViewModel @Inject constructor(
      * This callback is invoked from the Recorder's background thread when it has fully stopped.
      */
     override fun onRecordingStopped() {
-        // We are off the main thread here, but we need to run suspend functions.
-        // Launch a new coroutine in the ViewModel's scope to handle it.
         viewModelScope.launch {
-            _uiState.update { it.copy(isRecording = false) }
-            playStartSpeakingSound()
-            val transcribedText = transcribeBufferedAudio()
-            Log.d("ExamVM", "Recording stopped. Transcribed: '$transcribedText'")
+            try {
+                _uiState.update { it.copy(isRecording = false) }
+                playStartSpeakingSound()
+                val transcribedText = transcribeBufferedAudio()
 
-            // Safely resume the suspended coroutine with the transcription result.
-            transcriptionContinuation?.resume(transcribedText)
-            transcriptionContinuation = null // Clean up to prevent leaks.
+                // Additional validation
+                val cleanText =
+                    if (transcribedText.isBlank() || transcribedText.all { !it.isLetter() }) {
+                        Log.w("ExamVM", "Transcription produced no valid text")
+                        ""
+                    } else {
+                        transcribedText
+                    }
+
+                Log.d("ExamVM", "Recording stopped. Transcribed: '$cleanText'")
+                transcriptionContinuation?.resume(cleanText)
+            } catch (e: Exception) {
+                Log.e("ExamVM", "Error in onRecordingStopped", e)
+                transcriptionContinuation?.resume("")
+            } finally {
+                transcriptionContinuation = null
+            }
         }
     }
 
@@ -374,22 +400,51 @@ class MultilevelExamViewModel @Inject constructor(
             if (audioDataBuffer.isEmpty()) {
                 return ""
             }
-            allSamples = FloatArray(audioDataBuffer.sumOf { it.size })
+
+            // Check if we have meaningful audio data
+            val totalSamples = audioDataBuffer.sumOf { it.size }
+            if (totalSamples < 1600) { // Less than 0.1 seconds at 16kHz
+                Log.w("ExamVM", "Audio buffer too small: $totalSamples samples")
+                audioDataBuffer.clear()
+                return ""
+            }
+
+            allSamples = FloatArray(totalSamples)
             var destinationPos = 0
             audioDataBuffer.forEach { chunk ->
                 System.arraycopy(chunk, 0, allSamples, destinationPos, chunk.size)
                 destinationPos += chunk.size
             }
             audioDataBuffer.clear()
+
+            // Check for audio silence (all values near zero)
+            val maxAmplitude = allSamples.maxOrNull() ?: 0f
+            if (maxAmplitude < 0.001f) {
+                Log.w("ExamVM", "Audio appears to be silent")
+                return ""
+            }
         }
 
         return withContext(Dispatchers.Default) {
             try {
-                whisperEngine?.transcribeBuffer(allSamples) ?: ""
+                val rawResult = whisperEngine?.transcribeBuffer(allSamples) ?: ""
+                sanitizeUtf8String(rawResult)
             } catch (t: Throwable) {
                 Log.e("ExamViewModel", "Whisper transcription failed", t)
                 ""
             }
+        }
+    }
+
+    private fun sanitizeUtf8String(input: String): String {
+        return try {
+            // Remove invalid UTF-8 characters and control characters
+            input.replace(Regex("[\\p{Cntrl}&&[^\r\n\t]]"), "")
+                .replace(Regex("[\uFFFD\u0000-\u001F\u007F-\u009F]"), "")
+                .trim()
+        } catch (e: Exception) {
+            Log.w("ExamViewModel", "Failed to sanitize UTF-8 string", e)
+            ""
         }
     }
 
