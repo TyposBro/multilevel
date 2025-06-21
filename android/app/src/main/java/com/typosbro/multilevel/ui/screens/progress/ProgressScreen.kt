@@ -35,10 +35,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.viewmodels.ExamType
 import com.typosbro.multilevel.ui.viewmodels.GenericExamResultSummary
 import com.typosbro.multilevel.ui.viewmodels.ProgressViewModel
@@ -61,7 +63,7 @@ fun ProgressScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("My Progress") }) }
+        topBar = { TopAppBar(title = { Text(text = stringResource(id = R.string.progress_title)) }) }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             ExamTypeSwitcher(
@@ -77,7 +79,7 @@ fun ProgressScreen(
             } else if (currentHistory.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
-                        "No ${uiState.selectedTab.name} exam history yet.",
+                        text = stringResource(id = R.string.progress_empty),
                         modifier = Modifier.padding(16.dp)
                     )
                 }
@@ -88,7 +90,7 @@ fun ProgressScreen(
                 ) {
                     item {
                         Text(
-                            "Score Over Time",
+                            text = stringResource(id = R.string.progress_score),
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(horizontal = 16.dp)
                         )
@@ -105,7 +107,7 @@ fun ProgressScreen(
 
                     item {
                         Text(
-                            "Exam History",
+                            text = stringResource(id = R.string.progress_history),
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(
                                 start = 16.dp,
@@ -173,7 +175,7 @@ fun ExamHistoryItem(result: GenericExamResultSummary, onClick: () -> Unit) {
         trailingContent = {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "View Details"
+                contentDescription = stringResource(id = R.string.progress_detail)
             )
         },
         modifier = Modifier.clickable(onClick = onClick)
@@ -184,7 +186,7 @@ fun ExamHistoryItem(result: GenericExamResultSummary, onClick: () -> Unit) {
 fun ScoreHistoryChart(scores: List<Double>, yMax: Double, modifier: Modifier = Modifier) {
     if (scores.size < 2) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text("Take at least two tests to see a chart.")
+            Text(text = stringResource(id = R.string.progress_no_enough_data))
         }
         return
     }

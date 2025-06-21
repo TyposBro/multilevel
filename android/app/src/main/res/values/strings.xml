@@ -63,15 +63,26 @@
     <string name="profile_item_subtitle_permanent">This action is permanent</string>
 
     <!--  PROGRESS SCREEN  -->
+    <string name="progress_title">Progress</string>
+    <string name="progress_empty">No %s exam history yet.</string>
+    <string name="progress_score">Score Over Time</string>
+    <string name="progress_history">Exam History</string>
+    <string name="progress_no_enough_data">Take at least two tests to see a chart.</string>
+    <string name="progress_detail">View Details</string>
+
 
     <!--  RECORDING COMPONENT  -->
     <string name="recording_start">Start recording</string>
     <string name="recording_stop">Strop recording</string>
 
     <!--  ABOUT COMPONENT  -->
+    <string name="about_title">About Multilevel</string>
+    <string name="about_subtitle">A multi-level English learning and practice application.</string>
+    <string name="about_version">Version: %s</string>
 
     <!--  REUSABLE  -->
     <string name="error_message">Error: %s</string>
+    <string name="button_ok">Logout</string>
     <string name="button_back">Back button</string>
     <string name="button_logout">Logout</string>
     <string name="button_cancel">Cancel</string>
@@ -85,6 +96,7 @@
     <string name="delete_confirm_title">Delete Your Account?</string>
     <string name="delete_confirm_subtitle">This action is permanent. All of your data will be deleted forever. This cannot be undone. Are you sure you want to proceed?</string>
     <string name="logo_google_description">Google logo</string>
+    <string name="logo_app">App logo</string>
     <string name="permission_record_audio">Microphone permission is required to take the exam.</string>
     <string name="notice_english_only">⚠️ Please note: All exam instructions and questions will be in English, just like the official Speaking Test.</string>
 

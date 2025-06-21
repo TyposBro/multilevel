@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.utils.getAppVersion
@@ -31,20 +32,20 @@ fun AboutAppDialog(
         icon = {
             Image(
                 painter = painterResource(id = R.drawable.ic_launcher_round),
-                contentDescription = "App Icon",
+                contentDescription = stringResource(id = R.string.logo_app),
                 modifier = Modifier.size(48.dp)
             )
         },
-        title = { Text("About Multilevel") },
+        title = { Text(text = stringResource(id = R.string.about_title)) },
         text = {
             Column {
                 Text(
-                    text = "A multi-level English learning and practice application.",
+                    text = stringResource(id = R.string.about_subtitle),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "Version: $appVersion",
+                    text = stringResource(id = R.string.about_version, appVersion),
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
@@ -55,7 +56,7 @@ fun AboutAppDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("OK")
+                Text(text = stringResource(R.string.button_ok))
             }
         }
     )
