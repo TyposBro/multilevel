@@ -1,5 +1,7 @@
 package com.typosbro.multilevel.ui.screens.wordbank
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,16 +35,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.alexstyl.swipeablecard.Direction
 import com.alexstyl.swipeablecard.ExperimentalSwipeableCardApi
-import com.alexstyl.swipeablecard.SwipeableCardState
-import com.alexstyl.swipeablecard.rememberSwipeableCardState
-import com.alexstyl.swipeablecard.swipableCard
 import com.typosbro.multilevel.data.local.WordEntity
 import com.typosbro.multilevel.features.srs.ReviewQuality
 import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
@@ -84,27 +83,19 @@ fun WordReviewScreen(
             } else if (uiState.isSessionActive && currentWord == null) {
                 CircularProgressIndicator()
             } else if (uiState.isSessionActive && currentWord != null) {
-                val cardState = rememberSwipeableCardState()
                 val scope = rememberCoroutineScope()
 
                 fun onReview(quality: ReviewQuality) {
                     viewModel.handleReview(currentWord, quality)
                 }
 
-                LaunchedEffect(cardState.swipedDirection) {
-                    cardState.swipedDirection?.let { direction ->
-                        when (direction) {
-                            Direction.Left -> onReview(ReviewQuality.AGAIN)
-                            Direction.Right -> onReview(ReviewQuality.GOOD)
-                            else -> {}
-                        }
-                    }
-                }
-
                 Column(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                    verticalArrangement = Arrangement.spacedBy(
+                        20.dp,
+                        alignment = Alignment.CenterVertically
+                    )
                 ) {
                     Box(
                         modifier = Modifier
@@ -114,7 +105,6 @@ fun WordReviewScreen(
                     ) {
                         WordReviewCard(
                             word = currentWord,
-                            cardState = cardState
                         )
                     }
 
@@ -200,14 +190,15 @@ private fun ReviewButton(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalSwipeableCardApi::class)
+
+@OptIn(ExperimentalSwipeableCardApi::class)
 @Composable
 fun WordReviewCard(
     word: WordEntity,
-    cardState: SwipeableCardState
 ) {
     var isRevealed by remember { mutableStateOf(false) }
 
+    // When a new word is displayed, reset the revealed state
     LaunchedEffect(word) {
         isRevealed = false
     }
@@ -216,60 +207,113 @@ fun WordReviewCard(
         Modifier
             .fillMaxWidth(0.9f)
             .aspectRatio(3f / 4f)
-            .swipableCard(
-                state = cardState,
-                blockedDirections = listOf(Direction.Up, Direction.Down),
-                onSwiped = {},
-            )
     ) {
-        Card(
+        // Our new FlippableCard handles the rotation and content switching
+        FlippableCard(
+            isFlipped = isRevealed,
             onClick = { isRevealed = !isRevealed },
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = word.word,
-                    style = MaterialTheme.typography.displayMedium,
-                    textAlign = TextAlign.Center
+            front = {
+                // Content for the front of the card
+                CardContent(
+                    title = word.word,
+                    titleStyle = MaterialTheme.typography.displayMedium,
+                    example = word.example1,
+
+                    )
+            },
+            back = {
+                // Content for the back of the card
+                CardContent(
+                    title = word.translation,
+                    titleStyle = MaterialTheme.typography.headlineMedium,
+                    titleColor = MaterialTheme.colorScheme.primary,
+                    example = word.example1Translation
                 )
+            }
+        )
+    }
+}
 
-                if (isRevealed) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = word.translation,
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        word.example1?.let {
-                            Text(
-                                text = "e.g. $it",
-                                style = MaterialTheme.typography.bodyLarge,
-                                textAlign = TextAlign.Center
-                            )
-                            word.example1Translation?.let { trans ->
-                                Text(
-                                    text = trans,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.Gray,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
+/**
+ * A reusable composable that shows a card with a front and back that can be flipped.
+ */
+@Composable
+fun FlippableCard(
+    isFlipped: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    front: @Composable () -> Unit,
+    back: @Composable () -> Unit,
+) {
+    // Animate the rotationY value between 0f (front) and 180f (back)
+    val rotation by animateFloatAsState(
+        targetValue = if (isFlipped) 180f else 0f,
+        animationSpec = tween(durationMillis = 500),
+        label = "cardFlipRotation"
+    )
 
+    Card(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxSize()
+            // Apply the animated rotation to the graphics layer
+            .graphicsLayer {
+                rotationY = rotation
+                // Add a perspective effect
+                cameraDistance = 12 * density
+            }
+    ) {
+        // Show the back of the card if the rotation is past 90 degrees, otherwise show the front.
+        // The back is also rotated so it's not mirrored.
+        if (rotation <= 90f) {
+            Box(Modifier.fillMaxSize()) {
+                front()
+            }
+        } else {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    // Rotate the back content so it's facing the correct way
+                    .graphicsLayer { rotationY = 180f }
+            ) {
+                back()
+            }
+        }
+    }
+}
+
+/**
+ * A generic composable for displaying content inside the review card.
+ * Used for both the front and back sides.
+ */
+@Composable
+private fun CardContent(
+    title: String,
+    titleStyle: androidx.compose.ui.text.TextStyle,
+    titleColor: Color = MaterialTheme.colorScheme.onSurface,
+    example: String? = null,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = title,
+            style = titleStyle,
+            color = titleColor,
+            textAlign = TextAlign.Center
+        )
+
+        if (example != null) {
+            Spacer(Modifier.height(32.dp))
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    text = if (isRevealed) "" else "Tap to reveal",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.Gray
+                    text = "e.g. $example",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center
                 )
             }
         }
