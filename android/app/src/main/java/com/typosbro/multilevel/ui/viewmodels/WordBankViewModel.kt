@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.data.local.WordDao
 import com.typosbro.multilevel.data.local.WordEntity
+import com.typosbro.multilevel.data.remote.models.ApiWord
 import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.data.repositories.WordBankRepository
 import com.typosbro.multilevel.features.srs.ReviewQuality
@@ -23,10 +24,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/**
- * Represents a single deck or sub-deck in the review hierarchy.
- * @param topic Is null for a top-level (level) deck.
- */
 data class DeckInfo(
     val name: String,
     val level: String,
@@ -38,15 +35,22 @@ data class DeckInfo(
 )
 
 data class WordBankUiState(
-    // Global stats for the top bar of the decks screen
+    // Global stats
     val totalDue: Int = 0,
     val totalNew: Int = 0,
     val totalWords: Int = 0,
 
-    // The hierarchical deck structure for the main list
+    // For hierarchical deck screen
     val deckHierarchy: List<DeckInfo> = emptyList(),
 
-    // State for the actual review session
+    // State for the "Explore" flow
+    val exploreLevels: List<String> = emptyList(),
+    val exploreTopics: List<String> = emptyList(),
+    val exploreLevelsAddedStatus: Map<String, Boolean> = emptyMap(),
+    val exploreTopicAddedStatus: Map<String, Boolean> = emptyMap(),
+    val loadingItems: Set<String> = emptySet(),
+
+    // Review Session State
     val reviewWords: List<WordEntity> = emptyList(),
     val currentReviewIndex: Int = 0,
     val isSessionActive: Boolean = false,
@@ -78,20 +82,15 @@ class WordBankViewModel @Inject constructor(
                 wordDao.getNewWordsCount(),
                 wordDao.getTotalWordsCount()
             ) { due, new, total ->
-                // This will update the top stats bar whenever the database changes.
                 _uiState.update { it.copy(totalDue = due, totalNew = new, totalWords = total) }
             }.collect()
         }
     }
 
-    /**
-     * Builds the entire hierarchical structure of decks and sub-decks with their respective counts.
-     * This is the main function called by the UI to populate the "Decks" screen.
-     */
+    // --- Deck Hierarchy Logic (for main WordBankScreen) ---
     fun loadDeckHierarchy() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-
             val levelsResult = wordBankRepository.getLevels()
             if (levelsResult !is RepositoryResult.Success) {
                 _uiState.update { it.copy(isLoading = false, error = "Could not load levels.") }
@@ -136,9 +135,7 @@ class WordBankViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Starts a review session, optionally filtered by level and/or topic.
-     */
+    // --- Review Session Logic ---
     fun startReviewSession(level: String? = null, topic: String? = null) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, isSessionActive = true) }
@@ -155,20 +152,131 @@ class WordBankViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Processes a user's review of a single word using the SM-2 algorithm.
-     */
     fun handleReview(word: WordEntity, quality: ReviewQuality) {
         viewModelScope.launch {
             val updatedWord = SM2.calculate(word, quality)
             wordDao.update(updatedWord)
-
             val nextIndex = _uiState.value.currentReviewIndex + 1
             if (nextIndex >= _uiState.value.reviewWords.size) {
                 _uiState.update { it.copy(isSessionFinished = true, isSessionActive = false) }
             } else {
                 _uiState.update { it.copy(currentReviewIndex = nextIndex) }
             }
+        }
+    }
+
+    // --- Functions for the "Explore" word discovery flow ---
+    fun fetchExploreLevels() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            val result = wordBankRepository.getLevels()
+            if (result is RepositoryResult.Success) {
+                val levels = result.data
+                // Also fetch whether each level has been added
+                val statusMap = levels.associateWith { level ->
+                    wordDao.countTotalWordsInLevel(level) > 0
+                }
+                _uiState.update {
+                    it.copy(
+                        exploreLevels = levels,
+                        exploreLevelsAddedStatus = statusMap,
+                        isLoading = false
+                    )
+                }
+            } else if (result is RepositoryResult.Error) {
+                _uiState.update { it.copy(error = result.message, isLoading = false) }
+            }
+        }
+    }
+
+    fun fetchExploreTopics(level: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, exploreTopics = emptyList()) }
+            val result = wordBankRepository.getTopics(level)
+            if (result is RepositoryResult.Success) {
+                val topics = result.data
+                val statusMap = topics.associateWith { topic ->
+                    wordDao.countTotalWordsInTopic(level, topic) > 0
+                }
+                _uiState.update {
+                    it.copy(
+                        exploreTopics = topics,
+                        exploreTopicAddedStatus = statusMap,
+                        isLoading = false
+                    )
+                }
+            } else if (result is RepositoryResult.Error) {
+                _uiState.update { it.copy(error = result.message, isLoading = false) }
+            }
+        }
+    }
+
+    fun addWordsByLevel(level: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingItems = it.loadingItems + level) }
+            val result = wordBankRepository.getAllWordsForLevel(level)
+            if (result is RepositoryResult.Success) {
+                wordDao.insertAll(wordsToEntities(result.data))
+                // Refresh the status and the main decks view
+                fetchExploreLevels()
+                loadDeckHierarchy()
+            }
+            _uiState.update { it.copy(loadingItems = it.loadingItems - level) }
+        }
+    }
+
+    fun removeWordsByLevel(level: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingItems = it.loadingItems + level) }
+            wordDao.deleteByLevel(level)
+            // Refresh the status and the main decks view
+            fetchExploreLevels()
+            loadDeckHierarchy()
+            _uiState.update { it.copy(loadingItems = it.loadingItems - level) }
+        }
+    }
+
+    fun addWordsByTopic(level: String, topic: String) {
+        viewModelScope.launch {
+            val loadingKey = "${level}_$topic"
+            _uiState.update { it.copy(loadingItems = it.loadingItems + loadingKey) }
+            val result = wordBankRepository.getWords(level, topic)
+            if (result is RepositoryResult.Success) {
+                wordDao.insertAll(wordsToEntities(result.data))
+                fetchExploreTopics(level)
+                loadDeckHierarchy()
+            }
+            _uiState.update { it.copy(loadingItems = it.loadingItems - loadingKey) }
+        }
+    }
+
+    fun removeWordsByTopic(level: String, topic: String) {
+        viewModelScope.launch {
+            val loadingKey = "${level}_$topic"
+            _uiState.update { it.copy(loadingItems = it.loadingItems + loadingKey) }
+            wordDao.deleteByTopic(level, topic)
+            fetchExploreTopics(level)
+            loadDeckHierarchy()
+            _uiState.update { it.copy(loadingItems = it.loadingItems - loadingKey) }
+        }
+    }
+
+    private fun wordsToEntities(apiWords: List<ApiWord>): List<WordEntity> {
+        return apiWords.map { apiWord ->
+            WordEntity(
+                word = apiWord.word,
+                translation = apiWord.translation,
+                example1 = apiWord.example1,
+                example1Translation = apiWord.example1Translation,
+                example2 = apiWord.example2,
+                example2Translation = apiWord.example2Translation,
+                cefrLevel = apiWord.cefrLevel,
+                topic = apiWord.topic,
+                repetitions = 0,
+                easinessFactor = 2.5f,
+                interval = 0,
+                nextReviewTimestamp = System.currentTimeMillis()
+            )
         }
     }
 }

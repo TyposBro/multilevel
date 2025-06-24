@@ -18,19 +18,22 @@ import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.screens.practice.PracticeHubScreen
 import com.typosbro.multilevel.ui.screens.profile.ProfileScreen
 import com.typosbro.multilevel.ui.screens.progress.ProgressScreen
+import com.typosbro.multilevel.ui.screens.wordbank.ExploreLevelScreen
+import com.typosbro.multilevel.ui.screens.wordbank.ExploreTopicScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordBankScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordReviewScreen
 
-// Define routes for the main tabs
 object MainDestinations {
     const val PRACTICE_ROUTE = "practice"
     const val WORDBANK_ROUTE = "wordbank"
@@ -38,10 +41,11 @@ object MainDestinations {
     const val PROFILE_ROUTE = "profile"
 }
 
-// Simplified WordBank destinations
 object WordBankDestinations {
     const val HUB_ROUTE = "wordbank_hub"
     const val REVIEW_ROUTE = "wordbank_review"
+    const val EXPLORE_LEVEL_ROUTE = "wordbank_explore_level"
+    const val EXPLORE_TOPIC_ROUTE = "wordbank_explore_topic/{level}"
 }
 
 @Composable
@@ -69,7 +73,6 @@ fun MainScreen(
                 )
             }
 
-            // Simplified nested navigation graph for the Word Bank tab
             navigation(
                 startDestination = WordBankDestinations.HUB_ROUTE,
                 route = MainDestinations.WORDBANK_ROUTE
@@ -78,14 +81,32 @@ fun MainScreen(
                     WordBankScreen(
                         onNavigateToReview = {
                             mainNavController.navigate(WordBankDestinations.REVIEW_ROUTE)
+                        },
+                        onNavigateToExplore = {
+                            mainNavController.navigate(WordBankDestinations.EXPLORE_LEVEL_ROUTE)
                         }
                     )
                 }
                 composable(WordBankDestinations.REVIEW_ROUTE) {
                     WordReviewScreen(
-                        onNavigateBack = {
-                            mainNavController.popBackStack()
-                        }
+                        onNavigateBack = { mainNavController.popBackStack() }
+                    )
+                }
+                composable(WordBankDestinations.EXPLORE_LEVEL_ROUTE) {
+                    ExploreLevelScreen(
+                        onLevelSelected = { level ->
+                            mainNavController.navigate("wordbank_explore_topic/$level")
+                        },
+                        onNavigateBack = { mainNavController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = WordBankDestinations.EXPLORE_TOPIC_ROUTE,
+                    arguments = listOf(navArgument("level") { type = NavType.StringType })
+                ) { backStackEntry ->
+                    ExploreTopicScreen(
+                        level = backStackEntry.arguments?.getString("level") ?: "",
+                        onNavigateBack = { mainNavController.popBackStack() }
                     )
                 }
             }
@@ -129,9 +150,7 @@ fun BottomNavigationBar(navController: NavHostController) {
                 selected = currentDestination?.hierarchy?.any { it.route == route } == true,
                 onClick = {
                     navController.navigate(route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            saveState = true
-                        }
+                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                         launchSingleTop = true
                         restoreState = true
                     }

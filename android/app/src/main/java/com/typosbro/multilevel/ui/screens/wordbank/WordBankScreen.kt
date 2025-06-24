@@ -22,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -50,12 +51,12 @@ import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 @Composable
 fun WordBankScreen(
     onNavigateToReview: () -> Unit,
+    onNavigateToExplore: () -> Unit,
     viewModel: WordBankViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var expandedLevels by remember { mutableStateOf(setOf<String>()) }
 
-    // Refresh the deck hierarchy every time the screen comes into view
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = object : DefaultLifecycleObserver {
@@ -64,62 +65,67 @@ fun WordBankScreen(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Decks") }) }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            // Top Stats Bar
             StatsBar(
                 due = uiState.totalDue,
                 new = uiState.totalNew,
                 total = uiState.totalWords
             )
 
-            if (uiState.isLoading && uiState.deckHierarchy.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-            } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(uiState.deckHierarchy, key = { it.name }) { levelDeck ->
-                        Column {
-                            DeckItemRow(
-                                deck = levelDeck,
-                                isExpanded = levelDeck.name in expandedLevels,
-                                onExpandToggle = { isNowExpanded ->
-                                    expandedLevels = if (isNowExpanded) {
-                                        expandedLevels + levelDeck.name
-                                    } else {
-                                        expandedLevels - levelDeck.name
+            // This Box will now correctly contain either the loader or the weighted list.
+            Box(modifier = Modifier.weight(1f)) { // --- FIX 1: Give this Box the weight ---
+                if (uiState.isLoading && uiState.deckHierarchy.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    // --- FIX 2: Remove fillMaxSize() from here, the weight modifier handles it ---
+                    LazyColumn {
+                        items(uiState.deckHierarchy, key = { it.name }) { levelDeck ->
+                            Column {
+                                DeckItemRow(
+                                    deck = levelDeck,
+                                    isExpanded = levelDeck.name in expandedLevels,
+                                    onExpandToggle = { isNowExpanded ->
+                                        expandedLevels = if (isNowExpanded) {
+                                            expandedLevels + levelDeck.name
+                                        } else {
+                                            expandedLevels - levelDeck.name
+                                        }
+                                    },
+                                    onReviewClick = {
+                                        if (levelDeck.dueCount > 0) {
+                                            viewModel.startReviewSession(level = levelDeck.level)
+                                            onNavigateToReview()
+                                        }
                                     }
-                                },
-                                onReviewClick = {
-                                    if (levelDeck.dueCount > 0) {
-                                        viewModel.startReviewSession(level = levelDeck.level)
-                                        onNavigateToReview()
-                                    }
-                                }
-                            )
+                                )
 
-                            AnimatedVisibility(visible = levelDeck.name in expandedLevels) {
-                                Column {
-                                    levelDeck.subDecks.forEach { topicDeck ->
-                                        DeckItemRow(
-                                            deck = topicDeck,
-                                            isSubItem = true,
-                                            onReviewClick = {
-                                                if (topicDeck.dueCount > 0) {
-                                                    viewModel.startReviewSession(
-                                                        level = topicDeck.level,
-                                                        topic = topicDeck.topic
-                                                    )
-                                                    onNavigateToReview()
+                                AnimatedVisibility(visible = levelDeck.name in expandedLevels) {
+                                    Column {
+                                        levelDeck.subDecks.forEach { topicDeck ->
+                                            DeckItemRow(
+                                                deck = topicDeck,
+                                                isSubItem = true,
+                                                onReviewClick = {
+                                                    if (topicDeck.dueCount > 0) {
+                                                        viewModel.startReviewSession(
+                                                            level = topicDeck.level,
+                                                            topic = topicDeck.topic
+                                                        )
+                                                        onNavigateToReview()
+                                                    }
                                                 }
-                                            }
-                                        )
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -127,17 +133,31 @@ fun WordBankScreen(
                     }
                 }
             }
+
+            // --- FIX 3: Remove the Spacer. The weight on the Box above handles this now. ---
+
+            // This button will now correctly appear at the bottom.
+            OutlinedButton(
+                onClick = onNavigateToExplore,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text("Explore New Words")
+            }
         }
     }
 }
 
+// StatsBar, DeckItemRow, and CountBadge composables remain unchanged.
 @Composable
 private fun StatsBar(due: Int, new: Int, total: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.Center
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(text = "Due: ", fontWeight = FontWeight.Bold)
         Text(text = "$due", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
@@ -158,10 +178,11 @@ private fun DeckItemRow(
     onExpandToggle: ((Boolean) -> Unit)? = null,
     onReviewClick: () -> Unit
 ) {
+    val isClickable = deck.dueCount > 0
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onReviewClick)
+            .clickable(enabled = isClickable, onClick = onReviewClick)
             .padding(
                 start = if (isSubItem) 32.dp else 16.dp,
                 end = 16.dp,
@@ -184,7 +205,10 @@ private fun DeckItemRow(
         Text(
             text = deck.name,
             style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.weight(1f),
+            color = if (isClickable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(
+                alpha = 0.6f
+            )
         )
 
         CountBadge(count = deck.dueCount, color = Color(0xFF4CAF50))
