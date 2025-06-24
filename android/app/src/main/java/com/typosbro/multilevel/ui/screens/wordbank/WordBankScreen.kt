@@ -17,11 +17,15 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 
@@ -29,10 +33,30 @@ import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 @Composable
 fun WordBankScreen(
     onNavigateToReview: () -> Unit,
-    onNavigateToDiscovery: () -> Unit, // New navigation action
+    onNavigateToDiscovery: () -> Unit,
     viewModel: WordBankViewModel = hiltViewModel()
 ) {
-    val dueWordsCount by viewModel.dueWordsCount.collectAsStateWithLifecycle()
+    // Get the entire state from the ViewModel.
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val dueWordsCount = uiState.dueWordsCount
+
+    // This effect listens to the screen's lifecycle.
+    // When the screen comes into view (onResume), it tells the ViewModel to refresh its data.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = object : DefaultLifecycleObserver {
+            override fun onResume(owner: LifecycleOwner) {
+                // Refresh the count every time the screen is resumed.
+                viewModel.refreshDueWordsCount()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        // Clean up the observer when the composable is disposed.
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Word Bank") }) }
@@ -63,10 +87,7 @@ fun WordBankScreen(
             Spacer(Modifier.height(32.dp))
 
             Button(
-                onClick = {
-                    viewModel.startReviewSession()
-                    onNavigateToReview()
-                },
+                onClick = onNavigateToReview,
                 enabled = dueWordsCount > 0,
                 modifier = Modifier
                     .fillMaxWidth()

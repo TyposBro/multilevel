@@ -33,6 +33,7 @@ googleServices = "4.4.2"
 
 securityCrypto = "1.1.0-beta01"
 speech = "18.7.0"
+swipeablecard = "0.1.0"
 voskAndroid = "0.3.47"
 
 ipaTranscribers = "v0.2"
@@ -91,6 +92,7 @@ okhttp-sse = { module = "com.squareup.okhttp3:okhttp-sse", version.ref = "okhttp
 play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
 speech = { module = "com.google.mlkit:speech", version.ref = "speech" }
+swipeablecard = { module = "com.alexstyl.swipeablecard:swipeablecard", version.ref = "swipeablecard" }
 vosk-android = { module = "com.alphacephei:vosk-android", version.ref = "voskAndroid" }
 androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-viewmodel-ktx", version.ref = "lifecycleViewmodelKtx" }
 ipa-transcribers = { module = "com.github.medavox:IPA-Transcribers", version.ref = "ipaTranscribers" }

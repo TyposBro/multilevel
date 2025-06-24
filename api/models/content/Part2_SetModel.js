@@ -11,8 +11,8 @@ const questionSchema = new mongoose.Schema(
 );
 
 const part2_Schema = new mongoose.Schema({
-  imageUrl: { type: String, required: true },
-  imageDescription: { type: String, required: true }, // For internal reference
+  imageUrl: { type: String, required: false }, // Optional, can be null
+  imageDescription: { type: String, required: false }, // For internal reference
   questions: [questionSchema], // Should contain 3 questions
   tags: [String],
 });

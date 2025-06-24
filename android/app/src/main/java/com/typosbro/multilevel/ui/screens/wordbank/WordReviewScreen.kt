@@ -1,28 +1,52 @@
 package com.typosbro.multilevel.ui.screens.wordbank
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.alexstyl.swipeablecard.Direction
+import com.alexstyl.swipeablecard.ExperimentalSwipeableCardApi
+import com.alexstyl.swipeablecard.SwipeableCardState
+import com.alexstyl.swipeablecard.rememberSwipeableCardState
+import com.alexstyl.swipeablecard.swipableCard
 import com.typosbro.multilevel.data.local.WordEntity
+import com.typosbro.multilevel.features.srs.ReviewQuality
 import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,15 +81,93 @@ fun WordReviewScreen(
         ) {
             if (uiState.isSessionFinished) {
                 SessionComplete(onNavigateBack)
-            } else if (currentWord != null) {
-                SwipeableWordCard(
-                    word = currentWord,
-                    onSwipe = { knewIt ->
-                        viewModel.handleReview(currentWord, knewIt)
+            } else if (uiState.isSessionActive && currentWord == null) {
+                CircularProgressIndicator()
+            } else if (uiState.isSessionActive && currentWord != null) {
+                val cardState = rememberSwipeableCardState()
+                val scope = rememberCoroutineScope()
+
+                fun onReview(quality: ReviewQuality) {
+                    viewModel.handleReview(currentWord, quality)
+                }
+
+                LaunchedEffect(cardState.swipedDirection) {
+                    cardState.swipedDirection?.let { direction ->
+                        when (direction) {
+                            Direction.Left -> onReview(ReviewQuality.AGAIN)
+                            Direction.Right -> onReview(ReviewQuality.GOOD)
+                            else -> {}
+                        }
                     }
-                )
-            } else if (uiState.isSessionActive) {
-                CircularProgressIndicator() // Loading words
+                }
+
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        WordReviewCard(
+                            word = currentWord,
+                            cardState = cardState
+                        )
+                    }
+
+                    // --- NEW: 2x2 Grid Layout for Buttons ---
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Top Row: Again, Hard
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            ReviewButton(
+                                text = "Again",
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                scope.launch { onReview(ReviewQuality.AGAIN) }
+                            }
+                            ReviewButton(
+                                text = "Hard",
+                                color = Color(0xFFFFA726),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                scope.launch { onReview(ReviewQuality.HARD) }
+                            }
+                        }
+                        // Bottom Row: Good, Easy
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            ReviewButton(
+                                text = "Good",
+                                color = Color(0xFF42A5F5),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                scope.launch { onReview(ReviewQuality.GOOD) }
+                            }
+                            ReviewButton(
+                                text = "Easy",
+                                color = Color(0xFF66BB6A),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                scope.launch { onReview(ReviewQuality.EASY) }
+                            }
+                        }
+                    }
+                }
             } else {
                 Text(
                     "No words to review right now. Come back later!",
@@ -77,108 +179,99 @@ fun WordReviewScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+// --- UPDATED: Helper for larger, more readable buttons ---
 @Composable
-fun SwipeableWordCard(
-    word: WordEntity,
-    onSwipe: (knewIt: Boolean) -> Unit
+private fun ReviewButton(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
 ) {
-    val scope = rememberCoroutineScope()
-    val offsetX = remember { Animatable(0f) }
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(56.dp), // Increased height for better tap target
+        colors = ButtonDefaults.buttonColors(containerColor = color)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge, // Larger font
+            fontWeight = FontWeight.Bold // Bolder font
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSwipeableCardApi::class)
+@Composable
+fun WordReviewCard(
+    word: WordEntity,
+    cardState: SwipeableCardState
+) {
     var isRevealed by remember { mutableStateOf(false) }
-    val configuration = LocalConfiguration.current
-    val screenWidth = configuration.screenWidthDp.dp.value
 
-    val rotation = (offsetX.value / screenWidth) * 15f
-    val cardAlpha = 1f - (abs(offsetX.value) / screenWidth / 2)
+    LaunchedEffect(word) {
+        isRevealed = false
+    }
 
-    val swipeThreshold = screenWidth * 0.4f
-
-    Card(
-        onClick = { isRevealed = !isRevealed },
-        modifier = Modifier
+    Box(
+        Modifier
             .fillMaxWidth(0.9f)
             .aspectRatio(3f / 4f)
-            .graphicsLayer(
-                translationX = offsetX.value,
-                rotationZ = rotation
+            .swipableCard(
+                state = cardState,
+                blockedDirections = listOf(Direction.Up, Direction.Down),
+                onSwiped = {},
             )
-            .alpha(cardAlpha)
-            .pointerInput(word.word) { // Relaunch when the word changes
-                detectDragGestures(
-                    onDragEnd = {
-                        scope.launch {
-                            when {
-                                offsetX.targetValue > swipeThreshold -> {
-                                    offsetX.animateTo(screenWidth * 1.5f, tween(300))
-                                    onSwipe(true) // Knew it
-                                }
-
-                                offsetX.targetValue < -swipeThreshold -> {
-                                    offsetX.animateTo(-screenWidth * 1.5f, tween(300))
-                                    onSwipe(false) // Didn't know
-                                }
-
-                                else -> {
-                                    offsetX.animateTo(0f, tween(300))
-                                }
-                            }
-                        }
-                    },
-                    onDrag = { change, dragAmount ->
-                        change.consume()
-                        scope.launch {
-                            offsetX.snapTo(offsetX.targetValue + dragAmount.x)
-                        }
-                    }
-                )
-            }
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+        Card(
+            onClick = { isRevealed = !isRevealed },
+            modifier = Modifier.fillMaxSize()
         ) {
-            Text(
-                text = word.word,
-                style = MaterialTheme.typography.displayMedium,
-                textAlign = TextAlign.Center
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = word.word,
+                    style = MaterialTheme.typography.displayMedium,
+                    textAlign = TextAlign.Center
+                )
 
-            if (isRevealed) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = word.translation,
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    word.example1?.let {
+                if (isRevealed) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = "e.g. $it",
-                            style = MaterialTheme.typography.bodyLarge,
+                            text = word.translation,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary,
                             textAlign = TextAlign.Center
                         )
-                        word.example1Translation?.let { trans ->
+                        Spacer(Modifier.height(16.dp))
+                        word.example1?.let {
                             Text(
-                                text = trans,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Color.Gray,
+                                text = "e.g. $it",
+                                style = MaterialTheme.typography.bodyLarge,
                                 textAlign = TextAlign.Center
                             )
+                            word.example1Translation?.let { trans ->
+                                Text(
+                                    text = trans,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.Gray,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
                 }
-            }
 
-            Text(
-                text = if (isRevealed) "" else "Tap to reveal",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color.Gray
-            )
+                Text(
+                    text = if (isRevealed) "" else "Tap to reveal",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
+            }
         }
     }
 }

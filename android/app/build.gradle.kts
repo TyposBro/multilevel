@@ -69,6 +69,10 @@ android {
             keyPassword = "android"
         }
     }
+
+    aaptOptions {
+        noCompress += ".onnx"
+    }
 }
 
 dependencies {
@@ -146,4 +150,7 @@ dependencies {
     // Coil for Image Loading
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    // Swipe
+    implementation(libs.swipeablecard)
 }

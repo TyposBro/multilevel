@@ -131,7 +131,9 @@ fun MainScreen(
                     )
                 ) {
                     WordListScreen(
-                        onNavigateBack = { mainNavController.popBackStack() }
+                        onNavigateBack = { mainNavController.popBackStack() },
+                        level = it.arguments?.getString("level") ?: "",
+                        topic = it.arguments?.getString("topic") ?: ""
                     )
                 }
             }

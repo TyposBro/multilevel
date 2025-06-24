@@ -5,24 +5,24 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-// --- CHANGE: The entire data class is updated to match ApiWord structure ---
 @Entity(
     tableName = "words",
-    // Add an index to prevent adding the same word multiple times
     indices = [Index(value = ["word"], unique = true)]
 )
 data class WordEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val word: String, // Was 'text'
-    val translation: String, // New field, replaces 'definition'
-    val example1: String?, // Was 'example', now nullable to match API
-    val example1Translation: String?, // New field
-    val example2: String?, // New field
-    val example2Translation: String?, // New field
+    val word: String,
+    val translation: String,
+    val example1: String?,
+    val example1Translation: String?,
+    val example2: String?,
+    val example2Translation: String?,
     val cefrLevel: String,
     val topic: String,
 
-    // --- Spaced Repetition System (SRS) Fields ---
-    var srsStage: Int = 0,
+    // --- REVISED: Spaced Repetition System (SRS) Fields for SM-2 ---
+    var repetitions: Int = 0,           // n: Number of successful (q >= 3) repetitions.
+    var easinessFactor: Float = 2.5f,   // EF: The easiness factor, starts at 2.5.
+    var interval: Int = 0,              // The last calculated interval in days.
     var nextReviewTimestamp: Long = 0L
 )

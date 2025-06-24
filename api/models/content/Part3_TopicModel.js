@@ -6,8 +6,6 @@ const part3_Schema = new mongoose.Schema({
   topic: { type: String, required: true },
   forPoints: { type: [String], required: true }, // e.g., ["Point A", "Point B", "Point C"]
   againstPoints: { type: [String], required: true },
-  // Optional image to go with the topic
-  imageUrl: { type: String },
   tags: [String],
 });
 

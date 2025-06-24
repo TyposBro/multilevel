@@ -1,6 +1,6 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/wordbank/WordListScreen.kt
 package com.typosbro.multilevel.ui.screens.wordbank
 
+// No longer need BookmarkBorder
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -27,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,20 +42,21 @@ import com.typosbro.multilevel.ui.viewmodels.WordBankViewModel
 @Composable
 fun WordListScreen(
     onNavigateBack: () -> Unit,
+    level: String, // Pass level and topic to the screen
+    topic: String,
     viewModel: WordBankViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
+    LaunchedEffect(level, topic) {
+        viewModel.fetchWordsForDiscovery(level, topic)
+    }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add New Words") },
+                title = { Text(topic) }, // Use topic as title for context
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 }
             )
@@ -85,8 +86,7 @@ fun WordListScreen(
                         items(uiState.discoverableWords) { word ->
                             WordItem(
                                 word = word,
-                                isBookmarked = word.word in uiState.bookmarkedWords,
-                                onBookmarkClick = { viewModel.bookmarkWord(word) }
+                                isBookmarked = false
                             )
                         }
                     }
@@ -100,7 +100,7 @@ fun WordListScreen(
 fun WordItem(
     word: ApiWord,
     isBookmarked: Boolean,
-    onBookmarkClick: () -> Unit
+    // --- FIX: onBookmarkClick parameter is removed ---
 ) {
     Card(
         modifier = Modifier
@@ -133,14 +133,13 @@ fun WordItem(
                     )
                 }
             }
-            IconButton(
-                onClick = onBookmarkClick,
-                enabled = !isBookmarked
-            ) {
+            // --- FIX: The individual bookmark icon is now a static indicator ---
+            if (isBookmarked) {
                 Icon(
-                    imageVector = if (isBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                    contentDescription = if (isBookmarked) "Bookmarked" else "Bookmark word",
-                    tint = if (isBookmarked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    imageVector = Icons.Filled.Bookmark,
+                    contentDescription = "Bookmarked",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(start = 16.dp)
                 )
             }
         }

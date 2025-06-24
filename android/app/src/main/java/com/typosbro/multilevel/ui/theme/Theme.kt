@@ -1,7 +1,6 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/theme/Theme.kt
 package com.typosbro.multilevel.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -10,7 +9,15 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+
+// --- New Colors for accessibility buttons ---
+val SuccessGreen = Color(0xFF4CAF50)
+val SuccessGreenDark = Color(0xFF81C784)
+val FailureRed = Color(0xFFD32F2F)
+val FailureRedDark = Color(0xFFE57373)
+// -----------------------------------------
 
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,

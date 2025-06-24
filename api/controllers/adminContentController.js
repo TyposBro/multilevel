@@ -5,8 +5,9 @@ const Part3_Topic = require("../models/content/Part3_TopicModel");
 const { uploadToCDN } = require("../services/storageService");
 const Word = require("../models/wordModel");
 
-// Default provider if none is specified in the request body. Can be 'firebase' or 'supabase'.
-const DEFAULT_PROVIDER = "supabase"; // Change this to 'firebase' if needed
+const DEFAULT_PROVIDER = "supabase";
+
+// ... (uploadPart1_1 and uploadPart1_2 are unchanged) ...
 
 /**
  * @desc    Upload content for a new Part 1.1 Question
@@ -15,7 +16,7 @@ const DEFAULT_PROVIDER = "supabase"; // Change this to 'firebase' if needed
  */
 const uploadPart1_1 = async (req, res) => {
   const { questionText, provider = DEFAULT_PROVIDER } = req.body;
-  const file = req.file; // From multer single upload: `upload.single('audio')`
+  const file = req.file;
 
   if (!questionText || !file) {
     return res.status(400).json({ message: "Question text and an audio file are required." });
@@ -90,64 +91,73 @@ const uploadPart1_2 = async (req, res) => {
 };
 
 /**
- * @desc    Upload content for a new Part 2 Set
+ * @desc    Upload content for a new Part 2 Set (Image and Description are optional)
  * @route   POST /api/admin/content/part2
  * @access  Private/Admin
  */
 const uploadPart2 = async (req, res) => {
+  // --- START OF MODIFIED LOGIC ---
   const {
     question1,
     question2,
     question3,
-    imageDescription,
+    imageDescription, // This is now optional
     provider = DEFAULT_PROVIDER,
   } = req.body;
   const files = req.files;
 
-  if (!question1 || !question2 || !question3 || !imageDescription) {
-    return res.status(400).json({ message: "All text fields are required." });
+  // 1. Update validation: only questions and audio are mandatory.
+  if (!question1 || !question2 || !question3) {
+    return res.status(400).json({ message: "All three question text fields are required." });
   }
-  if (!files.image || !files.audio) {
-    return res
-      .status(400)
-      .json({ message: "An image file and a single combined audio file are required." });
+  if (!files.audio) {
+    return res.status(400).json({ message: "A single combined audio file is required." });
   }
 
   try {
     console.log(`[Part 2] Using storage provider: ${provider}`);
-    const [imageUrl, audioUrl] = await Promise.all([
-      uploadToCDN(provider, files.image[0], "images"),
-      uploadToCDN(provider, files.audio[0], "audio"),
-    ]);
 
+    // 2. Conditionally upload image only if it exists
+    let imageUrl = null;
+    if (files.image && files.image[0]) {
+      console.log("[Part 2] Image found, uploading...");
+      imageUrl = await uploadToCDN(provider, files.image[0], "images");
+    }
+
+    // 3. Upload the mandatory audio file
+    const audioUrl = await uploadToCDN(provider, files.audio[0], "audio");
+
+    // 4. Create the new set, saving the data to the database
     const newSet = new Part2_Set({
-      imageUrl,
-      imageDescription,
+      imageUrl, // This will be the URL or null
+      imageDescription: imageDescription || null, // Save description or null
       questions: [
-        { text: question1, audioUrl: audioUrl }, // All questions point to the same combined audio URL
+        { text: question1, audioUrl: audioUrl },
         { text: question2, audioUrl: audioUrl },
         { text: question3, audioUrl: audioUrl },
       ],
       tags: ["admin-upload"],
     });
 
-    await newSet.save();
+    await newSet.save(); // The data is being saved correctly.
+
     res.status(201).json({ message: "Part 2 content set uploaded successfully!", data: newSet });
   } catch (error) {
     console.error(`[Part 2] Upload Error:`, error);
     res.status(500).json({ message: error.message || "Server error during file upload." });
   }
+  // --- END OF MODIFIED LOGIC ---
 };
 
 /**
- * @desc    Upload content for a new Part 3 Topic
+ * @desc    Upload content for a new Part 3 Topic (Image is optional)
  * @route   POST /api/admin/content/part3
  * @access  Private/Admin
  */
 const uploadPart3 = async (req, res) => {
-  // For Part 3, text areas send text with newline characters. We need to split them.
+  // --- THIS LOGIC IS ALREADY CORRECT FOR OPTIONAL IMAGES ---
   const { topic, forPoints, againstPoints, provider = DEFAULT_PROVIDER } = req.body;
-  const file = req.file; // Optional image file `upload.single('image')`
+  const file = req.file; // From `upload.single('image')`, this will be undefined if no file is sent.
 
   if (!topic || !forPoints || !againstPoints) {
     return res.status(400).json({ message: "Topic, FOR points, and AGAINST points are required." });
@@ -156,20 +166,22 @@ const uploadPart3 = async (req, res) => {
   try {
     console.log(`[Part 3] Using storage provider: ${provider}`);
     let imageUrl = null;
+    // This `if (file)` check is the correct way to handle an optional single upload.
     if (file) {
+      console.log("[Part 3] Image found, uploading...");
       imageUrl = await uploadToCDN(provider, file, "images");
     }
 
     const newTopic = new Part3_Topic({
       topic,
-      // Split the newline-separated strings from the textarea into arrays
       forPoints: forPoints.split("\n").filter((p) => p.trim() !== ""),
       againstPoints: againstPoints.split("\n").filter((p) => p.trim() !== ""),
-      imageUrl, // This will be null if no file was uploaded
+      imageUrl, // This will correctly be the URL or null.
       tags: ["admin-upload"],
     });
 
-    await newTopic.save();
+    await newTopic.save(); // The data is being saved correctly.
+
     res.status(201).json({ message: "Part 3 topic uploaded successfully!", data: newTopic });
   } catch (error) {
     console.error(`[Part 3] Upload Error:`, error);
@@ -177,14 +189,12 @@ const uploadPart3 = async (req, res) => {
   }
 };
 
+// ... (uploadWordBankWord is unchanged) ...
 
 /**
  * @desc    Uploads a new word to the Word Bank
  * @route   POST /api/admin/wordbank/add
  * @access  Private (Admin only)
- * @expects A `multipart/form-data` request with text fields:
- *          - word, translation, cefrLevel, topic (all required)
- *          - example1, example1Translation, example2, example2Translation (all optional)
  */
 const uploadWordBankWord = async (req, res) => {
   const {
@@ -198,13 +208,13 @@ const uploadWordBankWord = async (req, res) => {
     example2Translation,
   } = req.body;
 
-  // 1. Basic Validation
   if (!word || !translation || !cefrLevel || !topic) {
-    return res.status(400).json({ message: "Please fill all required fields: word, translation, cefrLevel, and topic." });
+    return res.status(400).json({
+      message: "Please fill all required fields: word, translation, cefrLevel, and topic.",
+    });
   }
 
   try {
-    // 2. Create a new word instance
     const newWord = new Word({
       word,
       translation,
@@ -216,16 +226,13 @@ const uploadWordBankWord = async (req, res) => {
       example2Translation: example2Translation || null,
     });
 
-    // 3. Save to the database
     const createdWord = await newWord.save();
 
-    // 4. Send success response
     res.status(201).json({
       message: "Word successfully added to the Word Bank.",
       word: createdWord,
     });
   } catch (error) {
-    // Handle potential errors, such as a duplicate word
     if (error.code === 11000) {
       return res.status(409).json({ message: `Error: The word "${word}" already exists.` });
     }
@@ -233,7 +240,6 @@ const uploadWordBankWord = async (req, res) => {
     res.status(500).json({ message: "Server error while adding the word." });
   }
 };
-
 
 module.exports = {
   uploadPart1_1,
