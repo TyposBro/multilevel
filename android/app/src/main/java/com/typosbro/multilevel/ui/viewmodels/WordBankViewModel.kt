@@ -43,7 +43,7 @@ data class WordBankUiState(
     // For hierarchical deck screen
     val deckHierarchy: List<DeckInfo> = emptyList(),
 
-    // State for the "Explore" flow
+    // For "Explore" flow
     val exploreLevels: List<String> = emptyList(),
     val exploreTopics: List<String> = emptyList(),
     val exploreLevelsAddedStatus: Map<String, Boolean> = emptyMap(),
@@ -55,6 +55,7 @@ data class WordBankUiState(
     val currentReviewIndex: Int = 0,
     val isSessionActive: Boolean = false,
     val isSessionFinished: Boolean = false,
+    val lapsedWords: List<WordEntity> = emptyList(), // Queue for failed cards to show again
 
     // Common State
     val isLoading: Boolean = false,
@@ -75,7 +76,6 @@ class WordBankViewModel @Inject constructor(
     val uiState: StateFlow<WordBankUiState> = _uiState.asStateFlow()
 
     init {
-        // This Flow combines the global counts and keeps them updated reactively.
         viewModelScope.launch {
             combine(
                 wordDao.getDueWordsCount(System.currentTimeMillis()),
@@ -87,7 +87,7 @@ class WordBankViewModel @Inject constructor(
         }
     }
 
-    // --- Deck Hierarchy Logic (for main WordBankScreen) ---
+    // --- Deck Hierarchy Logic ---
     fun loadDeckHierarchy() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
@@ -97,7 +97,6 @@ class WordBankViewModel @Inject constructor(
                 return@launch
             }
             val levels = levelsResult.data
-
             val hierarchy = coroutineScope {
                 levels.map { level ->
                     async {
@@ -105,7 +104,6 @@ class WordBankViewModel @Inject constructor(
                         val topicsResult = wordBankRepository.getTopics(level)
                         val topics =
                             if (topicsResult is RepositoryResult.Success) topicsResult.data else emptyList()
-
                         val subDecks = topics.map { topic ->
                             DeckInfo(
                                 name = topic, level = level, topic = topic,
@@ -114,7 +112,6 @@ class WordBankViewModel @Inject constructor(
                                 totalCount = wordDao.countTotalWordsInTopic(level, topic)
                             )
                         }
-
                         DeckInfo(
                             name = level, level = level, topic = null,
                             dueCount = subDecks.sumOf { it.dueCount },
@@ -125,7 +122,6 @@ class WordBankViewModel @Inject constructor(
                     }
                 }.awaitAll()
             }
-
             _uiState.update {
                 it.copy(
                     deckHierarchy = hierarchy.filter { it.totalCount > 0 }.sortedBy { it.name },
@@ -143,6 +139,7 @@ class WordBankViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     reviewWords = dueList.shuffled(),
+                    lapsedWords = emptyList(), // Ensure lapse queue is empty at the start
                     currentReviewIndex = 0,
                     isSessionActive = dueList.isNotEmpty(),
                     isSessionFinished = false,
@@ -154,25 +151,48 @@ class WordBankViewModel @Inject constructor(
 
     fun handleReview(word: WordEntity, quality: ReviewQuality) {
         viewModelScope.launch {
-            val updatedWord = SM2.calculate(word, quality)
-            wordDao.update(updatedWord)
-            val nextIndex = _uiState.value.currentReviewIndex + 1
-            if (nextIndex >= _uiState.value.reviewWords.size) {
-                _uiState.update { it.copy(isSessionFinished = true, isSessionActive = false) }
+            if (quality == ReviewQuality.AGAIN) {
+                // If the user fails, add the card to a temporary "lapse" queue to be shown again soon.
+                _uiState.update {
+                    it.copy(lapsedWords = it.lapsedWords + word)
+                }
             } else {
+                // If the user succeeds, update the card's SRS data and save it to the database.
+                val updatedWord = SM2.calculate(word, quality)
+                wordDao.update(updatedWord)
+            }
+
+            val nextIndex = _uiState.value.currentReviewIndex + 1
+
+            if (nextIndex >= _uiState.value.reviewWords.size) {
+                // The main review queue is finished. Check if there are any failed cards.
+                if (_uiState.value.lapsedWords.isNotEmpty()) {
+                    // If so, start a new round with the failed cards.
+                    _uiState.update {
+                        it.copy(
+                            reviewWords = it.lapsedWords.shuffled(),
+                            lapsedWords = emptyList(), // Clear the lapse queue for the next round
+                            currentReviewIndex = 0
+                        )
+                    }
+                } else {
+                    // If there are no failed cards, the session is truly over.
+                    _uiState.update { it.copy(isSessionFinished = true, isSessionActive = false) }
+                }
+            } else {
+                // Otherwise, just move to the next card in the current queue.
                 _uiState.update { it.copy(currentReviewIndex = nextIndex) }
             }
         }
     }
 
-    // --- Functions for the "Explore" word discovery flow ---
+    // --- Word Discovery Logic ---
     fun fetchExploreLevels() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val result = wordBankRepository.getLevels()
             if (result is RepositoryResult.Success) {
                 val levels = result.data
-                // Also fetch whether each level has been added
                 val statusMap = levels.associateWith { level ->
                     wordDao.countTotalWordsInLevel(level) > 0
                 }
@@ -211,28 +231,22 @@ class WordBankViewModel @Inject constructor(
         }
     }
 
-    fun addWordsByLevel(level: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(loadingItems = it.loadingItems + level) }
-            val result = wordBankRepository.getAllWordsForLevel(level)
-            if (result is RepositoryResult.Success) {
-                wordDao.insertAll(wordsToEntities(result.data))
-                // Refresh the status and the main decks view
-                fetchExploreLevels()
-                loadDeckHierarchy()
-            }
-            _uiState.update { it.copy(loadingItems = it.loadingItems - level) }
-        }
-    }
-
-    fun removeWordsByLevel(level: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(loadingItems = it.loadingItems + level) }
-            wordDao.deleteByLevel(level)
-            // Refresh the status and the main decks view
-            fetchExploreLevels()
-            loadDeckHierarchy()
-            _uiState.update { it.copy(loadingItems = it.loadingItems - level) }
+    private fun wordsToEntities(apiWords: List<ApiWord>): List<WordEntity> {
+        return apiWords.map { apiWord ->
+            WordEntity(
+                word = apiWord.word,
+                translation = apiWord.translation,
+                example1 = apiWord.example1,
+                example1Translation = apiWord.example1Translation,
+                example2 = apiWord.example2,
+                example2Translation = apiWord.example2Translation,
+                cefrLevel = apiWord.cefrLevel,
+                topic = apiWord.topic,
+                repetitions = 0,
+                easinessFactor = 2.5f,
+                interval = 0,
+                nextReviewTimestamp = System.currentTimeMillis()
+            )
         }
     }
 
@@ -261,22 +275,26 @@ class WordBankViewModel @Inject constructor(
         }
     }
 
-    private fun wordsToEntities(apiWords: List<ApiWord>): List<WordEntity> {
-        return apiWords.map { apiWord ->
-            WordEntity(
-                word = apiWord.word,
-                translation = apiWord.translation,
-                example1 = apiWord.example1,
-                example1Translation = apiWord.example1Translation,
-                example2 = apiWord.example2,
-                example2Translation = apiWord.example2Translation,
-                cefrLevel = apiWord.cefrLevel,
-                topic = apiWord.topic,
-                repetitions = 0,
-                easinessFactor = 2.5f,
-                interval = 0,
-                nextReviewTimestamp = System.currentTimeMillis()
-            )
+    fun addWordsByLevel(level: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingItems = it.loadingItems + level) }
+            val result = wordBankRepository.getAllWordsForLevel(level)
+            if (result is RepositoryResult.Success) {
+                wordDao.insertAll(wordsToEntities(result.data))
+                fetchExploreLevels()
+                loadDeckHierarchy()
+            }
+            _uiState.update { it.copy(loadingItems = it.loadingItems - level) }
+        }
+    }
+
+    fun removeWordsByLevel(level: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingItems = it.loadingItems + level) }
+            wordDao.deleteByLevel(level)
+            fetchExploreLevels()
+            loadDeckHierarchy()
+            _uiState.update { it.copy(loadingItems = it.loadingItems - level) }
         }
     }
 }
