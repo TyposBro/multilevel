@@ -18,23 +18,17 @@ import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.screens.practice.PracticeHubScreen
 import com.typosbro.multilevel.ui.screens.profile.ProfileScreen
 import com.typosbro.multilevel.ui.screens.progress.ProgressScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordBankScreen
-import com.typosbro.multilevel.ui.screens.wordbank.WordLevelScreen
-import com.typosbro.multilevel.ui.screens.wordbank.WordListScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordReviewScreen
-import com.typosbro.multilevel.ui.screens.wordbank.WordTopicScreen
-
 
 // Define routes for the main tabs
 object MainDestinations {
@@ -44,22 +38,18 @@ object MainDestinations {
     const val PROFILE_ROUTE = "profile"
 }
 
-// --- Start of new code ---
+// Simplified WordBank destinations
 object WordBankDestinations {
     const val HUB_ROUTE = "wordbank_hub"
     const val REVIEW_ROUTE = "wordbank_review"
-    const val LEVEL_SELECT_ROUTE = "wordbank_level_select"
-    const val TOPIC_SELECT_ROUTE = "wordbank_topic_select/{level}"
-    const val WORD_LIST_ROUTE = "wordbank_word_list/{level}/{topic}"
 }
-// --- End of new code ---
 
 @Composable
 fun MainScreen(
     onNavigateToIELTS: () -> Unit,
     onNavigateToMultilevel: () -> Unit,
-    onNavigateToIeltsResult: (resultId: String) -> Unit, // New
-    onNavigateToMultilevelResult: (resultId: String) -> Unit, // New
+    onNavigateToIeltsResult: (resultId: String) -> Unit,
+    onNavigateToMultilevelResult: (resultId: String) -> Unit,
 ) {
     val mainNavController = rememberNavController()
     Scaffold(
@@ -73,14 +63,13 @@ fun MainScreen(
             modifier = Modifier.padding(innerPadding)
         ) {
             composable(MainDestinations.PRACTICE_ROUTE) {
-                // Pass the navigation action down to the PracticeHubScreen
                 PracticeHubScreen(
                     onNavigateToIELTS = onNavigateToIELTS,
                     onNavigateToMultilevel = onNavigateToMultilevel
                 )
             }
-            // --- Start of modified code ---
-            // This defines a nested navigation graph for the Word Bank tab
+
+            // Simplified nested navigation graph for the Word Bank tab
             navigation(
                 startDestination = WordBankDestinations.HUB_ROUTE,
                 route = MainDestinations.WORDBANK_ROUTE
@@ -89,9 +78,6 @@ fun MainScreen(
                     WordBankScreen(
                         onNavigateToReview = {
                             mainNavController.navigate(WordBankDestinations.REVIEW_ROUTE)
-                        },
-                        onNavigateToDiscovery = {
-                            mainNavController.navigate(WordBankDestinations.LEVEL_SELECT_ROUTE)
                         }
                     )
                 }
@@ -102,44 +88,9 @@ fun MainScreen(
                         }
                     )
                 }
-                composable(WordBankDestinations.LEVEL_SELECT_ROUTE) {
-                    WordLevelScreen(
-                        onLevelSelected = { level ->
-                            mainNavController.navigate("wordbank_topic_select/$level")
-                        },
-                        onNavigateBack = { mainNavController.popBackStack() }
-                    )
-                }
-                composable(
-                    route = WordBankDestinations.TOPIC_SELECT_ROUTE,
-                    arguments = listOf(navArgument("level") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    val level = backStackEntry.arguments?.getString("level") ?: ""
-                    WordTopicScreen(
-                        level = level,
-                        onTopicSelected = { topic ->
-                            mainNavController.navigate("wordbank_word_list/$level/$topic")
-                        },
-                        onNavigateBack = { mainNavController.popBackStack() }
-                    )
-                }
-                composable(
-                    route = WordBankDestinations.WORD_LIST_ROUTE,
-                    arguments = listOf(
-                        navArgument("level") { type = NavType.StringType },
-                        navArgument("topic") { type = NavType.StringType }
-                    )
-                ) {
-                    WordListScreen(
-                        onNavigateBack = { mainNavController.popBackStack() },
-                        level = it.arguments?.getString("level") ?: "",
-                        topic = it.arguments?.getString("topic") ?: ""
-                    )
-                }
             }
-            // --- End of modified code ---
+
             composable(MainDestinations.PROGRESS_ROUTE) {
-                // Pass the two specific navigation actions down to the ProgressScreen
                 ProgressScreen(
                     onNavigateToIeltsResult = onNavigateToIeltsResult,
                     onNavigateToMultilevelResult = onNavigateToMultilevelResult
@@ -154,7 +105,6 @@ fun MainScreen(
 
 @Composable
 fun BottomNavigationBar(navController: NavHostController) {
-
     val practiceString = stringResource(id = R.string.navbar_practice)
     val vocabularyString = stringResource(id = R.string.navbar_vocabulary)
     val progressString = stringResource(id = R.string.navbar_progress)
@@ -179,16 +129,10 @@ fun BottomNavigationBar(navController: NavHostController) {
                 selected = currentDestination?.hierarchy?.any { it.route == route } == true,
                 onClick = {
                     navController.navigate(route) {
-                        // Pop up to the start destination of the graph to
-                        // avoid building up a large stack of destinations
-                        // on the back stack as users select items
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
-                        // Avoid multiple copies of the same destination when
-                        // re-selecting the same item
                         launchSingleTop = true
-                        // Restore state when re-selecting a previously selected item
                         restoreState = true
                     }
                 }
