@@ -18,10 +18,10 @@ import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.ui.screens.MainScreen
 import com.typosbro.multilevel.ui.screens.auth.LoginScreen
 import com.typosbro.multilevel.ui.screens.auth.RegisterScreen
-import com.typosbro.multilevel.ui.screens.chat.ChatDetailScreen
-import com.typosbro.multilevel.ui.screens.chat.ChatListScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamResultScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamScreen
+import com.typosbro.multilevel.ui.screens.practice.MultilevelExamScreen
+import com.typosbro.multilevel.ui.screens.practice.MultilevelResultScreen
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 
 // Define navigation routes
@@ -31,10 +31,8 @@ object AppDestinations {
     const val MAIN_HUB_ROUTE = "main_hub"
     const val EXAM_SCREEN_ROUTE = "exam_screen"
     const val EXAM_RESULT_ROUTE = "exam_result/{resultId}"
-    const val CHAT_LIST_ROUTE = "chat_list"
-    const val CHAT_DETAIL_ROUTE = "chat_detail"
-    const val CHAT_ID_ARG = "chatId"
-    const val CHAT_DETAIL_ROUTE_WITH_ARGS = "$CHAT_DETAIL_ROUTE/{$CHAT_ID_ARG}"
+    const val MULTILEVEL_EXAM_ROUTE = "multilevel_exam"
+    const val MULTILEVEL_RESULT_ROUTE = "multilevel_result/{resultId}"
 }
 
 @Composable
@@ -89,14 +87,18 @@ fun AppNavigation(
 
         composable(AppDestinations.MAIN_HUB_ROUTE) {
             MainScreen(
-                onNavigateToExam = {
+                onNavigateToIELTS = {
                     navController.navigate(AppDestinations.EXAM_SCREEN_ROUTE)
                 },
-                onNavigateToExamResult = { resultId ->
+                onNavigateToMultilevel = {
+                    navController.navigate(AppDestinations.MULTILEVEL_EXAM_ROUTE)
+                },
+                // Define the specific navigation actions for each result type here
+                onNavigateToIeltsResult = { resultId ->
                     navController.navigate("exam_result/$resultId")
                 },
-                onNavigateToChat = { chatId ->
-                    navController.navigate("${AppDestinations.CHAT_DETAIL_ROUTE}/$chatId")
+                onNavigateToMultilevelResult = { resultId ->
+                    navController.navigate("multilevel_result/$resultId")
                 }
             )
         }
@@ -117,27 +119,20 @@ fun AppNavigation(
             ExamResultScreen(onNavigateBack = { navController.popBackStack() })
         }
 
-        // OLD MVP ROUTES
-        composable(AppDestinations.CHAT_LIST_ROUTE) {
-            ChatListScreen(
-                onNavigateToChat = { chatId ->
-                    navController.navigate("${AppDestinations.CHAT_DETAIL_ROUTE}/$chatId")
-                },
-                onLogout = {
-                    // The logout button in ProfileViewModel now calls sessionManager.logout(),
-                    // which is handled by our new LaunchedEffect.
+        composable(AppDestinations.MULTILEVEL_EXAM_ROUTE) {
+            MultilevelExamScreen(
+                onNavigateToResults = { resultId ->
+                    navController.navigate("multilevel_result/$resultId") {
+                        popUpTo(AppDestinations.MULTILEVEL_EXAM_ROUTE) { inclusive = true }
+                    }
                 }
             )
         }
         composable(
-            route = AppDestinations.CHAT_DETAIL_ROUTE_WITH_ARGS,
-            arguments = listOf(navArgument(AppDestinations.CHAT_ID_ARG) {
-                type = NavType.StringType
-            })
+            route = AppDestinations.MULTILEVEL_RESULT_ROUTE,
+            arguments = listOf(navArgument("resultId") { type = NavType.StringType })
         ) {
-            ChatDetailScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
+            MultilevelResultScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }

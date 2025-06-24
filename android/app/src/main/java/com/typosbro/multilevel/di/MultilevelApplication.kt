@@ -22,4 +22,5 @@ class MultilevelApplication : Application() {
             OnnxRuntimeManager.initialize(this@MultilevelApplication)
         }
     }
+
 }

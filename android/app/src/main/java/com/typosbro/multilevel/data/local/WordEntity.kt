@@ -1,22 +1,28 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/local/Word.kt
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/local/WordEntity.kt
 package com.typosbro.multilevel.data.local
 
-
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "words")
+@Entity(
+    tableName = "words",
+    indices = [Index(value = ["word"], unique = true)]
+)
 data class WordEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val text: String,
-    val definition: String,
-    val example: String,
+    val word: String,
+    val translation: String,
+    val example1: String?,
+    val example1Translation: String?,
+    val example2: String?,
+    val example2Translation: String?,
     val cefrLevel: String,
     val topic: String,
 
-    // --- Spaced Repetition System (SRS) Fields ---
-    // Stage 0: New, 1: Learning (e.g., 1 day), 2: (e.g., 3 days), etc.
-    var srsStage: Int = 0,
-    // The exact time (in milliseconds) when this word should be reviewed next.
+    // --- REVISED: Spaced Repetition System (SRS) Fields for SM-2 ---
+    var repetitions: Int = 0,           // n: Number of successful (q >= 3) repetitions.
+    var easinessFactor: Float = 2.5f,   // EF: The easiness factor, starts at 2.5.
+    var interval: Int = 0,              // The last calculated interval in days.
     var nextReviewTimestamp: Long = 0L
 )

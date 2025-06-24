@@ -1,59 +1,129 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/profile/ProfileScreen.kt
 package com.typosbro.multilevel.ui.screens.profile
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.PrivacyTip
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.typosbro.multilevel.R
+import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 import com.typosbro.multilevel.ui.viewmodels.ProfileViewModel
-import java.text.SimpleDateFormat
-import java.util.*
+import com.typosbro.multilevel.ui.viewmodels.SettingsViewModel
+import com.typosbro.multilevel.ui.viewmodels.UiState
+import com.typosbro.multilevel.utils.openUrlInCustomTab
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    viewModel: ProfileViewModel, // Injected from MainScreen
-    onLogout: () -> Unit
+    profileViewModel: ProfileViewModel = hiltViewModel(),
+    authViewModel: AuthViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showLogoutDialog by remember { mutableStateOf(false) }
+    val uiState by profileViewModel.uiState.collectAsStateWithLifecycle()
+    val userProfile = uiState.userProfile
 
-    // Formatter for the join date
-    val formattedDate = remember(uiState.userProfile.createdAt) {
-        if (uiState.userProfile.createdAt.isEmpty()) {
-            "..."
-        } else {
-            try {
-                // Input format from server (ISO 8601)
-                val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-                parser.timeZone = TimeZone.getTimeZone("UTC")
-                val date = parser.parse(uiState.userProfile.createdAt)
-                // Desired output format
-                val formatter = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
-                date?.let { formatter.format(it) } ?: "..."
-            } catch (e: Exception) {
-                "Invalid date" // Fallback
+    val isDarkTheme by settingsViewModel.isDarkTheme.collectAsStateWithLifecycle()
+    val currentLanguageCode by settingsViewModel.currentLanguageCode.collectAsStateWithLifecycle()
+
+    // --- State for Dialogs ---
+    var showLogoutDialog by remember { mutableStateOf(false) }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val context = LocalContext.current // Get context for the URL launcher
+
+    val privacyPolicyUrl =
+        stringResource(R.string.url_privacy_policy) // Fetch the URL from resources
+    val faqUrl =
+        stringResource(R.string.url_faq) // Fetch the FAQ URL from resources
+
+    // This effect handles the success of the account deletion by logging out.
+    LaunchedEffect(uiState.deleteState) {
+        if (uiState.deleteState is UiState.Success) {
+            coroutineScope.launch {
+                authViewModel.logout()
+                // Navigation will happen automatically.
             }
         }
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Profile & Settings") }) }
+        topBar = {
+            TopAppBar(
+                title = { Text(text = stringResource(id = R.string.profile_title)) },
+                actions = {
+                    IconButton(
+                        onClick = { profileViewModel.fetchUserProfile() },
+                        enabled = !uiState.isLoading
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(id = R.string.button_refresh)
+                        )
+                    }
+                }
+            )
+        }
     ) { padding ->
 
-        if (uiState.isLoading) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        if (uiState.isLoading && userProfile == null) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding), contentAlignment = Alignment.Center
+            ) {
                 CircularProgressIndicator()
             }
             return@Scaffold
@@ -66,80 +136,241 @@ fun ProfileScreen(
         ) {
             // --- Account Section ---
             item {
-                SectionHeader("Account")
+                SectionHeader(title = stringResource(id = R.string.profile_section_title_account))
                 ListItem(
-                    headlineContent = { Text("Email") },
-                    supportingContent = { Text(uiState.userProfile.email) },
-                    leadingContent = { Icon(Icons.Default.AccountCircle, contentDescription = "Email") }
+                    headlineContent = { Text(text = stringResource(id = R.string.login_email)) },
+                    supportingContent = { Text(userProfile?.email ?: "...") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.AccountCircle,
+                            contentDescription = stringResource(id = R.string.login_email)
+                        )
+                    }
                 )
                 ListItem(
-                    headlineContent = { Text("Member Since") },
-                    supportingContent = { Text(formattedDate) },
-                    leadingContent = { Icon(Icons.Default.Event, contentDescription = "Member Since") }
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_membership)) },
+                    supportingContent = { Text(userProfile?.registeredDate ?: "...") },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Event,
+                            contentDescription = stringResource(id = R.string.profile_item_membership)
+                        )
+                    }
                 )
                 ListItem(
-                    headlineContent = { Text("Subscription", fontWeight = FontWeight.SemiBold) },
-                    supportingContent = { Text("Free Tier") },
-                    leadingContent = { Icon(Icons.Default.WorkspacePremium, contentDescription = "Subscription") },
-                    trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.profile_item_subscription),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    supportingContent = { Text(text = stringResource(id = R.string.tier_free)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.WorkspacePremium,
+                            contentDescription = stringResource(id = R.string.profile_item_subscription)
+                        )
+                    },
+                    trailingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null
+                        )
+                    },
                     modifier = Modifier.clickable { /* Navigate to subscription screen */ }
                 )
             }
 
-            // --- Other sections remain the same ---
             item {
-                SectionHeader("Settings")
+                SectionHeader(title = stringResource(id = R.string.profile_section_title_settings))
+                // --- DARK MODE ---
                 ListItem(
-                    headlineContent = { Text("Dark Mode") },
-                    leadingContent = { Icon(Icons.Default.DarkMode, contentDescription = "Dark Mode") },
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_dark_mode)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.DarkMode,
+                            contentDescription = stringResource(id = R.string.profile_item_dark_mode)
+                        )
+                    },
+                    // The Switch is back and connected to the ViewModel
                     trailingContent = {
-                        Switch(checked = uiState.isDarkTheme, onCheckedChange = { viewModel.onThemeChanged(it) })
+                        Switch(
+                            checked = isDarkTheme,
+                            onCheckedChange = { isChecked ->
+                                settingsViewModel.onThemeChanged(isChecked)
+                            }
+                        )
                     }
                 )
+                // --- LANGUAGE SELECTOR ---
+                ListItem(
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_language)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Language,
+                            contentDescription = stringResource(id = R.string.profile_item_language)
+                        )
+                    },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = (currentLanguageCode ?: "en").uppercase(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Icon(
+                                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    modifier = Modifier.clickable { showLanguageDialog = true }
+                )
             }
-            item {
-                SectionHeader("Support & Legal")
-                ListItem(
-                    headlineContent = { Text("Help & FAQ") },
-                    leadingContent = { Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = "Help") },
-                    modifier = Modifier.clickable { /* Navigate to Help screen */ }
-                )
-                ListItem(
-                    headlineContent = { Text("Privacy Policy") },
-                    leadingContent = { Icon(Icons.Default.PrivacyTip, contentDescription = "Privacy Policy") },
-                    modifier = Modifier.clickable { /* Open URL */ }
-                )
-                ListItem(
-                    headlineContent = { Text("About This App") },
-                    leadingContent = { Icon(Icons.Default.Info, contentDescription = "About") },
-                    modifier = Modifier.clickable { /* Show About dialog */ }
-                )
 
-            }
+            // --- Support Section ---
             item {
-                Spacer(Modifier.height(32.dp))
+                SectionHeader(title = stringResource(id = R.string.profile_section_title_support))
                 ListItem(
-                    headlineContent = { Text("Logout", color = MaterialTheme.colorScheme.error) },
-                    leadingContent = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = "Logout", tint = MaterialTheme.colorScheme.error) },
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_help)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.HelpOutline,
+                            contentDescription = stringResource(id = R.string.profile_item_help)
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        openUrlInCustomTab(context, faqUrl)
+                    }
+                )
+                // --- PRIVACY POLICY ---
+                ListItem(
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_privacy)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.PrivacyTip,
+                            contentDescription = stringResource(id = R.string.profile_item_privacy)
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        openUrlInCustomTab(context, privacyPolicyUrl)
+                    }
+                )
+                // --- ABOUT APP ---
+                ListItem(
+                    headlineContent = { Text(text = stringResource(id = R.string.profile_item_about)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = stringResource(id = R.string.profile_item_about)
+                        )
+                    },
+                    modifier = Modifier.clickable { showAboutDialog = true } // Show the dialog
+                )
+            }
+
+            // --- Actions Section ---
+            item {
+                SectionHeader(title = stringResource(id = R.string.profile_section_title_action))
+                // --- LOGOUT BUTTON ---
+                ListItem(
+                    headlineContent = { Text(text = stringResource(id = R.string.button_logout)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ExitToApp,
+                            contentDescription = stringResource(id = R.string.button_logout)
+                        )
+                    },
                     modifier = Modifier.clickable { showLogoutDialog = true }
+                )
+                // --- DELETE ACCOUNT BUTTON ---
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            text = stringResource(id = R.string.profile_item_delete),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    supportingContent = { Text(text = stringResource(id = R.string.profile_item_subtitle_permanent)) },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.Warning,
+                            contentDescription = stringResource(id = R.string.profile_item_delete),
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    },
+                    modifier = Modifier.clickable { showDeleteDialog = true }
                 )
                 Spacer(Modifier.height(32.dp))
             }
         }
+
+        val deleteError = (uiState.deleteState as? UiState.Error)?.message
+        val fetchError = uiState.error
+        val errorMessage = deleteError ?: fetchError
+
+        errorMessage?.let {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 80.dp),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                Text(it, color = MaterialTheme.colorScheme.error)
+            }
+        }
     }
 
+    // --- DIALOGS ---
     if (showLogoutDialog) {
         LogoutConfirmationDialog(
             onConfirm = {
-                onLogout()
                 showLogoutDialog = false
+                coroutineScope.launch {
+                    authViewModel.logout()
+                }
             },
             onDismiss = { showLogoutDialog = false }
         )
     }
+
+    if (showDeleteDialog) {
+        DeleteAccountConfirmationDialog(
+            isLoading = uiState.deleteState is UiState.Loading,
+            onConfirm = {
+                profileViewModel.deleteAccount()
+            },
+            onDismiss = {
+                if (uiState.deleteState !is UiState.Loading) {
+                    showDeleteDialog = false
+                    profileViewModel.resetDeleteState()
+                }
+            }
+        )
+    }
+
+    if (showAboutDialog) {
+        AboutAppDialog(onDismiss = { showAboutDialog = false })
+    }
+
+    if (showLanguageDialog) {
+        LanguageSelectionDialog(
+            onLanguageSelected = { languageCode ->
+                settingsViewModel.onLanguageChanged(languageCode)
+                showLanguageDialog = false
+            },
+            onDismiss = { showLanguageDialog = false }
+        )
+    }
+
+    if (showAboutDialog) {
+        AboutAppDialog(onDismiss = { showAboutDialog = false })
+    }
 }
 
-// ... SectionHeader and LogoutConfirmationDialog composables are unchanged ...
+
+// --- HELPER COMPOSABLE ---
 @Composable
 private fun SectionHeader(title: String) {
     Column {
@@ -156,16 +387,89 @@ private fun SectionHeader(title: String) {
 private fun LogoutConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Confirm Logout") },
-        text = { Text("Are you sure you want to log out?") },
+        title = { Text(text = stringResource(id = R.string.logout_confirm_title)) },
+        text = { Text(text = stringResource(id = R.string.logout_confirm_subtitle)) },
+        confirmButton = {
+            Button(onClick = onConfirm) { Text(text = stringResource(id = R.string.button_logout)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(text = stringResource(id = R.string.button_cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun DeleteAccountConfirmationDialog(
+    isLoading: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                Icons.Default.Warning,
+                contentDescription = stringResource(id = R.string.button_warning),
+                tint = MaterialTheme.colorScheme.error
+            )
+        },
+        title = { Text(text = stringResource(id = R.string.delete_confirm_title)) },
+        text = { Text(text = stringResource(id = R.string.delete_confirm_subtitle)) },
         confirmButton = {
             Button(
                 onClick = onConfirm,
+                enabled = !isLoading,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-            ) { Text("Logout") }
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onError
+                    )
+                } else {
+                    Text(text = stringResource(id = R.string.delete_permanent))
+                }
+            }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) { Text(text = stringResource(id = R.string.button_cancel)) }
+        }
+    )
+}
+
+@Composable
+private fun LanguageSelectionDialog(
+    onLanguageSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    // Define the list of supported languages
+    val supportedLanguages = mapOf(
+        "en" to "English",
+        "ru" to "Русский",
+        "uz" to "O'zbekcha"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(id = R.string.language_dialog_title)) },
+        text = {
+            Column {
+                supportedLanguages.forEach { (code, name) ->
+                    ListItem(
+                        headlineContent = { Text(name) },
+                        modifier = Modifier.clickable { onLanguageSelected(code) },
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(id = R.string.button_cancel))
+            }
         }
     )
 }

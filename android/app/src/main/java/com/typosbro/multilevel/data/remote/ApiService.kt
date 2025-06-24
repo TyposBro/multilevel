@@ -1,13 +1,40 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/ApiService.kt
 package com.typosbro.multilevel.data.remote
 
-import com.typosbro.multilevel.data.remote.models.*
-import okhttp3.ResponseBody
-import retrofit2.Call
+import com.typosbro.multilevel.data.remote.models.AnalyzeExamRequest
+import com.typosbro.multilevel.data.remote.models.AnalyzeExamResponse
+import com.typosbro.multilevel.data.remote.models.ApiWord
+import com.typosbro.multilevel.data.remote.models.AuthRequest
+import com.typosbro.multilevel.data.remote.models.AuthResponse
+import com.typosbro.multilevel.data.remote.models.ExamHistorySummaryResponse
+import com.typosbro.multilevel.data.remote.models.ExamResultResponse
+import com.typosbro.multilevel.data.remote.models.ExamStepRequest
+import com.typosbro.multilevel.data.remote.models.ExamStepResponse
+import com.typosbro.multilevel.data.remote.models.GenericSuccessResponse
+import com.typosbro.multilevel.data.remote.models.GoogleSignInRequest
+import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
+import com.typosbro.multilevel.data.remote.models.MultilevelExamHistorySummaryResponse
+import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
+import com.typosbro.multilevel.data.remote.models.MultilevelExamResultResponse
+import com.typosbro.multilevel.data.remote.models.UserProfileResponse
 import retrofit2.Response
-import retrofit2.http.*
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.Path
+import retrofit2.http.Query
+
 
 interface ApiService {
+
+    // --- NEW: Social Auth Endpoints ---
+    @POST("auth/google-signin")
+    suspend fun googleSignIn(@Body request: GoogleSignInRequest): Response<AuthResponse>
+
+    // You would add one for Apple here too
+    // @POST("auth/apple-signin")
+    // suspend fun appleSignIn(@Body request: AppleSignInRequest): Response<AuthResponse>
 
     // --- Auth Endpoints ---
     @POST("auth/register")
@@ -19,46 +46,49 @@ interface ApiService {
     @GET("auth/profile")
     suspend fun getProfile(): Response<UserProfileResponse>
 
-    // --- Freestyle Chat Endpoints ---
-    @GET("chat/")
-    suspend fun getChatList(): Response<ChatListResponse>
-
-    @POST("chat/")
-    suspend fun createNewChat(@Body request: NewChatRequest): Response<NewChatResponse>
-
-    @GET("chat/{chatId}/history")
-    suspend fun getChatHistory(@Path("chatId") chatId: String): Response<ChatHistoryResponse>
-
-    @POST("chat/{chatId}/message")
-    @Streaming
-    fun sendMessageAndStream(
-        @Path("chatId") chatId: String,
-        @Body request: SendMessageRequest
-    ): Call<ResponseBody>
-
-    @DELETE("chat/{chatId}")
-    suspend fun deleteChat(@Path("chatId") chatId: String): Response<GenericSuccessResponse>
-
-    @PUT("chat/{chatId}/title")
-    suspend fun updateChatTitle(
-        @Path("chatId") chatId: String,
-        @Body request: TitleUpdateRequest
-    ): Response<GenericSuccessResponse>
+    @DELETE("auth/profile")
+    suspend fun deleteProfile(): Response<GenericSuccessResponse>
 
     // --- Structured Exam Endpoints ---
-    @POST("exam/start")
+    @POST("exam/ielts/start")
     suspend fun startExam(): Response<ExamStepResponse>
 
-    // [FIX] Replaced the streaming endpoint with a simple suspend function
-    @POST("exam/step")
+    @POST("exam/ielts/step")
     suspend fun getNextExamStep(@Body request: ExamStepRequest): Response<ExamStepResponse>
 
-    @POST("exam/analyze")
+    @POST("exam/ielts/analyze")
     suspend fun analyzeExam(@Body request: AnalyzeExamRequest): Response<AnalyzeExamResponse>
 
-    @GET("exam/history")
+    @GET("exam/ielts/history")
     suspend fun getExamHistory(): Response<ExamHistorySummaryResponse>
 
-    @GET("exam/result/{resultId}")
+    @GET("exam/ielts/result/{resultId}")
     suspend fun getExamResult(@Path("resultId") resultId: String): Response<ExamResultResponse>
+
+    // --- NEW: Multilevel Exam Endpoints ---
+    @GET("exam/multilevel/new")
+    suspend fun getNewMultilevelExam(): Response<MultilevelExamResponse>
+
+    @POST("exam/multilevel/analyze")
+    suspend fun analyzeMultilevelExam(@Body request: MultilevelAnalyzeRequest): Response<AnalyzeExamResponse> // Response can be reused
+
+    @GET("exam/multilevel/history")
+    suspend fun getMultilevelExamHistory(): Response<MultilevelExamHistorySummaryResponse>
+
+    @GET("exam/multilevel/result/{resultId}")
+    suspend fun getMultilevelExamResult(@Path("resultId") resultId: String): Response<MultilevelExamResultResponse>
+
+
+    //    NEW: WORDBANK Endpoints
+    @GET("wordbank/levels")
+    suspend fun getWordLevels(): Response<List<String>>
+
+    @GET("wordbank/topics")
+    suspend fun getWordTopics(@Query("level") level: String): Response<List<String>>
+
+    @GET("wordbank/words")
+    suspend fun getWords(
+        @Query("level") level: String,
+        @Query("topic") topic: String
+    ): Response<List<ApiWord>>
 }

@@ -1,130 +1,174 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/WordBankViewModel.kt
 package com.typosbro.multilevel.ui.viewmodels
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.local.WordEntity
 import com.typosbro.multilevel.data.local.WordDao
+import com.typosbro.multilevel.data.local.WordEntity
+import com.typosbro.multilevel.data.remote.models.RepositoryResult
+import com.typosbro.multilevel.data.repositories.WordBankRepository
+import com.typosbro.multilevel.features.srs.ReviewQuality
+import com.typosbro.multilevel.features.srs.SM2
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
+/**
+ * Represents a single deck or sub-deck in the review hierarchy.
+ * @param topic Is null for a top-level (level) deck.
+ */
+data class DeckInfo(
+    val name: String,
+    val level: String,
+    val topic: String?,
+    val dueCount: Int,
+    val newCount: Int,
+    val totalCount: Int,
+    val subDecks: List<DeckInfo> = emptyList()
+)
+
 data class WordBankUiState(
-    val dueWords: List<WordEntity> = emptyList(),
+    // Global stats for the top bar of the decks screen
+    val totalDue: Int = 0,
+    val totalNew: Int = 0,
+    val totalWords: Int = 0,
+
+    // The hierarchical deck structure for the main list
+    val deckHierarchy: List<DeckInfo> = emptyList(),
+
+    // State for the actual review session
+    val reviewWords: List<WordEntity> = emptyList(),
     val currentReviewIndex: Int = 0,
     val isSessionActive: Boolean = false,
-    val isSessionFinished: Boolean = false
+    val isSessionFinished: Boolean = false,
+
+    // Common State
+    val isLoading: Boolean = false,
+    val error: String? = null,
 ) {
     val currentWord: WordEntity?
-        get() = dueWords.getOrNull(currentReviewIndex)
+        get() = reviewWords.getOrNull(currentReviewIndex)
 }
+
 @HiltViewModel
 class WordBankViewModel @Inject constructor(
-    private val wordDao: WordDao
-) : ViewModel(){
+    private val wordDao: WordDao,
+    private val wordBankRepository: WordBankRepository,
+    private val savedStateHandle: SavedStateHandle
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(WordBankUiState())
-    val uiState = _uiState.asStateFlow()
-
-    val dueWordsCount: StateFlow<Int> =
-        wordDao.getDueWordsCount(System.currentTimeMillis())
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
-
-    // Spaced Repetition intervals in hours. Stage 0 is "wrong", so it's reviewed soon.
-    private val srsIntervalsHours = mapOf(
-        0 to 0,             // Wrong answer -> review again in this session (or very soon)
-        1 to 4,             // 4 hours
-        2 to 8,             // 8 hours
-        3 to 24,            // 1 day
-        4 to 24 * 3,        // 3 days
-        5 to 24 * 7,        // 1 week
-        6 to 24 * 14,       // 2 weeks
-        7 to 24 * 30,       // 1 month
-        8 to 24 * 90        // 3 months (considered "mastered")
-    )
-    private val REPEAT_SOON_MINUTES = 10L
+    val uiState: StateFlow<WordBankUiState> = _uiState.asStateFlow()
 
     init {
-        // For demonstration, let's add a few sample words if the DB is empty.
-        // In a real app, these would come from the user adding them.
+        // This Flow combines the global counts and keeps them updated reactively.
         viewModelScope.launch {
-            if (dueWordsCount.value == 0) {
-                addSampleWords()
+            combine(
+                wordDao.getDueWordsCount(System.currentTimeMillis()),
+                wordDao.getNewWordsCount(),
+                wordDao.getTotalWordsCount()
+            ) { due, new, total ->
+                // This will update the top stats bar whenever the database changes.
+                _uiState.update { it.copy(totalDue = due, totalNew = new, totalWords = total) }
+            }.collect()
+        }
+    }
+
+    /**
+     * Builds the entire hierarchical structure of decks and sub-decks with their respective counts.
+     * This is the main function called by the UI to populate the "Decks" screen.
+     */
+    fun loadDeckHierarchy() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            val levelsResult = wordBankRepository.getLevels()
+            if (levelsResult !is RepositoryResult.Success) {
+                _uiState.update { it.copy(isLoading = false, error = "Could not load levels.") }
+                return@launch
+            }
+            val levels = levelsResult.data
+
+            val hierarchy = coroutineScope {
+                levels.map { level ->
+                    async {
+                        val now = System.currentTimeMillis()
+                        val topicsResult = wordBankRepository.getTopics(level)
+                        val topics =
+                            if (topicsResult is RepositoryResult.Success) topicsResult.data else emptyList()
+
+                        val subDecks = topics.map { topic ->
+                            DeckInfo(
+                                name = topic, level = level, topic = topic,
+                                dueCount = wordDao.countDueWordsInTopic(level, topic, now),
+                                newCount = wordDao.countNewWordsInTopic(level, topic),
+                                totalCount = wordDao.countTotalWordsInTopic(level, topic)
+                            )
+                        }
+
+                        DeckInfo(
+                            name = level, level = level, topic = null,
+                            dueCount = subDecks.sumOf { it.dueCount },
+                            newCount = subDecks.sumOf { it.newCount },
+                            totalCount = subDecks.sumOf { it.totalCount },
+                            subDecks = subDecks.filter { it.totalCount > 0 }.sortedBy { it.name }
+                        )
+                    }
+                }.awaitAll()
+            }
+
+            _uiState.update {
+                it.copy(
+                    deckHierarchy = hierarchy.filter { it.totalCount > 0 }.sortedBy { it.name },
+                    isLoading = false
+                )
             }
         }
     }
 
-    fun startReviewSession() {
+    /**
+     * Starts a review session, optionally filtered by level and/or topic.
+     */
+    fun startReviewSession(level: String? = null, topic: String? = null) {
         viewModelScope.launch {
-            wordDao.getDueWords(System.currentTimeMillis())
-                .map { dueList ->
-                    _uiState.update {
-                        it.copy(
-                            dueWords = dueList,
-                            currentReviewIndex = 0,
-                            isSessionActive = dueList.isNotEmpty(),
-                            isSessionFinished = false
-                        )
-                    }
-                }.stateIn(viewModelScope) // Collect the flow
+            _uiState.update { it.copy(isLoading = true, isSessionActive = true) }
+            val dueList = wordDao.getDueWords(System.currentTimeMillis(), level, topic).first()
+            _uiState.update {
+                it.copy(
+                    reviewWords = dueList.shuffled(),
+                    currentReviewIndex = 0,
+                    isSessionActive = dueList.isNotEmpty(),
+                    isSessionFinished = false,
+                    isLoading = false
+                )
+            }
         }
     }
 
-    fun handleReview(word: WordEntity, knewIt: Boolean) {
-        val currentStage = word.srsStage
-        val nextStage = if (knewIt) {
-            currentStage + 1
-        } else {
-            // Be strict: if they get it wrong, reset progress.
-            1
-        }
-
-        val hoursUntilNextReview = srsIntervalsHours[nextStage]
-            ?: srsIntervalsHours.values.last() // If stage > max, use max interval
-
-        val nextReviewTime = if (nextStage == 0) {
-            // If they got it wrong, review again in 10 minutes.
-            System.currentTimeMillis() + TimeUnit.MINUTES.toMillis(REPEAT_SOON_MINUTES)
-        } else {
-            System.currentTimeMillis() + TimeUnit.HOURS.toMillis(hoursUntilNextReview.toLong())
-        }
-
-        val updatedWord = word.copy(
-            srsStage = nextStage,
-            nextReviewTimestamp = nextReviewTime
-        )
-
+    /**
+     * Processes a user's review of a single word using the SM-2 algorithm.
+     */
+    fun handleReview(word: WordEntity, quality: ReviewQuality) {
         viewModelScope.launch {
+            val updatedWord = SM2.calculate(word, quality)
             wordDao.update(updatedWord)
+
+            val nextIndex = _uiState.value.currentReviewIndex + 1
+            if (nextIndex >= _uiState.value.reviewWords.size) {
+                _uiState.update { it.copy(isSessionFinished = true, isSessionActive = false) }
+            } else {
+                _uiState.update { it.copy(currentReviewIndex = nextIndex) }
+            }
         }
-
-        // Move to the next card
-        val nextIndex = _uiState.value.currentReviewIndex + 1
-        if (nextIndex >= _uiState.value.dueWords.size) {
-            // Session is finished
-            _uiState.update { it.copy(isSessionFinished = true, isSessionActive = false) }
-        } else {
-            _uiState.update { it.copy(currentReviewIndex = nextIndex) }
-        }
-    }
-
-    fun endReviewSession() {
-        _uiState.update { it.copy(isSessionActive = false, isSessionFinished = false, dueWords = emptyList()) }
-    }
-
-    // Example function to add words. You'll call this from your Results Screen.
-    private suspend fun addSampleWords() {
-        val now = System.currentTimeMillis()
-        wordDao.insert(WordEntity(text = "Ubiquitous", definition = "Present, appearing, or found everywhere.", example = "Smartphones have become ubiquitous in modern society.", cefrLevel = "C1", topic = "Technology", nextReviewTimestamp = now))
-        wordDao.insert(WordEntity(text = "Ephemeral", definition = "Lasting for a very short time.", example = "The beauty of the cherry blossoms is ephemeral.", cefrLevel = "C1", topic = "Nature", nextReviewTimestamp = now))
-        wordDao.insert(WordEntity(text = "Pragmatic", definition = "Dealing with things sensibly and realistically in a practical way.", example = "She took a pragmatic approach to solving the problem.", cefrLevel = "B2", topic = "General", nextReviewTimestamp = now))
     }
 }

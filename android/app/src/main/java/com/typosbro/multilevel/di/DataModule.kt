@@ -1,7 +1,9 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/di/DataModule.kt
 package com.typosbro.multilevel.di
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStore
 import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.data.local.WordDao
@@ -13,12 +15,27 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+// --- ADD THIS TOP-LEVEL DELEGATE ---
+// Define the DataStore file name and the delegate once, in a central place.
+private const val SETTINGS_PREFERENCES = "settings_prefs"
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = SETTINGS_PREFERENCES)
+// ------------------------------------
+
+
 @Module
-@InstallIn(SingletonComponent::class) // These dependencies will live as long as the app does
+@InstallIn(SingletonComponent::class)
 object DataModule {
 
+    // --- ADD THIS NEW PROVIDER ---
     @Provides
-    @Singleton // A single instance will be created and shared
+    @Singleton
+    fun providePreferencesDataStore(@ApplicationContext context: Context): DataStore<Preferences> {
+        return context.dataStore
+    }
+    // -----------------------------
+
+    @Provides
+    @Singleton
     fun provideTokenManager(@ApplicationContext context: Context): TokenManager {
         return TokenManager(context)
     }

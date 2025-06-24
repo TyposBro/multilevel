@@ -1,15 +1,23 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/features/whisper/engine/WhisperEngineNative.java
+
 package com.typosbro.multilevel.features.whisper.engine;
 
 import android.content.Context;
 import android.util.Log;
 
 public class WhisperEngineNative implements WhisperEngine {
+    static {
+        // This must match the 'target_name' in the native code's CMakeLists.txt
+        System.loadLibrary("audioEngine");
+    }
+
     private final String TAG = "WhisperEngineNative";
-    private final long nativePtr;
+    private long nativePtr; // Make it non-final to allow proper release
     private boolean mIsInitialized = false;
 
     public WhisperEngineNative(Context context) {
+        // The native pointer is initialized here.
+        // It's crucial to release it later to avoid memory leaks.
         nativePtr = createTFLiteEngine();
     }
 
@@ -20,27 +28,35 @@ public class WhisperEngineNative implements WhisperEngine {
 
     @Override
     public boolean initialize(String modelPath, String vocabPath, boolean multilingual) {
-        // This native implementation seems to bundle vocab logic, so only modelPath is needed here.
+        if (nativePtr == 0) {
+            Log.e(TAG, "Cannot initialize, native pointer is null.");
+            return false;
+        }
         int ret = loadModel(modelPath, multilingual);
         Log.d(TAG, "Native model loaded: " + modelPath + ", result: " + ret);
-        mIsInitialized = (ret == 0); // Assuming 0 is success
+        mIsInitialized = (ret == 0);
         return mIsInitialized;
     }
 
     @Override
     public void deinitialize() {
-        freeModel();
+        if (nativePtr != 0) {
+            freeModel();
+            // After freeing the native resources, destroy the engine itself
+            nativePtr = 0; // Set to 0 to prevent reuse
+        }
         mIsInitialized = false;
     }
 
     @Override
     public String transcribeBuffer(float[] samples) {
-        if (!mIsInitialized) {
-            Log.w(TAG, "transcribeBuffer called before engine was initialized.");
+        if (!mIsInitialized || nativePtr == 0) {
+            Log.w(TAG, "transcribeBuffer called before engine was initialized or after it was released.");
             return "";
         }
 
-        // [THE FIX] Wrap the native call in a try-catch block.
+        // --- THE FIX IS HERE ---
+        // Wrap the native call in a try-catch block for any Throwable.
         try {
             // This is the call that is causing the native crash.
             String result = transcribeBuffer(nativePtr, samples);
@@ -63,12 +79,12 @@ public class WhisperEngineNative implements WhisperEngine {
 
     @Override
     public String transcribeFile(String waveFile) {
-        if (!mIsInitialized) {
-            Log.w(TAG, "transcribeFile called before engine was initialized.");
+        if (!mIsInitialized || nativePtr == 0) {
+            Log.w(TAG, "transcribeFile called before engine was initialized or after it was released.");
             return "";
         }
 
-        // [THE FIX] Also apply the same safety wrapper to this method.
+        // --- ALSO APPLY THE FIX HERE FOR CONSISTENCY ---
         try {
             String result = transcribeFile(nativePtr, waveFile);
             if (result == null) {
@@ -90,15 +106,15 @@ public class WhisperEngineNative implements WhisperEngine {
         freeModel(nativePtr);
     }
 
-    static {
-        // This must match the 'target_name' in the native code's CMakeLists.txt
-        System.loadLibrary("audioEngine");
-    }
-
-    // Native methods
+    // --- Native methods ---
     private native long createTFLiteEngine();
+
+
     private native int loadModel(long nativePtr, String modelPath, boolean isMultilingual);
+
     private native void freeModel(long nativePtr);
+
     private native String transcribeBuffer(long nativePtr, float[] samples);
+
     private native String transcribeFile(long nativePtr, String waveFile);
 }

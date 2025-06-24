@@ -40,7 +40,6 @@ android {
         }
     }
 
-    // FIX: Add the externalNativeBuild block to link your C++ code via CMake.
     externalNativeBuild {
         cmake {
             path = file("src/main/cpp/CMakeLists.txt")
@@ -59,6 +58,21 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // DEBUG Keystore
+    signingConfigs {
+        getByName("debug") {
+            // Point to the debug keystore you committed to your project.
+            storeFile = file("keystores/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
+    aaptOptions {
+        noCompress += ".onnx"
+    }
 }
 
 dependencies {
@@ -74,6 +88,7 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.material.icons.core)
     implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.appcompat)
 
     // Navigation
     implementation(libs.androidx.navigation.compose)
@@ -101,6 +116,7 @@ dependencies {
 
     // Room (Local Database)
     implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.benchmark.common)
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
 
@@ -121,4 +137,20 @@ dependencies {
     // Firebase Analytics
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
+
+    // Google  Sign-In
+    implementation(libs.play.services.auth)
+
+    // Built-in Browser
+    implementation(libs.androidx.browser)
+
+    // Jetpack DataStore for Theme Preferences
+    implementation(libs.androidx.datastore.preferences)
+
+    // Coil for Image Loading
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
+
+    // Swipe
+    implementation(libs.swipeablecard)
 }

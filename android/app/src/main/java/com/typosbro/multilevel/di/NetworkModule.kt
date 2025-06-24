@@ -1,9 +1,7 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/di/NetworkModule.kt
 package com.typosbro.multilevel.di
 
-import android.content.Context
 import com.typosbro.multilevel.data.local.SessionManager
-import com.typosbro.multilevel.data.local.TokenManager
 import com.typosbro.multilevel.data.remote.ApiService
 import com.typosbro.multilevel.data.remote.RetrofitClient
 import com.typosbro.multilevel.data.remote.interceptors.AuthInterceptor
@@ -12,7 +10,6 @@ import com.typosbro.multilevel.data.repositories.ChatRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -38,7 +35,9 @@ object NetworkModule {
     fun provideStandardOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient { // <-- Change parameter
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor) // <-- Use the injected interceptor
-            .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
+            .addInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            })
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -51,16 +50,15 @@ object NetworkModule {
     fun provideSseOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient { // <-- Change parameter
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor) // <-- Use the injected interceptor
-            .addInterceptor(HttpLoggingInterceptor().apply { level = HttpLoggingInterceptor.Level.BODY })
+            .addInterceptor(HttpLoggingInterceptor().apply {
+                level = HttpLoggingInterceptor.Level.BODY
+            })
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS) // No read timeout for SSE
             .writeTimeout(30, TimeUnit.SECONDS)
             .pingInterval(20, TimeUnit.SECONDS)
             .build()
     }
-
-
-
 
 
     @Provides
@@ -84,8 +82,5 @@ object NetworkModule {
     @Singleton
     fun provideChatRepository(
         apiService: ApiService,
-        @Named("SseOkHttpClient") sseClient: OkHttpClient,
-        tokenManager: TokenManager
-    ): ChatRepository = ChatRepository(apiService, sseClient, tokenManager)
-
+    ): ChatRepository = ChatRepository(apiService)
 }

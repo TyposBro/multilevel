@@ -1,43 +1,43 @@
-// {PATH_TO_PROJECT}/api/server.js
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
 const authRoutes = require("./routes/authRoutes");
-const chatRoutes = require("./routes/chatRoutes");
-const examRoutes = require("./routes/examRoutes");
+const ieltsExamRoutes = require("./routes/ieltsExamRoutes");
+const multilevelExamRoutes = require("./routes/multilevelExamRoutes");
+// --- Start of new code ---
+const wordBankRoutes = require("./routes/wordBankRoutes"); 
+// --- End of new code ---
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
+const adminRoutes = require("./routes/adminRoutes");
 
-// Load environment variables
 dotenv.config();
-
-// Connect to Database
 connectDB();
 
 const app = express();
 
-// --- Middleware ---
-app.use(cors()); // Enable Cross-Origin Resource Sharing
-app.use(express.json()); // Parse JSON request bodies
-app.use(express.urlencoded({ extended: false })); // Parse URL-encoded bodies
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
-// --- API Routes ---
 app.get("/", (req, res) => {
-  // Basic test route
   res.send("API is running...");
 });
 
+// --- API Routes ---
 app.use("/api/auth", authRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/exam", examRoutes);
 
-// --- Error Handling Middleware ---
-// Add AFTER your routes
-// We need to create this middleware file
+// --- Mount both exam routes under separate namespaces ---
+app.use("/api/exam/ielts", ieltsExamRoutes);
+app.use("/api/exam/multilevel", multilevelExamRoutes);
+// --- Start of new code ---
+app.use("/api/wordbank", wordBankRoutes);
+// --- End of new code ---
+app.use("/api/admin", adminRoutes);
+// ---
+
 app.use(notFound);
 app.use(errorHandler);
 
-// --- Start Server ---
-const PORT = process.env.PORT || 5000; // Fallback port
-
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

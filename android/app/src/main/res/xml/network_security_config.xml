@@ -4,6 +4,7 @@
         <domain includeSubdomains="true">localhost</domain>
         <domain includeSubdomains="true">127.0.0.1</domain>
         <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">192.168.25.6</domain>
         <!--   home     -->
         <domain includeSubdomains="true">192.168.25.19</domain>
         <!--   work     -->

@@ -9,7 +9,6 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.OrtSession.SessionOptions
 import android.content.Context
 import android.util.Log
-import com.typosbro.multilevel.R // Ensure this is your correct R file import
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -20,7 +19,6 @@ object OnnxRuntimeManager {
     private var environment: OrtEnvironment? = null
     private var session: OrtSession? = null
     private const val MODEL_FILE_NAME = "model_quantized.onnx"
-
 
 
     @Synchronized
@@ -44,14 +42,18 @@ object OnnxRuntimeManager {
 
         try {
             if (modelFile.exists()) {
-                Log.d("OnnxRuntimeManager", "Model already exists in cache: ${modelFile.absolutePath}")
+                Log.d(
+                    "OnnxRuntimeManager",
+                    "Model already exists in cache: ${modelFile.absolutePath}"
+                )
                 // Optional: Add a version check here if your model in res/raw can change
                 // For now, we assume if it exists, it's the correct one.
                 return modelFile
             }
 
             Log.d("OnnxRuntimeManager", "Copying model to cache: ${modelFile.absolutePath}")
-            inputStream = context.resources.openRawResource(R.raw.model_quantized) // Your model in res/raw
+            inputStream =
+                context.assets.open(MODEL_FILE_NAME)
             outputStream = FileOutputStream(modelFile)
             val buffer = ByteArray(4 * 1024) // 4K buffer
             var read: Int
@@ -81,7 +83,10 @@ object OnnxRuntimeManager {
         val options = SessionOptions().apply {
             // Your existing options
             addConfigEntry("nnapi.flags", "USE_FP16")
-            addConfigEntry("nnapi.use_gpu", "true") // Ensure NNAPI is available and model supports it
+            addConfigEntry(
+                "nnapi.use_gpu",
+                "true"
+            ) // Ensure NNAPI is available and model supports it
             addConfigEntry("nnapi.gpu_precision_loss_allowed", "true")
             // Consider adding optimization levels if needed, e.g.:
             // setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ORT_ENABLE_ALL)
