@@ -1,5 +1,5 @@
 // {PATH_TO_PROJECT}/api/controllers/authController.js
-const User = require("../models/UserModel");
+const User = require("../models/userModel");
 const ExamResult = require("../models/ieltsExamResultModel");
 const generateToken = require("../utils/generateToken");
 const { OAuth2Client } = require("google-auth-library");

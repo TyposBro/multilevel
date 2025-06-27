@@ -1,6 +1,6 @@
 // {PATH_TO_PROJECT}/api/middleware/authMiddleware.js
 const jwt = require("jsonwebtoken");
-const User = require("../models/UserModel"); // Adjust path as needed
+const User = require("../models/userModel"); // Adjust path as needed
 
 const protect = async (req, res, next) => {
   let token;
