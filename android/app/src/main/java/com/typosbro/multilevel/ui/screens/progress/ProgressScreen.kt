@@ -48,6 +48,9 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+// A sensible order for displaying the practice part tabs
+private val multilevelPartOrder = listOf("FULL", "P1_1", "P1_2", "P2", "P3")
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressScreen(
@@ -57,20 +60,38 @@ fun ProgressScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // UPDATED: Logic to get the correct list based on main tab and sub-tab
     val currentHistory = when (uiState.selectedTab) {
         ExamType.IELTS -> uiState.ieltsHistory
-        ExamType.MULTILEVEL -> uiState.multilevelHistory
+        ExamType.MULTILEVEL -> uiState.multilevelHistory[uiState.selectedMultilevelPart]
+            ?: emptyList()
     }
 
-    Scaffold(
-        topBar = { TopAppBar(title = { Text(text = stringResource(id = R.string.progress_title)) }) }
-    ) { padding ->
+    // A helper map to define max scores for the chart
+    val multilevelMaxScores = mapOf(
+        "FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0
+    )
+    val yMaxForChart = when (uiState.selectedTab) {
+        ExamType.IELTS -> 9.0
+        ExamType.MULTILEVEL -> multilevelMaxScores[uiState.selectedMultilevelPart] ?: 72.0
+    }
+
+    Scaffold(topBar = { TopAppBar(title = { Text(text = stringResource(id = R.string.progress_title)) }) }) { padding ->
         Column(modifier = Modifier.padding(padding)) {
             ExamTypeSwitcher(
                 selectedType = uiState.selectedTab,
                 onTypeSelected = { viewModel.selectTab(it) },
                 modifier = Modifier.fillMaxWidth()
             )
+
+            // NEW: Conditionally show the Multilevel part switcher
+            if (uiState.selectedTab == ExamType.MULTILEVEL && uiState.multilevelHistory.isNotEmpty()) {
+                MultilevelPartSwitcher(
+                    availableParts = uiState.multilevelHistory.keys,
+                    selectedPart = uiState.selectedMultilevelPart,
+                    onPartSelected = { viewModel.selectMultilevelPart(it) }
+                )
+            }
 
             if (uiState.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -97,7 +118,7 @@ fun ProgressScreen(
                         Spacer(Modifier.height(8.dp))
                         ScoreHistoryChart(
                             scores = currentHistory.map { it.score },
-                            yMax = if (uiState.selectedTab == ExamType.IELTS) 9.0 else 100.0,
+                            yMax = yMaxForChart, // Use dynamic max value
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(200.dp)
@@ -118,15 +139,12 @@ fun ProgressScreen(
                         )
                     }
                     items(currentHistory) { result ->
-                        ExamHistoryItem(
-                            result = result,
-                            onClick = {
-                                when (result.type) {
-                                    ExamType.IELTS -> onNavigateToIeltsResult(result.id)
-                                    ExamType.MULTILEVEL -> onNavigateToMultilevelResult(result.id)
-                                }
+                        ExamHistoryItem(result = result, onClick = {
+                            when (result.type) {
+                                ExamType.IELTS -> onNavigateToIeltsResult(result.id)
+                                ExamType.MULTILEVEL -> onNavigateToMultilevelResult(result.id)
                             }
-                        )
+                        })
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     }
                 }
@@ -135,6 +153,50 @@ fun ProgressScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MultilevelPartSwitcher(
+    availableParts: Set<String>,
+    selectedPart: String,
+    onPartSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // Filter and order the parts that actually have history data
+    val partsToShow = multilevelPartOrder.filter { it in availableParts }
+
+    if (partsToShow.size > 1) {
+        SingleChoiceSegmentedButtonRow(
+            modifier = modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            partsToShow.forEachIndexed { index, part ->
+                SegmentedButton(
+                    selected = part == selectedPart,
+                    onClick = { onPartSelected(part) },
+                    shape = SegmentedButtonDefaults.itemShape(
+                        index = index,
+                        count = partsToShow.size
+                    ),
+                ) {
+                    // Make labels more user-friendly
+                    val label = when (part) {
+                        "FULL" -> "Full"
+                        "P1_1" -> "1.1"
+                        "P1_2" -> "1.2"
+                        "P2" -> "2"
+                        "P3" -> "3"
+                        else -> part
+                    }
+                    Text(label)
+                }
+            }
+        }
+    }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExamTypeSwitcher(
     selectedType: ExamType,

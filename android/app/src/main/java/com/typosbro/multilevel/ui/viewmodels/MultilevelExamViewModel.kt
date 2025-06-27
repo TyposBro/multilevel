@@ -115,16 +115,30 @@ class MultilevelExamViewModel @Inject constructor(
                     _uiState.update { it.copy(examContent = result.data) }
                     // Jump to the correct starting point based on the practice part
                     when (practicePart) {
-                        PracticePart.FULL -> {
+                        PracticePart.FULL, PracticePart.P1_1 -> {
                             _uiState.update { it.copy(stage = MultilevelExamStage.INTRO) }
                             playInstructionAndWait(R.raw.multilevel_part1_intro)
+                            playStartSpeakingSound()
                             startPart1_1()
                         }
 
-                        PracticePart.P1_1 -> startPart1_1()
-                        PracticePart.P1_2 -> startPart1_2()
-                        PracticePart.P2 -> startPart2()
-                        PracticePart.P3 -> startPart3()
+                        PracticePart.P1_2 -> {
+                            _uiState.update { it.copy(stage = MultilevelExamStage.PART1_2_INTRO) }
+                            playInstructionAndWait(R.raw.multilevel_part1_2_intro)
+                            processPart1_2_Question()
+                        }
+
+                        PracticePart.P2 -> {
+                            _uiState.update { it.copy(stage = MultilevelExamStage.PART2_INTRO) }
+                            playInstructionAndWait(R.raw.multilevel_part2_intro)
+                            startPart2_Prep()
+                        }
+
+                        PracticePart.P3 -> {
+                            _uiState.update { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
+                            playInstructionAndWait(R.raw.multilevel_part3_intro)
+                            startPart3_Prep()
+                        }
                     }
                 }
 
@@ -176,11 +190,9 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart1_2() {
         viewModelScope.launch {
-            // Only play intro if it's a full exam or the first time this part is started
-            if (practicePart == PracticePart.FULL || uiState.value.stage == MultilevelExamStage.NOT_STARTED) {
-                _uiState.update { it.copy(stage = MultilevelExamStage.PART1_2_INTRO) }
-                playInstructionAndWait(R.raw.multilevel_part1_2_intro)
-            }
+            // This function is now only called when chaining from Part 1.1 in a FULL exam.
+            _uiState.update { it.copy(stage = MultilevelExamStage.PART1_2_INTRO) }
+            playInstructionAndWait(R.raw.multilevel_part1_2_intro)
             processPart1_2_Question()
         }
     }
@@ -219,10 +231,9 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart2() {
         viewModelScope.launch {
-            if (practicePart == PracticePart.FULL || uiState.value.stage == MultilevelExamStage.NOT_STARTED) {
-                _uiState.update { it.copy(stage = MultilevelExamStage.PART2_INTRO) }
-                playInstructionAndWait(R.raw.multilevel_part2_intro)
-            }
+            // This function is now only called when chaining from Part 1.2 in a FULL exam.
+            _uiState.update { it.copy(stage = MultilevelExamStage.PART2_INTRO) }
+            playInstructionAndWait(R.raw.multilevel_part2_intro)
             startPart2_Prep()
         }
     }
@@ -264,10 +275,9 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart3() {
         viewModelScope.launch {
-            if (practicePart == PracticePart.FULL || uiState.value.stage == MultilevelExamStage.NOT_STARTED) {
-                _uiState.update { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
-                playInstructionAndWait(R.raw.multilevel_part3_intro)
-            }
+            // This function is now only called when chaining from Part 2 in a FULL exam.
+            _uiState.update { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
+            playInstructionAndWait(R.raw.multilevel_part3_intro)
             startPart3_Prep()
         }
     }
@@ -363,6 +373,7 @@ class MultilevelExamViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isRecording = false) }
+                // Play a sound to indicate recording has stopped, as requested.
                 playStartSpeakingSound()
                 val transcribedText = transcribeBufferedAudio()
                 val cleanText =
@@ -443,8 +454,9 @@ class MultilevelExamViewModel @Inject constructor(
 
     private suspend fun playInstructionAndWait(@RawRes resId: Int) {
         try {
+            // This function should ONLY play the instruction and wait.
+            // The "start speaking" sound is handled by the functions that actually start a speaking timer.
             AudioPlayer.playFromRawAndWait(context, resId)
-            playStartSpeakingSound()
         } catch (e: Exception) {
             Log.e("ExamVM", "Instruction audio failed to play", e)
             _uiState.update { it.copy(error = "Audio playback failed. Please try again.") }

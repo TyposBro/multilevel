@@ -47,13 +47,13 @@ const partAnalysisConfig = {
       "Detailed feedback for Part 1.1 performance, focusing on fluency, relevance, and clarity for short personal questions.",
   },
   P1_2: {
-    maxScore: 22,
+    maxScore: 22, // This seems high, might want to review scoring distribution
     partName: "Part 1.2",
     promptFocus:
       "Detailed feedback for Part 1.2, focusing on description, comparison, and speculative language related to the pictures.",
   },
   P2: {
-    maxScore: 18,
+    maxScore: 18, // This seems low, might want to review
     partName: "Part 2",
     promptFocus:
       "Detailed feedback for Part 2, assessing the ability to structure a 2-minute monologue and develop ideas based on the cue card.",
@@ -72,7 +72,6 @@ const partAnalysisConfig = {
  * @access  Private
  */
 const analyzeExam = async (req, res) => {
-  // Destructure practicePart from the body
   const { transcript, examContentIds, practicePart } = req.body;
   const userId = req.user._id;
 
@@ -86,7 +85,6 @@ const analyzeExam = async (req, res) => {
     const isSinglePartPractice = !!practicePart && partAnalysisConfig[practicePart];
 
     if (isSinglePartPractice) {
-      // --- PROMPT FOR SINGLE PART PRACTICE ---
       const config = partAnalysisConfig[practicePart];
       prompt = `
 You are an expert examiner for a structured, multilevel English speaking test.
@@ -107,7 +105,6 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
 }
 `;
     } else {
-      // --- PROMPT FOR FULL EXAM (Unchanged) ---
       prompt = `
 You are an expert examiner for a structured, multilevel English speaking test. The maximum score is 72.
 Analyze the following speaking test transcript. The user's speech may be minimal or nonsensical; score it accordingly.
@@ -158,20 +155,17 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
     const responseText = await generateText(prompt);
     const analysisData = safeJsonParse(responseText);
 
-    // --- Process and Save the Result ---
     let totalScore;
     let feedbackBreakdown;
 
     if (isSinglePartPractice) {
-      // For single part, the AI returns one object. We wrap it in an array.
       if (!analysisData || typeof analysisData.score === "undefined" || !analysisData.feedback) {
         console.error("AI failed to generate a valid single-part analysis JSON.", responseText);
         return res.status(500).json({ message: "AI failed to generate a valid analysis." });
       }
       totalScore = analysisData.score;
-      feedbackBreakdown = [analysisData]; // Wrap the single object in an array for the schema
+      feedbackBreakdown = [analysisData];
     } else {
-      // For full exam, the AI returns the full structure.
       if (!analysisData || !analysisData.totalScore || !analysisData.feedbackBreakdown) {
         console.error("AI failed to generate a valid full-exam analysis JSON.", responseText);
         return res.status(500).json({ message: "AI failed to generate a valid analysis." });
@@ -186,7 +180,7 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
       totalScore,
       feedbackBreakdown,
       examContent: examContentIds,
-      // NEW: Store which part was practiced, or mark as "FULL"
+      // This logic is correct and saves the part to the DB.
       practicedPart: isSinglePartPractice ? practicePart : "FULL",
     });
 
@@ -205,15 +199,17 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
  */
 const getExamHistory = async (req, res) => {
   try {
+    // UPDATED: The .select() now includes `practicedPart`.
     const history = await MultilevelExamResult.find({ userId: req.user._id })
-      .select("_id totalScore createdAt practicedPart") // Include practicedPart
+      .select("_id totalScore createdAt practicedPart")
       .sort({ createdAt: -1 });
 
+    // UPDATED: The map now includes `practicePart` in the response object.
     const historySummaries = history.map((item) => ({
       id: item._id,
       examDate: item.createdAt.getTime(),
       totalScore: item.totalScore,
-      // You could potentially use `practicedPart` on the frontend list view
+      practicePart: item.practicedPart, // Pass the part to the client
     }));
 
     res.json({ history: historySummaries });

@@ -1,5 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/ProgressViewModel.kt
-
 package com.typosbro.multilevel.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
@@ -22,30 +20,40 @@ enum class ExamType {
 }
 
 // A unified data class to represent a summary for any exam type in the UI
+// UPDATED: Added practicePart to help with filtering
 data class GenericExamResultSummary(
     val id: String,
     val examDate: Long,
     val score: Double,
     val scoreLabel: String, // e.g., "Overall Band" or "Total Score"
-    val type: ExamType
+    val type: ExamType,
+    val practicePart: String = "FULL" // Default for IELTS or full exams
 )
 
 data class ProgressUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
-    val selectedTab: ExamType = ExamType.MULTILEVEL, // Default to the new exam type
+    val selectedTab: ExamType = ExamType.MULTILEVEL,
     val ieltsHistory: List<GenericExamResultSummary> = emptyList(),
-    val multilevelHistory: List<GenericExamResultSummary> = emptyList()
+    // UPDATED: multilevelHistory is now a map to group results by part
+    val multilevelHistory: Map<String, List<GenericExamResultSummary>> = emptyMap(),
+    // UPDATED: State to hold the selected sub-category for Multilevel
+    val selectedMultilevelPart: String = "FULL"
 )
 
 @HiltViewModel
 class ProgressViewModel @Inject constructor(
-    private val chatRepository: ChatRepository, // For IELTS
-    private val multilevelExamRepository: MultilevelExamRepository // For Multilevel
+    private val ieltsRepository: ChatRepository, // Renamed for clarity
+    private val multilevelExamRepository: MultilevelExamRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProgressUiState())
     val uiState = _uiState.asStateFlow()
+
+    // A helper map to define max scores for the chart
+    private val multilevelMaxScores = mapOf(
+        "FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0
+    )
 
     init {
         loadAllHistories()
@@ -55,25 +63,31 @@ class ProgressViewModel @Inject constructor(
         _uiState.update { it.copy(selectedTab = type) }
     }
 
+    // NEW function to handle sub-category selection
+    fun selectMultilevelPart(part: String) {
+        _uiState.update { it.copy(selectedMultilevelPart = part) }
+    }
+
+
     private fun loadAllHistories() {
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             // Fetch both histories in parallel for better performance
-            val ieltsDeferred =
-                async { multilevelExamRepository.getExamHistory() } // Corrected repository for Multilevel
-            val multilevelDeferred = async { chatRepository.getExamHistorySummary() } // For IELTS
+            // CORRECTED variable names for clarity
+            val multilevelDeferred = async { multilevelExamRepository.getExamHistory() }
+            val ieltsDeferred = async { ieltsRepository.getExamHistorySummary() }
 
-            val ieltsResult = ieltsDeferred.await()
             val multilevelResult = multilevelDeferred.await()
+            val ieltsResult = ieltsDeferred.await()
 
             var ieltsHistory: List<GenericExamResultSummary> = emptyList()
-            var multilevelHistory: List<GenericExamResultSummary> = emptyList()
+            var multilevelHistoryMap: Map<String, List<GenericExamResultSummary>> = emptyMap()
             var error: String? = null
 
             // Process IELTS results
-            when (multilevelResult) {
+            when (ieltsResult) {
                 is RepositoryResult.Success -> {
-                    ieltsHistory = multilevelResult.data.history.map { summary ->
+                    ieltsHistory = ieltsResult.data.history.map { summary ->
                         GenericExamResultSummary(
                             id = summary.id,
                             examDate = summary.examDate,
@@ -84,33 +98,40 @@ class ProgressViewModel @Inject constructor(
                     }.sortedByDescending { it.examDate }
                 }
 
-                is RepositoryResult.Error -> error = multilevelResult.message
+                is RepositoryResult.Error -> error = ieltsResult.message
             }
 
             // Process Multilevel results
-            when (ieltsResult) {
+            when (multilevelResult) {
                 is RepositoryResult.Success -> {
-                    multilevelHistory = ieltsResult.data.history.map { summary ->
+                    multilevelHistoryMap = multilevelResult.data.history.map { summary ->
+                        val maxScore =
+                            multilevelMaxScores[summary.practicePart] ?: summary.totalScore
                         GenericExamResultSummary(
                             id = summary.id,
                             examDate = summary.examDate,
                             score = summary.totalScore.toDouble(),
-                            scoreLabel = "Total Score: ${summary.totalScore}",
-                            type = ExamType.MULTILEVEL
+                            scoreLabel = "Score: ${summary.totalScore} / ${maxScore.toInt()}",
+                            type = ExamType.MULTILEVEL,
+                            practicePart = summary.practicePart
                         )
                     }.sortedByDescending { it.examDate }
+                        .groupBy { it.practicePart } // The key change: grouping by part
                 }
 
                 is RepositoryResult.Error -> error =
-                    error ?: ieltsResult.message // Keep first error
+                    error ?: multilevelResult.message // Keep first error
             }
 
             _uiState.update {
                 it.copy(
                     isLoading = false,
                     ieltsHistory = ieltsHistory,
-                    multilevelHistory = multilevelHistory,
-                    error = error
+                    multilevelHistory = multilevelHistoryMap,
+                    error = error,
+                    // Ensure a valid part is selected, default to FULL if available
+                    selectedMultilevelPart = if (multilevelHistoryMap.containsKey("FULL")) "FULL" else multilevelHistoryMap.keys.firstOrNull()
+                        ?: "FULL"
                 )
             }
         }

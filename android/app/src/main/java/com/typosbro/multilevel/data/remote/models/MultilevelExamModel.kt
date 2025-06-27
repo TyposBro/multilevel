@@ -1,4 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/models/MultilevelExamModel.kt
 package com.typosbro.multilevel.data.remote.models
 
 import com.google.gson.annotations.SerializedName
@@ -79,8 +78,10 @@ data class MultilevelExamHistorySummaryResponse(
     val history: List<MultilevelExamResultSummary>
 )
 
+// UPDATED: Added practicePart to distinguish between full exams and part practices
 data class MultilevelExamResultSummary(
     val id: String,
     val examDate: Long,
-    val totalScore: Int
+    val totalScore: Int,
+    val practicePart: String // e.g., "FULL", "P1_1", "P2", etc.
 )
