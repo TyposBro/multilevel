@@ -1,0 +1,4 @@
+This is full backend code. now help me implement premium logic and it would be great to have different files and implementations for each provider and a unifying api or handler like in storage cdn.
+Also, take into account that we want to offer both a subscription and a one time purchase, of our monthly subscription
+it basically non-recuring subscription because many students might now have a credit card setup and might ask for money from parents every time to purchase monthly subscription
+payment providers payme/click/paynet/google play billing
