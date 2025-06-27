@@ -38,13 +38,42 @@ const generateNewExam = async (req, res) => {
   }
 };
 
+// --- Helper object to define prompts and scoring for each part ---
+const partAnalysisConfig = {
+  P1_1: {
+    maxScore: 12,
+    partName: "Part 1.1",
+    promptFocus:
+      "Detailed feedback for Part 1.1 performance, focusing on fluency, relevance, and clarity for short personal questions.",
+  },
+  P1_2: {
+    maxScore: 22,
+    partName: "Part 1.2",
+    promptFocus:
+      "Detailed feedback for Part 1.2, focusing on description, comparison, and speculative language related to the pictures.",
+  },
+  P2: {
+    maxScore: 18,
+    partName: "Part 2",
+    promptFocus:
+      "Detailed feedback for Part 2, assessing the ability to structure a 2-minute monologue and develop ideas based on the cue card.",
+  },
+  P3: {
+    maxScore: 20,
+    partName: "Part 3",
+    promptFocus:
+      "Detailed feedback for Part 3, evaluating the construction of a balanced argument using the provided for/against points.",
+  },
+};
+
 /**
- * @desc    Analyze a full multilevel exam transcript and save the result
- * @route   POST /api/exam/analyze
+ * @desc    Analyze a full or partial multilevel exam transcript and save the result
+ * @route   POST /api/exam/multilevel/analyze
  * @access  Private
  */
 const analyzeExam = async (req, res) => {
-  const { transcript, examContentIds } = req.body; // Frontend sends full transcript and content IDs
+  // Destructure practicePart from the body
+  const { transcript, examContentIds, practicePart } = req.body;
   const userId = req.user._id;
 
   if (!transcript || transcript.length === 0) {
@@ -53,16 +82,41 @@ const analyzeExam = async (req, res) => {
 
   try {
     const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
+    let prompt;
+    const isSinglePartPractice = !!practicePart && partAnalysisConfig[practicePart];
 
-    const prompt = `
+    if (isSinglePartPractice) {
+      // --- PROMPT FOR SINGLE PART PRACTICE ---
+      const config = partAnalysisConfig[practicePart];
+      prompt = `
+You are an expert examiner for a structured, multilevel English speaking test.
+The user is practicing a single part of the exam: ${config.partName}. The maximum score for this part is ${config.maxScore}.
+Analyze the following speaking test transcript. The user's speech may be minimal or nonsensical; score it accordingly.
+
+TRANSCRIPT:
+---
+${formattedTranscript}
+---
+
+CRITICAL: Your entire response must be ONLY a single, valid JSON object using this exact structure, with no extra text or explanations.
+
+{
+  "part": "${config.partName}",
+  "score": <number>,
+  "feedback": "${config.promptFocus}"
+}
+`;
+    } else {
+      // --- PROMPT FOR FULL EXAM (Unchanged) ---
+      prompt = `
 You are an expert examiner for a structured, multilevel English speaking test. The maximum score is 72.
 Analyze the following speaking test transcript. The user's speech may be minimal or nonsensical; score it accordingly.
 
 The exam has 4 parts:
-- Part 1.1: 3 personal questions (12 points total)
-- Part 1.2: Picture comparison (22 points total)
-- Part 2: Single picture monologue (18 points total)
-- Part 3: Argumentative monologue (20 points total)
+- Part 1.1: 3 personal questions (${partAnalysisConfig.P1_1.maxScore} points total)
+- Part 1.2: Picture comparison (${partAnalysisConfig.P1_2.maxScore} points total)
+- Part 2: Single picture monologue (${partAnalysisConfig.P2.maxScore} points total)
+- Part 3: Argumentative monologue (${partAnalysisConfig.P3.maxScore} points total)
 
 Based on the transcript, provide a score and constructive feedback for each part. Calculate the final total score (out of 72).
 
@@ -79,41 +133,61 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
     {
       "part": "Part 1.1",
       "score": <number>,
-      "feedback": "Detailed feedback for Part 1.1 performance, focusing on fluency, relevance, and clarity for short questions."
+      "feedback": "${partAnalysisConfig.P1_1.promptFocus}"
     },
     {
       "part": "Part 1.2",
       "score": <number>,
-      "feedback": "Detailed feedback for Part 1.2, focusing on description, comparison, and speculative language."
+      "feedback": "${partAnalysisConfig.P1_2.promptFocus}"
     },
     {
       "part": "Part 2",
       "score": <number>,
-      "feedback": "Detailed feedback for Part 2, assessing the ability to structure a 2-minute monologue and develop ideas."
+      "feedback": "${partAnalysisConfig.P2.promptFocus}"
     },
     {
       "part": "Part 3",
       "score": <number>,
-      "feedback": "Detailed feedback for Part 3, evaluating the construction of a balanced argument using the provided points."
+      "feedback": "${partAnalysisConfig.P3.promptFocus}"
     }
   ]
 }
 `;
+    }
 
     const responseText = await generateText(prompt);
     const analysisData = safeJsonParse(responseText);
 
-    if (!analysisData || !analysisData.totalScore || !analysisData.feedbackBreakdown) {
-      console.error("AI failed to generate a valid analysis JSON.", responseText);
-      return res.status(500).json({ message: "AI failed to generate a valid analysis." });
+    // --- Process and Save the Result ---
+    let totalScore;
+    let feedbackBreakdown;
+
+    if (isSinglePartPractice) {
+      // For single part, the AI returns one object. We wrap it in an array.
+      if (!analysisData || typeof analysisData.score === "undefined" || !analysisData.feedback) {
+        console.error("AI failed to generate a valid single-part analysis JSON.", responseText);
+        return res.status(500).json({ message: "AI failed to generate a valid analysis." });
+      }
+      totalScore = analysisData.score;
+      feedbackBreakdown = [analysisData]; // Wrap the single object in an array for the schema
+    } else {
+      // For full exam, the AI returns the full structure.
+      if (!analysisData || !analysisData.totalScore || !analysisData.feedbackBreakdown) {
+        console.error("AI failed to generate a valid full-exam analysis JSON.", responseText);
+        return res.status(500).json({ message: "AI failed to generate a valid analysis." });
+      }
+      totalScore = analysisData.totalScore;
+      feedbackBreakdown = analysisData.feedbackBreakdown;
     }
 
     const newExamResult = new MultilevelExamResult({
       userId,
       transcript,
-      totalScore: analysisData.totalScore,
-      feedbackBreakdown: analysisData.feedbackBreakdown,
-      examContent: examContentIds, // Save the IDs of the content used
+      totalScore,
+      feedbackBreakdown,
+      examContent: examContentIds,
+      // NEW: Store which part was practiced, or mark as "FULL"
+      practicedPart: isSinglePartPractice ? practicePart : "FULL",
     });
 
     const savedResult = await newExamResult.save();
@@ -124,23 +198,35 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
   }
 };
 
-// Add getExamHistory and getExamResultDetails, but for the Multilevel model
+/**
+ * @desc    Get the user's exam history for Multilevel
+ * @route   GET /api/exam/multilevel/history
+ * @access  Private
+ */
 const getExamHistory = async (req, res) => {
   try {
     const history = await MultilevelExamResult.find({ userId: req.user._id })
-      .select("_id totalScore createdAt")
+      .select("_id totalScore createdAt practicedPart") // Include practicedPart
       .sort({ createdAt: -1 });
+
     const historySummaries = history.map((item) => ({
       id: item._id,
       examDate: item.createdAt.getTime(),
       totalScore: item.totalScore,
+      // You could potentially use `practicedPart` on the frontend list view
     }));
+
     res.json({ history: historySummaries });
   } catch (error) {
     res.status(500).json({ message: "Server error fetching history." });
   }
 };
 
+/**
+ * @desc    Get the details of a single Multilevel exam result
+ * @route   GET /api/exam/multilevel/result/:resultId
+ * @access  Private
+ */
 const getExamResultDetails = async (req, res) => {
   try {
     const result = await MultilevelExamResult.findOne({

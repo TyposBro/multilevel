@@ -31,7 +31,7 @@ object AppDestinations {
     const val MAIN_HUB_ROUTE = "main_hub"
     const val EXAM_SCREEN_ROUTE = "exam_screen"
     const val EXAM_RESULT_ROUTE = "exam_result/{resultId}"
-    const val MULTILEVEL_EXAM_ROUTE = "multilevel_exam"
+    const val MULTILEVEL_EXAM_ROUTE = "multilevel_exam/{practicePart}"
     const val MULTILEVEL_RESULT_ROUTE = "multilevel_result/{resultId}"
 }
 
@@ -90,10 +90,10 @@ fun AppNavigation(
                 onNavigateToIELTS = {
                     navController.navigate(AppDestinations.EXAM_SCREEN_ROUTE)
                 },
-                onNavigateToMultilevel = {
-                    navController.navigate(AppDestinations.MULTILEVEL_EXAM_ROUTE)
+                // UPDATED: This lambda now takes the part string
+                onNavigateToMultilevel = { practicePart ->
+                    navController.navigate("multilevel_exam/$practicePart")
                 },
-                // Define the specific navigation actions for each result type here
                 onNavigateToIeltsResult = { resultId ->
                     navController.navigate("exam_result/$resultId")
                 },
@@ -119,11 +119,19 @@ fun AppNavigation(
             ExamResultScreen(onNavigateBack = { navController.popBackStack() })
         }
 
-        composable(AppDestinations.MULTILEVEL_EXAM_ROUTE) {
+        composable(
+            route = AppDestinations.MULTILEVEL_EXAM_ROUTE,
+            arguments = listOf(navArgument("practicePart") { type = NavType.StringType })
+        ) {
             MultilevelExamScreen(
                 onNavigateToResults = { resultId ->
                     navController.navigate("multilevel_result/$resultId") {
-                        popUpTo(AppDestinations.MULTILEVEL_EXAM_ROUTE) { inclusive = true }
+                        // Pop back to the multilevel practice hub, not just the exam screen
+                        popUpTo(navController.graph.id) {
+                            inclusive = false // Keep MainScreen in the backstack
+                        }
+                        // A more specific popUp can be used if you know the route
+                        // popUpTo(PracticeDestinations.MULTILEVEL_HUB) { inclusive = true }
                     }
                 }
             )

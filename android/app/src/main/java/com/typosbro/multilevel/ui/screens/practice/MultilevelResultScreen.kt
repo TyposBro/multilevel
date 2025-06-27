@@ -77,7 +77,7 @@ fun MultilevelResultScreen(
         ) {
             when {
                 uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                uiState.error != null -> ErrorView(uiState.error!!)
+                uiState.error != null -> ErrorView(uiState.error!!) // Reusing ErrorView from ExamScreen
                 uiState.result != null -> MultilevelResultContent(result = uiState.result!!)
             }
         }
@@ -91,9 +91,15 @@ fun MultilevelResultContent(result: MultilevelExamResultResponse) {
     val transcriptString = stringResource(id = R.string.exam_result_transcript)
     val tabs = listOf(feedbackString, transcriptString)
 
+    // Check if this is a result for a single part or a full exam
+    val isSinglePartResult = result.feedbackBreakdown.size == 1
 
     Column(modifier = Modifier.fillMaxSize()) {
-        OverallScoreCardMultilevel(score = result.totalScore)
+        OverallScoreCardMultilevel(
+            score = result.totalScore,
+            maxScore = if (isSinglePartResult) null else 72,
+            isSinglePart = isSinglePartResult
+        )
 
         TabRow(selectedTabIndex = selectedTabIndex) {
             tabs.forEachIndexed { index, title ->
@@ -107,13 +113,13 @@ fun MultilevelResultContent(result: MultilevelExamResultResponse) {
 
         when (selectedTabIndex) {
             0 -> FeedbackTabMultilevel(feedbackBreakdown = result.feedbackBreakdown)
-            1 -> TranscriptTab(transcript = result.transcript) // Can reuse from IELTS result screen
+            1 -> TranscriptTab(transcript = result.transcript)
         }
     }
 }
 
 @Composable
-fun OverallScoreCardMultilevel(score: Int) {
+fun OverallScoreCardMultilevel(score: Int, maxScore: Int?, isSinglePart: Boolean) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -127,7 +133,9 @@ fun OverallScoreCardMultilevel(score: Int) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = stringResource(id = R.string.exam_result_overall),
+                text = if (isSinglePart) stringResource(R.string.exam_result_part_score) else stringResource(
+                    R.string.exam_result_overall
+                ),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -139,12 +147,15 @@ fun OverallScoreCardMultilevel(score: Int) {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Text(
-                    text = " / 72",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.padding(bottom = 6.dp)
-                )
+                // Only show the max score if it's provided (for the full exam)
+                if (maxScore != null) {
+                    Text(
+                        text = " / $maxScore",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                }
             }
         }
     }

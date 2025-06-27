@@ -47,7 +47,8 @@ data class QuestionAudio(
 
 data class MultilevelAnalyzeRequest(
     val transcript: List<TranscriptEntry>, // Can reuse from IELTS models
-    val examContentIds: ExamContentIds
+    val examContentIds: ExamContentIds,
+    val practicePart: String? = null
 )
 
 data class ExamContentIds(

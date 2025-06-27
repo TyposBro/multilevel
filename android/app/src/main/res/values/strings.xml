@@ -47,7 +47,7 @@
     <string name="exam_result_overall">Overall Band Score</string>
     <string name="exam_result_suggestion">Examples and Suggestions</string>
     <string name="exam_result_suggestion_description">Suggestion</string>
-
+    <string name="exam_result_part_score">Part Score</string>
     <!--  PRACTICE HUB SCREEN  -->
     <string name="practice_hub_title">Practice Hub</string>
     <string name="practice_hub_multilevel">Multilevel Speaking</string>
