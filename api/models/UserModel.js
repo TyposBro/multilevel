@@ -1,3 +1,5 @@
+// {PATH_TO_PROJECT}/api/models/userModel.js
+
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -15,29 +17,58 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    // --- CHANGE: Password is no longer universally required ---
-    // required: [true, "Please provide a password"], // REMOVE THIS LINE
     minlength: 6,
     select: false,
   },
-  // --- NEW: Add a field to track the auth method ---
   authProvider: {
     type: String,
     required: true,
-    enum: ["email", "google"], // Only allow these values
+    enum: ["email", "google"],
     default: "email",
   },
+  // --- NEW: SUBSCRIPTION & USAGE LOGIC ---
+  subscription: {
+    tier: {
+      type: String,
+      enum: ["free", "silver", "gold"],
+      default: "free",
+    },
+    // The date when the current subscription or one-time purchase expires.
+    expiresAt: {
+      type: Date,
+      default: null,
+    },
+    // For auto-renewing subscriptions, this is the ID from the payment provider (e.g., Google Play).
+    providerSubscriptionId: {
+      type: String,
+      default: null,
+    },
+    // Tracks if the user has already activated their one-time Gold trial.
+    hasUsedGoldTrial: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  dailyUsage: {
+    fullExams: {
+      count: { type: Number, default: 0 },
+      lastReset: { type: Date, default: () => new Date() },
+    },
+    partPractices: {
+      count: { type: Number, default: 0 },
+      lastReset: { type: Date, default: () => new Date() },
+    },
+  },
+  // --- END OF NEW LOGIC ---
   createdAt: {
     type: Date,
     default: Date.now,
   },
 });
 
-// --- Mongoose Middleware ---
+// Mongoose middleware remains the same...
 
-// Hash password before saving (only if it exists and is modified)
 userSchema.pre("save", async function (next) {
-  // --- CHANGE: Only hash if provider is 'email' and password is set
   if (this.authProvider !== "email" || !this.isModified("password")) {
     return next();
   }
@@ -46,9 +77,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// Method to compare entered password with hashed password
 userSchema.methods.matchPassword = async function (enteredPassword) {
-  // This method remains the same, it will only be called for 'email' users
   return await bcrypt.compare(enteredPassword, this.password);
 };
 

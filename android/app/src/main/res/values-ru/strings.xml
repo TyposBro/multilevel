@@ -42,7 +42,7 @@
     <string name="practice_hub_title">Центр практики</string>
     <string name="practice_hub_multilevel">Многоуровневый разговорный тест</string>
     <string name="practice_hub_multilevel_description">Симуляция полного теста длительностью 11–14 минут.</string>
-    <string name="practice_hub_ielts">IELTS Speaking</string>
+    <string name="practice_hub_ielts">IELTS Speaking (Experimental)</string>
     <string name="practice_hub_ielts_description">Симуляция полного теста длительностью 11–14 минут.</string>
 
     <!--  PROFILE SCREEN  -->

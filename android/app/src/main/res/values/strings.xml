@@ -51,9 +51,11 @@
     <!--  PRACTICE HUB SCREEN  -->
     <string name="practice_hub_title">Practice Hub</string>
     <string name="practice_hub_multilevel">Multilevel Speaking</string>
-    <string name="practice_hub_multilevel_description">Simulate a full 11–14 minute test.</string>
-    <string name="practice_hub_ielts">IELTS Speaking</string>
+    <string name="practice_hub_multilevel_description">Simulate a full 15 minute test.</string>
+    <string name="practice_hub_ielts">IELTS Speaking (Experimental)</string>
     <string name="practice_hub_ielts_description">Simulate a full 11–14 minute test.</string>
+    <string name="practice_hub_toefl">TOEFL Speaking (Coming Soon)</string>
+    <string name="practice_hub_toefl_description">Simulate a full test.</string>
 
     <!--  PROFILE SCREEN  -->
     <string name="profile_title">Profile &amp; Settings</string>
