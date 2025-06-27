@@ -1,7 +1,9 @@
 // {PATH_TO_PROJECT}/api/controllers/multilevelExamController.js
 
 const MultilevelExamResult = require("../models/multilevelExamResultModel.js");
+const User = require("../models/userModel.js"); // Needed for updating usage
 const { generateText, safeJsonParse } = require("../utils/gemini.js");
+const OFFERINGS = require("../config/offerings"); // <-- The new centralized config
 
 // Import content models
 const Part1_1_Question = require("../models/content/Part1_1_QuestionModel");
@@ -20,12 +22,14 @@ const generateNewExam = async (req, res) => {
     const p1_2_Promise = Part1_2_Set.aggregate([{ $sample: { size: 1 } }]);
     const p2_Promise = Part2_Set.aggregate([{ $sample: { size: 1 } }]);
     const p3_Promise = Part3_Topic.aggregate([{ $sample: { size: 1 } }]);
+
     const [part1_1, part1_2, part2, part3] = await Promise.all([
       p1_1_Promise,
       p1_2_Promise,
       p2_Promise,
       p3_Promise,
     ]);
+
     if (part1_1.length < 3 || !part1_2[0] || !part2[0] || !part3[0]) {
       return res
         .status(500)
@@ -47,13 +51,13 @@ const partAnalysisConfig = {
       "Detailed feedback for Part 1.1 performance, focusing on fluency, relevance, and clarity for short personal questions.",
   },
   P1_2: {
-    maxScore: 22, // This seems high, might want to review scoring distribution
+    maxScore: 22,
     partName: "Part 1.2",
     promptFocus:
       "Detailed feedback for Part 1.2, focusing on description, comparison, and speculative language related to the pictures.",
   },
   P2: {
-    maxScore: 18, // This seems low, might want to review
+    maxScore: 18,
     partName: "Part 2",
     promptFocus:
       "Detailed feedback for Part 2, assessing the ability to structure a 2-minute monologue and develop ideas based on the cue card.",
@@ -66,25 +70,84 @@ const partAnalysisConfig = {
   },
 };
 
+// Helper function to reset daily counts if the last reset was on a different day (UTC)
+const resetDailyUsageIfNeeded = (usageObject) => {
+  const now = new Date();
+  const lastReset = new Date(usageObject.lastReset);
+  if (
+    lastReset.getUTCFullYear() !== now.getUTCFullYear() ||
+    lastReset.getUTCMonth() !== now.getUTCMonth() ||
+    lastReset.getUTCDate() !== now.getUTCDate()
+  ) {
+    usageObject.count = 0;
+    usageObject.lastReset = now;
+  }
+};
+
 /**
  * @desc    Analyze a full or partial multilevel exam transcript and save the result
  * @route   POST /api/exam/multilevel/analyze
  * @access  Private
  */
 const analyzeExam = async (req, res) => {
+  // The user object is attached by our `protect` and `checkSubscriptionStatus` middleware
+  const user = req.user;
   const { transcript, examContentIds, practicePart } = req.body;
-  const userId = req.user._id;
+  const isSinglePartPractice = !!practicePart;
 
   if (!transcript || transcript.length === 0) {
     return res.status(400).json({ message: "Transcript is required for analysis." });
   }
 
+  // --- TIER & USAGE CHECK LOGIC ---
+  const { tier } = user.subscription;
+  const limits = OFFERINGS[tier]; // Get limits for the user's current tier
+
+  if (tier === "free") {
+    // Make sure usage objects exist
+    user.dailyUsage = user.dailyUsage || {};
+    user.dailyUsage.fullExams = user.dailyUsage.fullExams || { count: 0, lastReset: new Date() };
+    user.dailyUsage.partPractices = user.dailyUsage.partPractices || {
+      count: 0,
+      lastReset: new Date(),
+    };
+
+    // Reset counters if it's a new day
+    resetDailyUsageIfNeeded(user.dailyUsage.fullExams);
+    resetDailyUsageIfNeeded(user.dailyUsage.partPractices);
+
+    if (isSinglePartPractice) {
+      if (user.dailyUsage.partPractices.count >= limits.dailyPartPractices) {
+        return res
+          .status(403)
+          .json({
+            message: `You have used all ${limits.dailyPartPractices} of your free part practices for today. Upgrade for unlimited access.`,
+          });
+      }
+      user.dailyUsage.partPractices.count += 1;
+    } else {
+      // Full Exam
+      if (user.dailyUsage.fullExams.count >= limits.dailyFullExams) {
+        return res
+          .status(403)
+          .json({
+            message: `You have used your ${limits.dailyFullExams} free full mock exam for today. Upgrade for more.`,
+          });
+      }
+      user.dailyUsage.fullExams.count += 1;
+    }
+    // We must save the updated user object with the new counts
+    await user.save();
+  }
+
+  // NOTE: A complete implementation for Silver tier's monthly limit would require adding
+  // a `monthlyUsage` object to the user model and a `resetMonthlyUsageIfNeeded` helper.
+
   try {
     const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
     let prompt;
-    const isSinglePartPractice = !!practicePart && partAnalysisConfig[practicePart];
 
-    if (isSinglePartPractice) {
+    if (isSinglePartPractice && partAnalysisConfig[practicePart]) {
       const config = partAnalysisConfig[practicePart];
       prompt = `
 You are an expert examiner for a structured, multilevel English speaking test.
@@ -127,26 +190,10 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
 {
   "totalScore": <number>,
   "feedbackBreakdown": [
-    {
-      "part": "Part 1.1",
-      "score": <number>,
-      "feedback": "${partAnalysisConfig.P1_1.promptFocus}"
-    },
-    {
-      "part": "Part 1.2",
-      "score": <number>,
-      "feedback": "${partAnalysisConfig.P1_2.promptFocus}"
-    },
-    {
-      "part": "Part 2",
-      "score": <number>,
-      "feedback": "${partAnalysisConfig.P2.promptFocus}"
-    },
-    {
-      "part": "Part 3",
-      "score": <number>,
-      "feedback": "${partAnalysisConfig.P3.promptFocus}"
-    }
+    { "part": "Part 1.1", "score": <number>, "feedback": "${partAnalysisConfig.P1_1.promptFocus}" },
+    { "part": "Part 1.2", "score": <number>, "feedback": "${partAnalysisConfig.P1_2.promptFocus}" },
+    { "part": "Part 2", "score": <number>, "feedback": "${partAnalysisConfig.P2.promptFocus}" },
+    { "part": "Part 3", "score": <number>, "feedback": "${partAnalysisConfig.P3.promptFocus}" }
   ]
 }
 `;
@@ -160,27 +207,24 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
 
     if (isSinglePartPractice) {
       if (!analysisData || typeof analysisData.score === "undefined" || !analysisData.feedback) {
-        console.error("AI failed to generate a valid single-part analysis JSON.", responseText);
-        return res.status(500).json({ message: "AI failed to generate a valid analysis." });
+        throw new Error("AI failed to generate a valid single-part analysis JSON.");
       }
       totalScore = analysisData.score;
       feedbackBreakdown = [analysisData];
     } else {
       if (!analysisData || !analysisData.totalScore || !analysisData.feedbackBreakdown) {
-        console.error("AI failed to generate a valid full-exam analysis JSON.", responseText);
-        return res.status(500).json({ message: "AI failed to generate a valid analysis." });
+        throw new Error("AI failed to generate a valid full-exam analysis JSON.");
       }
       totalScore = analysisData.totalScore;
       feedbackBreakdown = analysisData.feedbackBreakdown;
     }
 
     const newExamResult = new MultilevelExamResult({
-      userId,
+      userId: user._id,
       transcript,
       totalScore,
       feedbackBreakdown,
       examContent: examContentIds,
-      // This logic is correct and saves the part to the DB.
       practicedPart: isSinglePartPractice ? practicePart : "FULL",
     });
 
@@ -188,32 +232,48 @@ CRITICAL: Your entire response must be ONLY a single, valid JSON object using th
     res.status(201).json({ resultId: savedResult._id });
   } catch (error) {
     console.error("Error during exam analysis:", error);
-    res.status(500).json({ message: "Server error during exam analysis." });
+    res.status(500).json({ message: error.message || "Server error during exam analysis." });
   }
 };
 
 /**
- * @desc    Get the user's exam history for Multilevel
+ * @desc    Get the user's exam history for Multilevel, filtered by subscription tier
  * @route   GET /api/exam/multilevel/history
  * @access  Private
  */
 const getExamHistory = async (req, res) => {
   try {
-    // UPDATED: The .select() now includes `practicedPart`.
-    const history = await MultilevelExamResult.find({ userId: req.user._id })
+    const user = req.user;
+    const { tier } = user.subscription;
+    const limits = OFFERINGS[tier];
+
+    const dateFilter = {};
+
+    if (limits.historyRetentionDays !== Infinity) {
+      const now = new Date();
+      const retentionStartDate = new Date(now.setDate(now.getDate() - limits.historyRetentionDays));
+      dateFilter.createdAt = { $gte: retentionStartDate };
+    }
+
+    const query = {
+      userId: req.user._id,
+      ...dateFilter,
+    };
+
+    const history = await MultilevelExamResult.find(query)
       .select("_id totalScore createdAt practicedPart")
       .sort({ createdAt: -1 });
 
-    // UPDATED: The map now includes `practicePart` in the response object.
     const historySummaries = history.map((item) => ({
       id: item._id,
       examDate: item.createdAt.getTime(),
       totalScore: item.totalScore,
-      practicePart: item.practicedPart, // Pass the part to the client
+      practicePart: item.practicedPart,
     }));
 
     res.json({ history: historySummaries });
   } catch (error) {
+    console.error("Error fetching history:", error);
     res.status(500).json({ message: "Server error fetching history." });
   }
 };
