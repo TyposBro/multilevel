@@ -9,6 +9,7 @@ const subscriptionRoutes = require("./routes/subscriptionRoutes");
 const wordBankRoutes = require("./routes/wordBankRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
 const adminRoutes = require("./routes/adminRoutes");
+const telegramWebhookRoutes = require("./routes/telegramWebhookRoutes");
 
 dotenv.config();
 connectDB();
@@ -32,6 +33,7 @@ app.use("/api/exam/multilevel", multilevelExamRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/wordbank", wordBankRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/telegram/webhook", telegramWebhookRoutes);
 // ---
 
 app.use(notFound);

@@ -12,6 +12,7 @@
 
     <!--  LOGIN SCREEN  -->
     <string name="login_google">Google orqali kirish</string>
+    <string name="login_telegram">Telegram orqali kirish</string>
     <string name="login_google_error">Google orqali kirishda xatolik. Iltimos, qaytadan urining.</string>
     <string name="login_title">Xush kelibsiz</string>
     <string name="login_subtitle">Davom etish uchun kiring</string>

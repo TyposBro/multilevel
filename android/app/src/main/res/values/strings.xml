@@ -22,6 +22,7 @@
 
     <!--  LOGIN SCREEN  -->
     <string name="login_google">Sign in with Google</string>
+    <string name="login_telegram">Login with Telegram</string>
     <string name="login_google_error">Google sign in failed. Please try again.</string>
     <string name="login_title">Welcome Back</string>
     <string name="login_subtitle">Sign in to continue</string>

@@ -4,7 +4,6 @@ package com.typosbro.multilevel.data.remote.models
 import com.google.gson.annotations.SerializedName
 
 // --- Auth ---
-data class AuthRequest(val email: String, val password: String)
 data class AuthResponse(val _id: String, val email: String, val token: String)
 
 // --- Social Auth ---
@@ -15,3 +14,6 @@ data class UserProfileResponse(
     @SerializedName("email") val email: String,
     @SerializedName("createdAt") val createdAt: String // GSON will parse the date as a String
 )
+
+// This represents the JSON body: { "oneTimeToken": "some-uuid-string" }
+data class OneTimeTokenRequest(val oneTimeToken: String)

@@ -17,7 +17,6 @@ import androidx.navigation.navArgument
 import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.ui.screens.MainScreen
 import com.typosbro.multilevel.ui.screens.auth.LoginScreen
-import com.typosbro.multilevel.ui.screens.auth.RegisterScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamResultScreen
 import com.typosbro.multilevel.ui.screens.practice.ExamScreen
 import com.typosbro.multilevel.ui.screens.practice.MultilevelExamScreen
@@ -74,16 +73,9 @@ fun AppNavigation(
         startDestination = startDestination
     ) {
         composable(AppDestinations.LOGIN_ROUTE) {
-            LoginScreen(
-                onNavigateToRegister = { navController.navigate(AppDestinations.REGISTER_ROUTE) }
-            )
+            LoginScreen()
         }
 
-        composable(AppDestinations.REGISTER_ROUTE) {
-            RegisterScreen(
-                onNavigateToLogin = { navController.navigate(AppDestinations.LOGIN_ROUTE) }
-            )
-        }
 
         composable(AppDestinations.MAIN_HUB_ROUTE) {
             MainScreen(

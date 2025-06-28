@@ -1,11 +1,11 @@
 // {PATH_TO_PROJECT}/api/routes/authRoutes.js
 const express = require("express");
 const {
-  registerUser,
-  loginUser,
   getUserProfile,
   googleSignIn,
   deleteUserProfile,
+  verifyTelegramToken,
+  telegramRedirect,
 } = require("../controllers/authController"); // Adjust path
 const { protect } = require("../middleware/authMiddleware"); // Adjust path
 
@@ -14,8 +14,8 @@ const router = express.Router();
 // --- Social Sign-In route ---
 router.post("/google-signin", googleSignIn);
 
-router.post("/register", registerUser);
-router.post("/login", loginUser);
+router.post("/verify-telegram-token", verifyTelegramToken);
+router.get("/telegram/redirect", telegramRedirect);
 
 router
   .route("/profile")

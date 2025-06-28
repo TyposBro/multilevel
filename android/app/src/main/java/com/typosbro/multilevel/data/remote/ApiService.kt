@@ -4,7 +4,6 @@ package com.typosbro.multilevel.data.remote
 import com.typosbro.multilevel.data.remote.models.AnalyzeExamRequest
 import com.typosbro.multilevel.data.remote.models.AnalyzeExamResponse
 import com.typosbro.multilevel.data.remote.models.ApiWord
-import com.typosbro.multilevel.data.remote.models.AuthRequest
 import com.typosbro.multilevel.data.remote.models.AuthResponse
 import com.typosbro.multilevel.data.remote.models.ExamHistorySummaryResponse
 import com.typosbro.multilevel.data.remote.models.ExamResultResponse
@@ -16,6 +15,7 @@ import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
 import com.typosbro.multilevel.data.remote.models.MultilevelExamHistorySummaryResponse
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResultResponse
+import com.typosbro.multilevel.data.remote.models.OneTimeTokenRequest
 import com.typosbro.multilevel.data.remote.models.UserProfileResponse
 import retrofit2.Response
 import retrofit2.http.Body
@@ -28,20 +28,18 @@ import retrofit2.http.Query
 
 interface ApiService {
 
-    // --- NEW: Social Auth Endpoints ---
+    // --- Social Auth Endpoints ---
     @POST("auth/google-signin")
     suspend fun googleSignIn(@Body request: GoogleSignInRequest): Response<AuthResponse>
+
+    // NEW: Endpoint for verifying the deep link token
+    @POST("auth/verify-telegram-token")
+    suspend fun verifyTelegramToken(@Body request: OneTimeTokenRequest): Response<AuthResponse>
 
     // You would add one for Apple here too
     // @POST("auth/apple-signin")
     // suspend fun appleSignIn(@Body request: AppleSignInRequest): Response<AuthResponse>
 
-    // --- Auth Endpoints ---
-    @POST("auth/register")
-    suspend fun register(@Body request: AuthRequest): Response<AuthResponse>
-
-    @POST("auth/login")
-    suspend fun login(@Body request: AuthRequest): Response<AuthResponse>
 
     @GET("auth/profile")
     suspend fun getProfile(): Response<UserProfileResponse>

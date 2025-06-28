@@ -3,92 +3,9 @@ const User = require("../models/userModel");
 const ExamResult = require("../models/ieltsExamResultModel");
 const generateToken = require("../utils/generateToken");
 const { OAuth2Client } = require("google-auth-library");
+const OneTimeToken = require("../models/oneTimeTokenModel");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
-// @desc    Register a new user
-// @route   POST /api/auth/register
-// @access  Public
-const registerUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ message: "Please provide email and password" });
-  }
-
-  try {
-    const userExists = await User.findOne({ email });
-
-    if (userExists) {
-      // --- Optional but recommended: Handle conflicts ---
-      if (userExists.authProvider === "google") {
-        return res.status(400).json({
-          message: "This email was used to sign up with Google. Please use Google Sign-In.",
-        });
-      }
-      return res.status(400).json({ message: "User already exists with this email." });
-    }
-
-    // --- CHANGE: Explicitly set authProvider ---
-    const user = await User.create({
-      email,
-      password,
-      authProvider: "email", // Ensure this is set for standard registration
-    });
-
-    if (user) {
-      res.status(201).json({
-        _id: user._id,
-        email: user.email,
-        token: generateToken(user._id),
-      });
-    } else {
-      res.status(400).json({ message: "Invalid user data" });
-    }
-  } catch (error) {
-    console.error("Registration Error:", error);
-    if (error.name === "ValidationError") {
-      return res.status(400).json({ message: error.message });
-    }
-    res.status(500).json({ message: "Server error during registration" });
-  }
-};
-
-// @desc    Authenticate user & get token (Login)
-// @route   POST /api/auth/login
-// @access  Public
-const loginUser = async (req, res) => {
-  // ... loginUser function remains the same ...
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ message: "Please provide email and password" });
-  }
-
-  try {
-    const user = await User.findOne({ email }).select("+password");
-
-    // --- CHANGE: Add check for auth provider ---
-    if (user && user.authProvider === "google") {
-      return res
-        .status(400)
-        .json({ message: "This account uses Google Sign-In. Please log in with Google." });
-    }
-
-    if (user && (await user.matchPassword(password))) {
-      res.json({
-        _id: user._id,
-        email: user.email,
-        token: generateToken(user._id),
-      });
-    } else {
-      res.status(401).json({ message: "Invalid credentials" });
-    }
-  } catch (error) {
-    console.error("Login Error:", error);
-    res.status(500).json({ message: "Server error during login" });
-  }
-};
 
 // @desc    Get user profile (Example of a protected route)
 // @route   GET /api/auth/profile
@@ -183,10 +100,88 @@ const deleteUserProfile = async (req, res) => {
   }
 };
 
+const verifyTelegramToken = async (req, res) => {
+  const { oneTimeToken } = req.body;
+  if (!oneTimeToken) {
+    return res.status(400).json({ message: "One-time token is required." });
+  }
+
+  try {
+    // 1. Find and DELETE the token in one atomic operation to ensure it's single-use.
+    const foundToken = await OneTimeToken.findOneAndDelete({ token: oneTimeToken });
+
+    if (!foundToken) {
+      return res.status(401).json({ message: "Invalid or expired token. Please try again." });
+    }
+
+    // 2. We have the user's telegramId, now find or create the main user account.
+    let user = await User.findOne({ telegramId: foundToken.telegramId });
+
+    if (!user) {
+      // Because the webhook doesn't give us the user's name, we can't pre-populate it here.
+      // The app can fetch it later if needed.
+      user = await User.create({
+        telegramId: foundToken.telegramId,
+        authProvider: "telegram",
+      });
+    }
+
+    // 3. Issue the standard JWT
+    res.status(200).json({
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error("Error verifying one-time token:", error);
+    res.status(500).json({ message: "Server error during login." });
+  }
+};
+
+/**
+ * @desc    Serves a simple HTML page that redirects the user to the mobile app deep link.
+ *          This is the target for Telegram's login_url button.
+ * @route   GET /api/auth/telegram/redirect
+ * @access  Public
+ */
+const telegramRedirect = (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    return res
+      .status(400)
+      .send("<html><body>Error: Missing login token. Please try again.</body></html>");
+  }
+
+  const deepLink = `multilevelapp://login?token=${token}`;
+
+  // Serve a simple HTML page with a JavaScript redirect.
+  // This gives the user a seamless transition from Telegram's webview to your app.
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Logging in...</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+        </style>
+        <script>
+          window.location.replace("${deepLink}");
+        </script>
+      </head>
+      <body>
+        <p>Redirecting you to the app...</p>
+        <p>If you are not redirected automatically, <a href="${deepLink}">click here to log in</a>.</p>
+      </body>
+    </html>
+  `);
+};
+
 module.exports = {
-  registerUser,
-  loginUser,
   getUserProfile,
   googleSignIn,
   deleteUserProfile,
+  verifyTelegramToken,
+  telegramRedirect,
 };

@@ -12,6 +12,8 @@
 
     <!--  LOGIN SCREEN  -->
     <string name="login_google">Войти через Google</string>
+    <string name="login_telegram">Войти через  Telegram</string>
+
     <string name="login_google_error">Не удалось войти через Google. Пожалуйста, попробуйте еще раз.</string>
     <string name="login_title">С возвращением</string>
     <string name="login_subtitle">Войдите, чтобы продолжить</string>

@@ -1,84 +1,91 @@
-// {PATH_TO_PROJECT}/api/models/userModel.js
-
 const mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
 
-const userSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    required: [true, "Please provide an email"],
-    unique: true,
-    lowercase: true,
-    match: [
-      /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-      "Please provide a valid email address",
-    ],
-    trim: true,
-  },
-  password: {
-    type: String,
-    minlength: 6,
-    select: false,
-  },
-  authProvider: {
-    type: String,
-    required: true,
-    enum: ["email", "google"],
-    default: "email",
-  },
-  // --- NEW: SUBSCRIPTION & USAGE LOGIC ---
-  subscription: {
-    tier: {
+const userSchema = new mongoose.Schema(
+  {
+    // Email is optional and not a unique identifier. It's just profile data.
+    email: {
       type: String,
-      enum: ["free", "silver", "gold"],
-      default: "free",
+      lowercase: true,
+      trim: true,
     },
-    // The date when the current subscription or one-time purchase expires.
-    expiresAt: {
-      type: Date,
-      default: null,
-    },
-    // For auto-renewing subscriptions, this is the ID from the payment provider (e.g., Google Play).
-    providerSubscriptionId: {
+
+    // The method used to create and log in to the account.
+    authProvider: {
       type: String,
-      default: null,
+      required: true,
+      enum: ["google", "telegram", "apple"], // List of supported providers
     },
-    // Tracks if the user has already activated their one-time Gold trial.
-    hasUsedGoldTrial: {
-      type: Boolean,
-      default: false,
-    },
-  },
-  dailyUsage: {
-    fullExams: {
-      count: { type: Number, default: 0 },
-      lastReset: { type: Date, default: () => new Date() },
-    },
-    partPractices: {
-      count: { type: Number, default: 0 },
-      lastReset: { type: Date, default: () => new Date() },
-    },
-  },
-  // --- END OF NEW LOGIC ---
-  createdAt: {
-    type: Date,
-    default: Date.now,
-  },
-});
 
-// Mongoose middleware remains the same...
+    // --- Provider-Specific Unique IDs ---
+    // We use sparse indexes to allow multiple documents to have a null value for these fields,
+    // but enforce that any non-null value must be unique across the collection.
 
-userSchema.pre("save", async function (next) {
-  if (this.authProvider !== "email" || !this.isModified("password")) {
-    return next();
-  }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
-});
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    telegramId: {
+      type: Number,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    appleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
 
-userSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
+    // --- Profile Information (can be populated from providers) ---
+    firstName: {
+      type: String,
+    },
+    username: {
+      // Specifically for Telegram's @username
+      type: String,
+    },
+
+    // --- Subscription & Monetization Logic ---
+    subscription: {
+      tier: {
+        type: String,
+        enum: ["free", "silver", "gold"],
+        default: "free",
+      },
+      // The date when the current subscription or one-time purchase expires.
+      expiresAt: {
+        type: Date,
+        default: null,
+      },
+      // For auto-renewing subscriptions, this is the ID from the payment provider.
+      providerSubscriptionId: {
+        type: String,
+        default: null,
+      },
+      // Tracks if the user has already activated their one-time Gold trial.
+      hasUsedGoldTrial: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
+    // --- Usage Tracking for Freemium Limits ---
+    dailyUsage: {
+      fullExams: {
+        count: { type: Number, default: 0 },
+        lastReset: { type: Date, default: () => new Date() },
+      },
+      partPractices: {
+        count: { type: Number, default: 0 },
+        lastReset: { type: Date, default: () => new Date() },
+      },
+    },
+    // Note: For Silver tier's monthly limit, you would add a similar 'monthlyUsage' object here.
+  },
+  { timestamps: true }
+); // Adds createdAt and updatedAt automatically
 
 module.exports = mongoose.model("User", userSchema);

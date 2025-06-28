@@ -1,35 +1,25 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/auth/LoginScreen.kt
 package com.typosbro.multilevel.ui.screens.auth
 
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -44,20 +34,14 @@ import com.typosbro.multilevel.ui.viewmodels.UiState
 
 @Composable
 fun LoginScreen(
-    onNavigateToRegister: () -> Unit,
     authViewModel: AuthViewModel = hiltViewModel()
 ) {
     // --- State Management ---
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-
-    // It's better to unify the UI state in the ViewModel, but for now we'll combine them here.
-    val emailLoginState by authViewModel.loginState.collectAsState()
     val googleSignInState by authViewModel.googleSignInState.collectAsState()
-
-    // Determine overall loading state
-    val isLoading = emailLoginState is UiState.Loading || googleSignInState is UiState.Loading
-    val isFormEnabled = !isLoading
+    // You might have a state for when the app is waiting for the deep link token verification
+    // val deepLinkVerifyState by authViewModel.deepLinkVerifyState.collectAsState()
+    val isLoading =
+        googleSignInState is UiState.Loading // || deepLinkVerifyState is UiState.Loading
 
     // --- Google Sign-In Setup ---
     val context = LocalContext.current
@@ -85,7 +69,6 @@ fun LoginScreen(
         }
     }
 
-
     // --- UI ---
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -94,12 +77,10 @@ fun LoginScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp), // More horizontal padding
+                .padding(horizontal = 24.dp, vertical = 32.dp),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-
             Text(
                 text = stringResource(id = R.string.login_title),
                 style = MaterialTheme.typography.headlineLarge
@@ -107,73 +88,57 @@ fun LoginScreen(
             Text(
                 text = stringResource(id = R.string.login_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // --- Email & Password Form ---
-            OutlinedTextField(
-                value = email,
-                onValueChange = { email = it },
-                label = { Text(text = stringResource(id = R.string.login_email)) },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                enabled = isFormEnabled
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            OutlinedTextField(
-                value = password,
-                onValueChange = { password = it },
-                label = { Text(text = stringResource(id = R.string.login_pwd)) },
-                modifier = Modifier.fillMaxWidth(),
-                visualTransformation = PasswordVisualTransformation(),
-                singleLine = true,
-                enabled = isFormEnabled
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // --- Login Button ---
-            Button(
-                onClick = { authViewModel.login(email, password) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                enabled = email.isNotBlank() && password.isNotBlank() && isFormEnabled
-            ) {
-                if (emailLoginState is UiState.Loading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text(text = stringResource(id = R.string.login_button))
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // --- Divider ---
-            DividerWithText(
-                text = stringResource(id = R.string.login_or),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(48.dp))
 
             // --- Google Sign-In Button ---
             GoogleSignInButton(
                 isLoading = googleSignInState is UiState.Loading,
-                onClick = { googleSignInLauncher.launch(googleSignInClient.signInIntent) }
+                onClick = {
+                    if (!isLoading) googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                }
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // --- Divider ---
+            DividerWithText(
+                text = stringResource(id = R.string.login_or),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // --- Telegram Native Login Button ---
+            TelegramNativeLoginButton(
+                enabled = !isLoading,
+                onClick = {
+                    val botUsername = "milliy_technology_bot" // Your bot username
+                    // This intent opens the Telegram app directly to your bot.
+                    // Telegram will send a webhook to your backend when the user clicks "Start".
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://t.me/$botUsername")
+                    )
+                    try {
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        // Handle case where Telegram is not installed
+                        Log.e("LoginScreen", "Failed to open Telegram", e)
+                        // You could show a Toast or Snackbar message here.
+                    }
+                }
             )
 
             // --- Error Display ---
-            val emailError = (emailLoginState as? UiState.Error)?.message
+            // You would also check the deepLinkVerifyState error here in a real implementation
             val googleError = (googleSignInState as? UiState.Error)?.message
-            val errorMessage = emailError ?: googleError
+            val errorMessage = googleError
 
             if (errorMessage != null) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = errorMessage,
                     color = MaterialTheme.colorScheme.error,
@@ -181,14 +146,40 @@ fun LoginScreen(
                     textAlign = TextAlign.Center
                 )
             }
-
-            Spacer(modifier = Modifier.weight(1f)) // Pushes the register button down
-
-            // --- Register Button ---
-            TextButton(onClick = onNavigateToRegister, enabled = isFormEnabled) {
-                Text(text = stringResource(id = R.string.login_question))
-            }
-            Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+}
+
+
+/**
+ * A custom styled button for initiating the native Telegram login flow.
+ */
+@Composable
+private fun TelegramNativeLoginButton(
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Color(0xFF54A9E9), // Official Telegram Blue
+            contentColor = Color.White
+        )
+    ) {
+        Icon(
+            painter = painterResource(id = R.drawable.ic_telegram_logo), // You need to add this drawable
+            contentDescription = null, // decorative
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = stringResource(id = R.string.login_telegram),
+            fontWeight = FontWeight.Bold
+        )
     }
 }
