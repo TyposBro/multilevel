@@ -15,14 +15,14 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject
 
-// We can enhance the user profile with a formatted date
 data class UserProfileViewData(
     val id: String,
-    val email: String,
-    val registeredDate: String
+    val displayName: String,
+    val primaryIdentifier: String,
+    val registeredDate: String,
+    val authProvider: String,
 )
 
-// The UI State for the Profile Screen
 data class ProfileUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
@@ -50,7 +50,7 @@ class ProfileViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            userProfile = result.data.toViewData() // Map to a display-friendly model
+                            userProfile = result.data.toViewData()
                         )
                     }
                 }
@@ -80,7 +80,6 @@ class ProfileViewModel @Inject constructor(
         }
     }
 
-    // Optional: A way to reset the delete state if needed
     fun resetDeleteState() {
         _uiState.update { it.copy(deleteState = UiState.Idle) }
     }
@@ -95,9 +94,28 @@ private fun UserProfileResponse.toViewData(): UserProfileViewData {
     } catch (e: Exception) {
         null
     }
+
+    // --- THIS IS THE CORRECTED LOGIC ---
+    // We use the safe call operator (?.) to prevent a crash if authProvider is null.
+    // The Elvis operator (?:) provides a default value ("unknown") in that case.
+    val displayName = when (this.authProvider?.lowercase()) {
+        "google" -> this.firstName ?: this.email ?: "Google User"
+        "telegram" -> this.firstName ?: this.username?.let { "@$it" } ?: "Telegram User"
+        else -> "User" // Default for unknown or null providers
+    }
+
+    val primaryIdentifier = this.email ?: this.telegramId?.toString() ?: "No identifier"
+
+    val providerName = this.authProvider?.replaceFirstChar {
+        if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+    } ?: "Unknown"
+    // --- END OF CORRECTION ---
+
     return UserProfileViewData(
         id = this.id,
-        email = this.email,
-        registeredDate = date?.let { formatter.format(it) } ?: "N/A"
+        displayName = displayName,
+        primaryIdentifier = primaryIdentifier,
+        registeredDate = date?.let { formatter.format(it) } ?: "N/A",
+        authProvider = providerName
     )
 }

@@ -11,17 +11,34 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // @route   GET /api/auth/profile
 // @access  Private
 const getUserProfile = async (req, res) => {
-  // req.user is attached by the 'protect' middleware
-  res.json({
-    _id: req.user._id,
-    email: req.user.email,
-    createdAt: req.user.createdAt,
-  });
+  // The `protect` middleware has already fetched the user object and attached it to `req.user`.
+  // The object contains all the fields from our userModel.
+  const user = req.user;
+
+  if (user) {
+    // --- THIS IS THE FIX ---
+    // Construct a response object that includes all the fields the frontend expects.
+    res.json({
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      telegramId: user.telegramId,
+      username: user.username,
+      authProvider: user.authProvider,
+      createdAt: user.createdAt,
+    });
+    // --- END OF FIX ---
+  } else {
+    // This case should ideally not be hit if the `protect` middleware is working correctly.
+    res.status(404).json({ message: "User not found" });
+  }
 };
 
-// @desc    Authenticate user with Google & get token
-// @route   POST /api/auth/google-signin
-// @access  Public
+/**
+ * @desc    Authenticate user with Google & get token
+ * @route   POST /api/auth/google-signin
+ * @access  Public
+ */
 const googleSignIn = async (req, res) => {
   const { idToken } = req.body;
 
@@ -30,41 +47,37 @@ const googleSignIn = async (req, res) => {
   }
 
   try {
-    // 1. Verify the ID token with Google
     const ticket = await client.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
-    const { email, name } = ticket.getPayload(); // You can also get 'name', 'picture' etc.
 
-    // 2. Find user in your DB
-    let user = await User.findOne({ email });
+    // IMPORTANT: Use 'sub' as the unique ID from Google
+    const { sub, email, name } = ticket.getPayload();
 
-    // 3. If user doesn't exist, create a new one
+    // Find user by their unique Google ID, not email
+    let user = await User.findOne({ googleId: sub });
+
     if (!user) {
+      // If no user with this Google ID, create one.
       user = await User.create({
-        email,
+        googleId: sub,
+        email: email,
+        firstName: name,
         authProvider: "google",
-        // Note: No password is set
       });
     }
 
-    // 4. If user exists but signed up with email, handle it
-    // This is an important edge case. Here, we just log them in.
-    // You could also return an error if you want to keep accounts separate.
-    if (user.authProvider === "email") {
-      console.log(`User ${email} originally signed up with email/password. Logging in via Google.`);
-    }
-
-    // 5. Generate your own JWT and send it back to the client
+    // Generate our app's JWT and send it back.
+    // Also include firstName in the response so the app can greet the user immediately.
     res.status(200).json({
       _id: user._id,
       email: user.email,
+      firstName: user.firstName,
       token: generateToken(user._id),
     });
   } catch (error) {
     console.error("Google Sign-In Error:", error);
-    // This can happen if the token is invalid, expired, or the audience doesn't match
     res.status(401).json({ message: "Google Sign-In failed. Invalid token." });
   }
 };

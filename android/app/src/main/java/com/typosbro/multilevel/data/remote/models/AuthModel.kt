@@ -1,19 +1,29 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/models/AuthModel.kt
 package com.typosbro.multilevel.data.remote.models
 
 import com.google.gson.annotations.SerializedName
 
-// --- Auth ---
-data class AuthResponse(val _id: String, val email: String, val token: String)
-
-// --- Social Auth ---
-data class GoogleSignInRequest(val idToken: String)
-
-data class UserProfileResponse(
+// --- Auth Response ---
+// email and firstName are now nullable to handle all provider types.
+data class AuthResponse(
     @SerializedName("_id") val id: String,
-    @SerializedName("email") val email: String,
-    @SerializedName("createdAt") val createdAt: String // GSON will parse the date as a String
+    @SerializedName("email") val email: String?,
+    @SerializedName("firstName") val firstName: String?,
+    @SerializedName("token") val token: String
 )
 
-// This represents the JSON body: { "oneTimeToken": "some-uuid-string" }
+// --- Social Auth Requests ---
+data class GoogleSignInRequest(val idToken: String)
 data class OneTimeTokenRequest(val oneTimeToken: String)
+
+
+// --- User Profile Response ---
+// This model should also reflect that some fields can be null.
+data class UserProfileResponse(
+    @SerializedName("_id") val id: String,
+    @SerializedName("email") val email: String?,
+    @SerializedName("firstName") val firstName: String?,
+    @SerializedName("telegramId") val telegramId: Long?,
+    @SerializedName("username") val username: String?, // Telegram username
+    @SerializedName("authProvider") val authProvider: String,
+    @SerializedName("createdAt") val createdAt: String
+)

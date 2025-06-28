@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -82,19 +83,15 @@ fun ProfileScreen(
     var showAboutDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
-    val context = LocalContext.current // Get context for the URL launcher
+    val context = LocalContext.current
 
-    val privacyPolicyUrl =
-        stringResource(R.string.url_privacy_policy) // Fetch the URL from resources
-    val faqUrl =
-        stringResource(R.string.url_faq) // Fetch the FAQ URL from resources
+    val privacyPolicyUrl = stringResource(R.string.url_privacy_policy)
+    val faqUrl = stringResource(R.string.url_faq)
 
-    // This effect handles the success of the account deletion by logging out.
     LaunchedEffect(uiState.deleteState) {
         if (uiState.deleteState is UiState.Success) {
             coroutineScope.launch {
                 authViewModel.logout()
-                // Navigation will happen automatically.
             }
         }
     }
@@ -137,14 +134,41 @@ fun ProfileScreen(
             // --- Account Section ---
             item {
                 SectionHeader(title = stringResource(id = R.string.profile_section_title_account))
+                // --- CORRECTED: Use the new display fields from UserProfileViewData ---
                 ListItem(
-                    headlineContent = { Text(text = stringResource(id = R.string.login_email)) },
-                    supportingContent = { Text(userProfile?.email ?: "...") },
+                    headlineContent = { Text(text = userProfile?.displayName ?: "...") },
+                    supportingContent = { Text(userProfile?.primaryIdentifier ?: "...") },
                     leadingContent = {
                         Icon(
                             Icons.Default.AccountCircle,
-                            contentDescription = stringResource(id = R.string.login_email)
+                            contentDescription = "User Profile"
                         )
+                    }
+                )
+                ListItem(
+                    headlineContent = { Text(text = "Authentication Method") },
+                    supportingContent = { Text(userProfile?.authProvider ?: "...") },
+                    leadingContent = {
+                        when (userProfile?.authProvider?.lowercase()) {
+                            "google" -> Icon(
+                                painter = painterResource(id = R.drawable.ic_google_logo),
+                                contentDescription = "Google Login",
+                                modifier = Modifier.size(24.dp),
+                                tint = Color.Unspecified // Use default color
+                            )
+
+                            "telegram" -> Icon(
+                                painter = painterResource(id = R.drawable.ic_telegram_logo),
+                                contentDescription = "Telegram Login",
+                                modifier = Modifier.size(24.dp),
+                                tint = Color.Unspecified // Use default color
+                            )
+
+                            else -> Icon(
+                                imageVector = Icons.Default.PrivacyTip,
+                                contentDescription = "Default Login Method"
+                            )
+                        }
                     }
                 )
                 ListItem(
@@ -177,13 +201,13 @@ fun ProfileScreen(
                             contentDescription = null
                         )
                     },
-                    modifier = Modifier.clickable { /* Navigate to subscription screen */ }
+                    modifier = Modifier.clickable { /* TODO: Navigate to subscription screen */ }
                 )
             }
 
+            // --- Settings Section ---
             item {
                 SectionHeader(title = stringResource(id = R.string.profile_section_title_settings))
-                // --- DARK MODE ---
                 ListItem(
                     headlineContent = { Text(text = stringResource(id = R.string.profile_item_dark_mode)) },
                     leadingContent = {
@@ -192,7 +216,6 @@ fun ProfileScreen(
                             contentDescription = stringResource(id = R.string.profile_item_dark_mode)
                         )
                     },
-                    // The Switch is back and connected to the ViewModel
                     trailingContent = {
                         Switch(
                             checked = isDarkTheme,
@@ -202,7 +225,6 @@ fun ProfileScreen(
                         )
                     }
                 )
-                // --- LANGUAGE SELECTOR ---
                 ListItem(
                     headlineContent = { Text(text = stringResource(id = R.string.profile_item_language)) },
                     leadingContent = {
@@ -240,11 +262,8 @@ fun ProfileScreen(
                             contentDescription = stringResource(id = R.string.profile_item_help)
                         )
                     },
-                    modifier = Modifier.clickable {
-                        openUrlInCustomTab(context, faqUrl)
-                    }
+                    modifier = Modifier.clickable { openUrlInCustomTab(context, faqUrl) }
                 )
-                // --- PRIVACY POLICY ---
                 ListItem(
                     headlineContent = { Text(text = stringResource(id = R.string.profile_item_privacy)) },
                     leadingContent = {
@@ -253,11 +272,9 @@ fun ProfileScreen(
                             contentDescription = stringResource(id = R.string.profile_item_privacy)
                         )
                     },
-                    modifier = Modifier.clickable {
-                        openUrlInCustomTab(context, privacyPolicyUrl)
-                    }
+                    modifier = Modifier.clickable { openUrlInCustomTab(context, privacyPolicyUrl) }
                 )
-                // --- ABOUT APP ---
+
                 ListItem(
                     headlineContent = { Text(text = stringResource(id = R.string.profile_item_about)) },
                     leadingContent = {
@@ -266,14 +283,13 @@ fun ProfileScreen(
                             contentDescription = stringResource(id = R.string.profile_item_about)
                         )
                     },
-                    modifier = Modifier.clickable { showAboutDialog = true } // Show the dialog
+                    modifier = Modifier.clickable { showAboutDialog = true }
                 )
             }
 
             // --- Actions Section ---
             item {
                 SectionHeader(title = stringResource(id = R.string.profile_section_title_action))
-                // --- LOGOUT BUTTON ---
                 ListItem(
                     headlineContent = { Text(text = stringResource(id = R.string.button_logout)) },
                     leadingContent = {
@@ -284,7 +300,6 @@ fun ProfileScreen(
                     },
                     modifier = Modifier.clickable { showLogoutDialog = true }
                 )
-                // --- DELETE ACCOUNT BUTTON ---
                 ListItem(
                     headlineContent = {
                         Text(
@@ -306,6 +321,7 @@ fun ProfileScreen(
             }
         }
 
+        // --- Error Message Display ---
         val deleteError = (uiState.deleteState as? UiState.Error)?.message
         val fetchError = uiState.error
         val errorMessage = deleteError ?: fetchError
@@ -350,6 +366,7 @@ fun ProfileScreen(
         )
     }
 
+    // Add this to your composable to prevent showing multiple dialogs
     if (showAboutDialog) {
         AboutAppDialog(onDismiss = { showAboutDialog = false })
     }
@@ -363,14 +380,9 @@ fun ProfileScreen(
             onDismiss = { showLanguageDialog = false }
         )
     }
-
-    if (showAboutDialog) {
-        AboutAppDialog(onDismiss = { showAboutDialog = false })
-    }
 }
 
 
-// --- HELPER COMPOSABLE ---
 @Composable
 private fun SectionHeader(title: String) {
     Column {
@@ -445,7 +457,6 @@ private fun LanguageSelectionDialog(
     onLanguageSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    // Define the list of supported languages
     val supportedLanguages = mapOf(
         "en" to "English",
         "ru" to "Русский",
