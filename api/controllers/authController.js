@@ -4,6 +4,7 @@ const ExamResult = require("../models/ieltsExamResultModel");
 const generateToken = require("../utils/generateToken");
 const { OAuth2Client } = require("google-auth-library");
 const OneTimeToken = require("../models/oneTimeTokenModel");
+const axios = require("axios");
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -120,26 +121,53 @@ const verifyTelegramToken = async (req, res) => {
   }
 
   try {
-    // 1. Find and DELETE the token in one atomic operation to ensure it's single-use.
     const foundToken = await OneTimeToken.findOneAndDelete({ token: oneTimeToken });
 
     if (!foundToken) {
       return res.status(401).json({ message: "Invalid or expired token. Please try again." });
     }
 
-    // 2. We have the user's telegramId, now find or create the main user account.
+    const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
+
+    // 1. Delete the bot's "Log In" button message
+    if (foundToken.botMessageId) {
+      axios
+        .post(`${TELEGRAM_API}/deleteMessage`, {
+          chat_id: foundToken.telegramId,
+          message_id: foundToken.botMessageId,
+        })
+        .catch((err) => {
+          console.error(
+            "Failed to delete bot's login message:",
+            err.response ? err.response.data : err.message
+          );
+        });
+    }
+
+    // 2. Delete the user's "/start" command message
+    if (foundToken.userMessageId) {
+      axios
+        .post(`${TELEGRAM_API}/deleteMessage`, {
+          chat_id: foundToken.telegramId,
+          message_id: foundToken.userMessageId,
+        })
+        .catch((err) => {
+          console.error(
+            "Failed to delete user's /start message:",
+            err.response ? err.response.data : err.message
+          );
+        });
+    }
+
     let user = await User.findOne({ telegramId: foundToken.telegramId });
 
     if (!user) {
-      // Because the webhook doesn't give us the user's name, we can't pre-populate it here.
-      // The app can fetch it later if needed.
       user = await User.create({
         telegramId: foundToken.telegramId,
         authProvider: "telegram",
       });
     }
 
-    // 3. Issue the standard JWT
     res.status(200).json({
       _id: user._id,
       email: user.email,
