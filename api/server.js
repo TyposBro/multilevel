@@ -2,14 +2,7 @@ const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
 const connectDB = require("./config/db");
-const authRoutes = require("./routes/authRoutes");
-const ieltsExamRoutes = require("./routes/ieltsExamRoutes");
-const multilevelExamRoutes = require("./routes/multilevelExamRoutes");
-const subscriptionRoutes = require("./routes/subscriptionRoutes");
-const wordBankRoutes = require("./routes/wordBankRoutes");
 const { notFound, errorHandler } = require("./middleware/errorMiddleware");
-const adminRoutes = require("./routes/adminRoutes");
-const telegramWebhookRoutes = require("./routes/telegramWebhookRoutes");
 
 dotenv.config();
 connectDB();
@@ -25,15 +18,16 @@ app.get("/", (req, res) => {
 });
 
 // --- API Routes ---
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", require("./routes/authRoutes"));
 
 // --- Mount both exam routes under separate namespaces ---
-app.use("/api/exam/ielts", ieltsExamRoutes);
-app.use("/api/exam/multilevel", multilevelExamRoutes);
-app.use("/api/subscriptions", subscriptionRoutes);
-app.use("/api/wordbank", wordBankRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/telegram/webhook", telegramWebhookRoutes);
+app.use("/api/exam/ielts", require("./routes/ieltsExamRoutes"));
+app.use("/api/exam/multilevel", require("./routes/multilevelExamRoutes"));
+app.use("/api/subscriptions", require("./routes/subscriptionRoutes"));
+app.use("/api/wordbank", require("./routes/wordBankRoutes"));
+app.use("/api/admin", require("./routes/adminRoutes"));
+app.use("/api/telegram/webhook", require("./routes/telegramWebhookRoutes"));
+app.use("/api/payment", require("./routes/paymentRoutes"));
 // ---
 
 app.use(notFound);

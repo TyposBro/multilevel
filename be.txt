@@ -1,0 +1,2569 @@
+const express = require("express");
+const dotenv = require("dotenv");
+const cors = require("cors");
+const connectDB = require("./config/db");
+const authRoutes = require("./routes/authRoutes");
+const ieltsExamRoutes = require("./routes/ieltsExamRoutes");
+const multilevelExamRoutes = require("./routes/multilevelExamRoutes");
+const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const wordBankRoutes = require("./routes/wordBankRoutes");
+const { notFound, errorHandler } = require("./middleware/errorMiddleware");
+const adminRoutes = require("./routes/adminRoutes");
+const telegramWebhookRoutes = require("./routes/telegramWebhookRoutes");
+
+dotenv.config();
+connectDB();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+app.get("/", (req, res) => {
+  res.send("API is running...");
+});
+
+// --- API Routes ---
+app.use("/api/auth", authRoutes);
+
+// --- Mount both exam routes under separate namespaces ---
+app.use("/api/exam/ielts", ieltsExamRoutes);
+app.use("/api/exam/multilevel", multilevelExamRoutes);
+app.use("/api/subscriptions", subscriptionRoutes);
+app.use("/api/wordbank", wordBankRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/telegram/webhook", telegramWebhookRoutes);
+// ---
+
+app.use(notFound);
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// {PATH_TO_PROJECT}/api/config/db.js
+const mongoose = require("mongoose");
+require("dotenv").config(); // Load .env variables
+
+const connectDB = async () => {
+  try {
+    const conn = await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      // Mongoose 6 doesn't need useCreateIndex or useFindAndModify
+    });
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error(`Error connecting to MongoDB: ${error.message}`);
+    process.exit(1); // Exit process with failure
+  }
+};
+
+module.exports = connectDB;
+// {PATH_TO_PROJECT}/api/config/offerings.js
+
+const OFFERINGS = {
+  free: {
+    dailyPartPractices: 3,
+    dailyFullExams: 1,
+    historyRetentionDays: 7,
+    // For features that are unlimited, we can use a special value like -1 or Infinity
+    monthlyFullExams: Infinity,
+  },
+  silver: {
+    dailyPartPractices: Infinity, // Or just omit the key if you check for its existence
+    dailyFullExams: Infinity,
+    historyRetentionDays: 180, // ~6 months
+    monthlyFullExams: 5,
+  },
+  gold: {
+    dailyPartPractices: Infinity,
+    dailyFullExams: Infinity,
+    historyRetentionDays: Infinity, // Represents unlimited
+    monthlyFullExams: Infinity,
+  },
+};
+
+// We use `Infinity` for checks. It's cleaner than checking for null/undefined/-1.
+// e.g., if (count >= OFFERINGS[tier].dailyPartPractices) { ... }
+// If the limit is Infinity, this check will always be false.
+
+module.exports = OFFERINGS;
+// {PATH_TO_PROJECT}/api/config/plans.js
+
+const PLANS = {
+  silver_monthly: {
+    tier: "silver",
+    durationDays: 30,
+    prices: {
+      // Prices in the smallest currency unit (tiyin/cents)
+      uzs: 1500000,
+      usd: 149, // For Google Play
+    },
+    // IDs from each payment provider's dashboard
+    providerIds: {
+      google: "silver_monthly_sub_id", // Your Google Play Subscription ID
+      payme: "product_id_silver_monthly",
+      paynet: "product_id_silver_monthly",
+      click: "service_id_silver_monthly",
+    },
+  },
+  gold_monthly: {
+    tier: "gold",
+    durationDays: 30,
+    prices: {
+      uzs: 5000000,
+      usd: 499,
+    },
+    providerIds: {
+      google: "gold_monthly_sub_id",
+      payme: "product_id_gold_monthly",
+      paynet: "product_id_gold_monthly",
+      click: "service_id_gold_monthly",
+    },
+  },
+  // This is the ONE-TIME purchase (non-recurring subscription)
+  gold_one_time_month: {
+    tier: "gold",
+    durationDays: 30,
+    prices: {
+      uzs: 5000000, // Same price, different product
+      usd: 499,
+    },
+    providerIds: {
+      google: "gold_one_time_purchase_id", // This would be an "In-App Product" in Google Play
+      payme: "product_id_gold_one_time",
+      paynet: "product_id_gold_one_time",
+      click: "service_id_gold_one_time",
+    },
+  },
+};
+
+module.exports = PLANS;
+// {PATH_TO_PROJECT}/api/controllers/adminAuthController.js
+
+const Admin = require("../models/AdminModel");
+const jwt = require("jsonwebtoken");
+
+// Generate a token specifically for an admin
+const generateAdminToken = (adminId) => {
+  return jwt.sign({ id: adminId }, process.env.JWT_SECRET_ADMIN, {
+    expiresIn: process.env.JWT_EXPIRES_IN_ADMIN,
+  });
+};
+
+/**
+ * @desc    Authenticate admin & get token (Login)
+ * @route   POST /api/admin/auth/login
+ * @access  Public
+ */
+const loginAdmin = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: "Please provide email and password" });
+  }
+
+  try {
+    const admin = await Admin.findOne({ email }).select("+password");
+
+    if (admin && (await admin.matchPassword(password))) {
+      res.json({
+        _id: admin._id,
+        email: admin.email,
+        role: admin.role,
+        token: generateAdminToken(admin._id),
+      });
+    } else {
+      res.status(401).json({ message: "Invalid admin credentials" });
+    }
+  } catch (error) {
+    console.error("Admin Login Error:", error);
+    res.status(500).json({ message: "Server error during admin login" });
+  }
+};
+
+module.exports = { loginAdmin };
+const Part1_1_Question = require("../models/content/Part1_1_QuestionModel");
+const Part1_2_Set = require("../models/content/Part1_2_SetModel");
+const Part2_Set = require("../models/content/Part2_SetModel");
+const Part3_Topic = require("../models/content/Part3_TopicModel");
+const { uploadToCDN } = require("../services/storageService");
+const Word = require("../models/wordModel");
+
+const DEFAULT_PROVIDER = "supabase";
+
+// ... (uploadPart1_1 and uploadPart1_2 are unchanged) ...
+
+/**
+ * @desc    Upload content for a new Part 1.1 Question
+ * @route   POST /api/admin/content/part1.1
+ * @access  Private/Admin
+ */
+const uploadPart1_1 = async (req, res) => {
+  const { questionText, provider = DEFAULT_PROVIDER } = req.body;
+  const file = req.file;
+
+  if (!questionText || !file) {
+    return res.status(400).json({ message: "Question text and an audio file are required." });
+  }
+
+  try {
+    console.log(`[Part 1.1] Using storage provider: ${provider}`);
+    const audioUrl = await uploadToCDN(provider, file, "audio");
+
+    const newQuestion = new Part1_1_Question({ questionText, audioUrl });
+    await newQuestion.save();
+
+    res
+      .status(201)
+      .json({ message: "Part 1.1 question uploaded successfully!", data: newQuestion });
+  } catch (error) {
+    console.error(`[Part 1.1] Upload Error:`, error);
+    res.status(500).json({ message: error.message || "Server error during file upload." });
+  }
+};
+
+/**
+ * @desc    Upload content for a new Part 1.2 Set
+ * @route   POST /api/admin/content/part1.2
+ * @access  Private/Admin
+ */
+const uploadPart1_2 = async (req, res) => {
+  const {
+    question1,
+    question2,
+    question3,
+    imageDescription,
+    provider = DEFAULT_PROVIDER,
+  } = req.body;
+  const files = req.files;
+
+  if (!question1 || !question2 || !question3 || !imageDescription) {
+    return res.status(400).json({ message: "All text fields are required." });
+  }
+  if (!files.image1 || !files.image2 || !files.audio1 || !files.audio2 || !files.audio3) {
+    return res.status(400).json({ message: "All 5 files (2 images, 3 audio) are required." });
+  }
+
+  try {
+    console.log(`[Part 1.2] Using storage provider: ${provider}`);
+    const [image1Url, image2Url, audio1Url, audio2Url, audio3Url] = await Promise.all([
+      uploadToCDN(provider, files.image1[0], "images"),
+      uploadToCDN(provider, files.image2[0], "images"),
+      uploadToCDN(provider, files.audio1[0], "audio"),
+      uploadToCDN(provider, files.audio2[0], "audio"),
+      uploadToCDN(provider, files.audio3[0], "audio"),
+    ]);
+
+    const newSet = new Part1_2_Set({
+      image1Url,
+      image2Url,
+      imageDescription,
+      questions: [
+        { text: question1, audioUrl: audio1Url },
+        { text: question2, audioUrl: audio2Url },
+        { text: question3, audioUrl: audio3Url },
+      ],
+      tags: ["admin-upload"],
+    });
+
+    await newSet.save();
+    res.status(201).json({ message: "Part 1.2 content set uploaded successfully!", data: newSet });
+  } catch (error) {
+    console.error(`[Part 1.2] Upload Error:`, error);
+    res.status(500).json({ message: error.message || "Server error during file upload." });
+  }
+};
+
+/**
+ * @desc    Upload content for a new Part 2 Set (Image and Description are optional)
+ * @route   POST /api/admin/content/part2
+ * @access  Private/Admin
+ */
+const uploadPart2 = async (req, res) => {
+  // --- START OF MODIFIED LOGIC ---
+  const {
+    question1,
+    question2,
+    question3,
+    imageDescription, // This is now optional
+    provider = DEFAULT_PROVIDER,
+  } = req.body;
+  const files = req.files;
+
+  // 1. Update validation: only questions and audio are mandatory.
+  if (!question1 || !question2 || !question3) {
+    return res.status(400).json({ message: "All three question text fields are required." });
+  }
+  if (!files.audio) {
+    return res.status(400).json({ message: "A single combined audio file is required." });
+  }
+
+  try {
+    console.log(`[Part 2] Using storage provider: ${provider}`);
+
+    // 2. Conditionally upload image only if it exists
+    let imageUrl = null;
+    if (files.image && files.image[0]) {
+      console.log("[Part 2] Image found, uploading...");
+      imageUrl = await uploadToCDN(provider, files.image[0], "images");
+    }
+
+    // 3. Upload the mandatory audio file
+    const audioUrl = await uploadToCDN(provider, files.audio[0], "audio");
+
+    // 4. Create the new set, saving the data to the database
+    const newSet = new Part2_Set({
+      imageUrl, // This will be the URL or null
+      imageDescription: imageDescription || null, // Save description or null
+      questions: [
+        { text: question1, audioUrl: audioUrl },
+        { text: question2, audioUrl: audioUrl },
+        { text: question3, audioUrl: audioUrl },
+      ],
+      tags: ["admin-upload"],
+    });
+
+    await newSet.save(); // The data is being saved correctly.
+
+    res.status(201).json({ message: "Part 2 content set uploaded successfully!", data: newSet });
+  } catch (error) {
+    console.error(`[Part 2] Upload Error:`, error);
+    res.status(500).json({ message: error.message || "Server error during file upload." });
+  }
+  // --- END OF MODIFIED LOGIC ---
+};
+
+/**
+ * @desc    Upload content for a new Part 3 Topic (Image is optional)
+ * @route   POST /api/admin/content/part3
+ * @access  Private/Admin
+ */
+const uploadPart3 = async (req, res) => {
+  // --- THIS LOGIC IS ALREADY CORRECT FOR OPTIONAL IMAGES ---
+  const { topic, forPoints, againstPoints, provider = DEFAULT_PROVIDER } = req.body;
+  const file = req.file; // From `upload.single('image')`, this will be undefined if no file is sent.
+
+  if (!topic || !forPoints || !againstPoints) {
+    return res.status(400).json({ message: "Topic, FOR points, and AGAINST points are required." });
+  }
+
+  try {
+    console.log(`[Part 3] Using storage provider: ${provider}`);
+    let imageUrl = null;
+    // This `if (file)` check is the correct way to handle an optional single upload.
+    if (file) {
+      console.log("[Part 3] Image found, uploading...");
+      imageUrl = await uploadToCDN(provider, file, "images");
+    }
+
+    const newTopic = new Part3_Topic({
+      topic,
+      forPoints: forPoints.split("\n").filter((p) => p.trim() !== ""),
+      againstPoints: againstPoints.split("\n").filter((p) => p.trim() !== ""),
+      imageUrl, // This will correctly be the URL or null.
+      tags: ["admin-upload"],
+    });
+
+    await newTopic.save(); // The data is being saved correctly.
+
+    res.status(201).json({ message: "Part 3 topic uploaded successfully!", data: newTopic });
+  } catch (error) {
+    console.error(`[Part 3] Upload Error:`, error);
+    res.status(500).json({ message: error.message || "Server error during file upload." });
+  }
+};
+
+// ... (uploadWordBankWord is unchanged) ...
+
+/**
+ * @desc    Uploads a new word to the Word Bank
+ * @route   POST /api/admin/wordbank/add
+ * @access  Private (Admin only)
+ */
+const uploadWordBankWord = async (req, res) => {
+  const {
+    word,
+    translation,
+    cefrLevel,
+    topic,
+    example1,
+    example1Translation,
+    example2,
+    example2Translation,
+  } = req.body;
+
+  if (!word || !translation || !cefrLevel || !topic) {
+    return res.status(400).json({
+      message: "Please fill all required fields: word, translation, cefrLevel, and topic.",
+    });
+  }
+
+  try {
+    const newWord = new Word({
+      word,
+      translation,
+      cefrLevel,
+      topic,
+      example1: example1 || null,
+      example1Translation: example1Translation || null,
+      example2: example2 || null,
+      example2Translation: example2Translation || null,
+    });
+
+    const createdWord = await newWord.save();
+
+    res.status(201).json({
+      message: "Word successfully added to the Word Bank.",
+      word: createdWord,
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({ message: `Error: The word "${word}" already exists.` });
+    }
+    console.error("Word Bank Upload Error:", error);
+    res.status(500).json({ message: "Server error while adding the word." });
+  }
+};
+
+module.exports = {
+  uploadPart1_1,
+  uploadPart1_2,
+  uploadPart2,
+  uploadPart3,
+  uploadWordBankWord,
+};
+// {PATH_TO_PROJECT}/api/controllers/authController.js
+const User = require("../models/userModel");
+const ExamResult = require("../models/ieltsExamResultModel");
+const generateToken = require("../utils/generateToken");
+const { OAuth2Client } = require("google-auth-library");
+const OneTimeToken = require("../models/oneTimeTokenModel");
+const axios = require("axios");
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// @desc    Get user profile (Example of a protected route)
+// @route   GET /api/auth/profile
+// @access  Private
+const getUserProfile = async (req, res) => {
+  // The `protect` middleware has already fetched the user object and attached it to `req.user`.
+  // The object contains all the fields from our userModel.
+  const user = req.user;
+
+  if (user) {
+    // --- THIS IS THE FIX ---
+    // Construct a response object that includes all the fields the frontend expects.
+    res.json({
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      telegramId: user.telegramId,
+      username: user.username,
+      authProvider: user.authProvider,
+      createdAt: user.createdAt,
+    });
+    // --- END OF FIX ---
+  } else {
+    // This case should ideally not be hit if the `protect` middleware is working correctly.
+    res.status(404).json({ message: "User not found" });
+  }
+};
+
+/**
+ * @desc    Authenticate user with Google & get token
+ * @route   POST /api/auth/google-signin
+ * @access  Public
+ */
+const googleSignIn = async (req, res) => {
+  const { idToken } = req.body;
+
+  if (!idToken) {
+    return res.status(400).json({ message: "Google ID token is required." });
+  }
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    // IMPORTANT: Use 'sub' as the unique ID from Google
+    const { sub, email, name } = ticket.getPayload();
+
+    // Find user by their unique Google ID, not email
+    let user = await User.findOne({ googleId: sub });
+
+    if (!user) {
+      // If no user with this Google ID, create one.
+      user = await User.create({
+        googleId: sub,
+        email: email,
+        firstName: name,
+        authProvider: "google",
+      });
+    }
+
+    // Generate our app's JWT and send it back.
+    // Also include firstName in the response so the app can greet the user immediately.
+    res.status(200).json({
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error("Google Sign-In Error:", error);
+    res.status(401).json({ message: "Google Sign-In failed. Invalid token." });
+  }
+};
+
+// @desc    Delete user profile and all associated data
+// @route   DELETE /api/auth/profile
+// @access  Private
+const deleteUserProfile = async (req, res) => {
+  try {
+    // req.user is attached by the 'protect' middleware. We get the user's ID from there.
+    const userId = req.user._id;
+
+    // 1. Delete all associated data first (cascading delete)
+    // This prevents orphaned data in your database.
+    // Adjust the field names ('userId') to match your schemas.
+    await ExamResult.deleteMany({ userId: userId });
+    // await Chat.deleteMany({ userId: userId }); // Uncomment when you have a Chat model
+    // Add any other models associated with the user here...
+
+    // 2. Find and delete the user themselves
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // 3. Respond with success
+    console.log(`User ${userId} and their data have been deleted successfully.`);
+    res.status(200).json({ message: "User account and all associated data deleted successfully." });
+  } catch (error) {
+    console.error("Delete User Error:", error);
+    res.status(500).json({ message: "Server error during account deletion." });
+  }
+};
+
+const verifyTelegramToken = async (req, res) => {
+  const { oneTimeToken } = req.body;
+  if (!oneTimeToken) {
+    return res.status(400).json({ message: "One-time token is required." });
+  }
+
+  try {
+    const foundToken = await OneTimeToken.findOneAndDelete({ token: oneTimeToken });
+
+    if (!foundToken) {
+      return res.status(401).json({ message: "Invalid or expired token. Please try again." });
+    }
+
+    const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
+
+    // 1. Delete the bot's "Log In" button message
+    if (foundToken.botMessageId) {
+      axios
+        .post(`${TELEGRAM_API}/deleteMessage`, {
+          chat_id: foundToken.telegramId,
+          message_id: foundToken.botMessageId,
+        })
+        .catch((err) => {
+          console.error(
+            "Failed to delete bot's login message:",
+            err.response ? err.response.data : err.message
+          );
+        });
+    }
+
+    // 2. Delete the user's "/start" command message
+    if (foundToken.userMessageId) {
+      axios
+        .post(`${TELEGRAM_API}/deleteMessage`, {
+          chat_id: foundToken.telegramId,
+          message_id: foundToken.userMessageId,
+        })
+        .catch((err) => {
+          console.error(
+            "Failed to delete user's /start message:",
+            err.response ? err.response.data : err.message
+          );
+        });
+    }
+
+    let user = await User.findOne({ telegramId: foundToken.telegramId });
+
+    if (!user) {
+      user = await User.create({
+        telegramId: foundToken.telegramId,
+        authProvider: "telegram",
+      });
+    }
+
+    res.status(200).json({
+      _id: user._id,
+      email: user.email,
+      firstName: user.firstName,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error("Error verifying one-time token:", error);
+    res.status(500).json({ message: "Server error during login." });
+  }
+};
+
+/**
+ * @desc    Serves a simple HTML page that redirects the user to the mobile app deep link.
+ *          This is the target for Telegram's login_url button.
+ * @route   GET /api/auth/telegram/redirect
+ * @access  Public
+ */
+const telegramRedirect = (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    return res
+      .status(400)
+      .send("<html><body>Error: Missing login token. Please try again.</body></html>");
+  }
+
+  const deepLink = `multilevelapp://login?token=${token}`;
+
+  // Serve a simple HTML page with a JavaScript redirect.
+  // This gives the user a seamless transition from Telegram's webview to your app.
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Logging in...</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: sans-serif; text-align: center; padding-top: 50px; }
+        </style>
+        <script>
+          window.location.replace("${deepLink}");
+        </script>
+      </head>
+      <body>
+        <p>Redirecting you to the app...</p>
+        <p>If you are not redirected automatically, <a href="${deepLink}">click here to log in</a>.</p>
+      </body>
+    </html>
+  `);
+};
+
+module.exports = {
+  getUserProfile,
+  googleSignIn,
+  deleteUserProfile,
+  verifyTelegramToken,
+  telegramRedirect,
+};
+// {PATH_TO_PROJECT}/api/models/ieltsExamController
+
+const ExamResult = require("../models/ieltsExamResultModel.js");
+const { generateText, safeJsonParse } = require("../utils/gemini.js");
+const { getKokoroInputIds } = require("../utils/kokoro.js");
+
+/**
+ * @desc    Start a new mock exam
+ * @route   POST /api/exam/start
+ * @access  Private
+ */
+const startExam = async (req, res) => {
+  try {
+    const prompt = `You are an IELTS examiner. Begin a new speaking test. Your first line should be to state your name and ask for the user's name. Respond ONLY with a valid JSON object with the structure: {"examiner_line": "Your full response here", "next_part": 1, "cue_card": null, "is_final_question": false}`;
+
+    const responseText = await generateText(prompt);
+    const data = safeJsonParse(responseText);
+
+    if (!data || !data.examiner_line) {
+      return res.status(500).json({ message: "AI failed to generate a valid starting question." });
+    }
+
+    data.input_ids = await getKokoroInputIds(data.examiner_line);
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Error starting exam:", error);
+    res.status(500).json({ message: "Server error while starting exam." });
+  }
+};
+
+/**
+ * @desc    Handle the next step in an exam
+ * @route   POST /api/exam/step
+ * @access  Private
+ */
+const handleExamStep = async (req, res) => {
+  const { part, userInput, transcriptContext, questionCountInPart } = req.body;
+
+  // [DEBUG LOG] Log the full incoming request body for /step
+  console.log("--- handleExamStep: INCOMING REQUEST ---");
+  console.log(JSON.stringify(req.body, null, 2)); // Pretty-print the JSON
+  console.log("------------------------------------");
+
+  try {
+    const prompt = `You are an IELTS examiner and the logic engine for a mock speaking test.
+The user is in Part ${part}.
+This is question number ${questionCountInPart + 1} for this part.
+The user just said: "${userInput}"
+The conversation history is:
+---
+${transcriptContext}
+---
+Based on the current state and user input, generate your next response.
+Your response MUST be a single, valid JSON object with the following structure:
+{
+  "examiner_line": "Your full spoken response here.",
+  "next_part": <number for the next part, e.g., 1, 2, 3>,
+  "cue_card": {"topic": "...", "points": ["...", "..."]} or null,
+  "is_final_question": <boolean>
+}
+- If moving to Part 2, provide the cue card. For example, your 'examiner_line' might be "Now, I'm going to give you a topic...", but the cue card JSON object should contain the actual topic, like 'Describe a historical place...'. Otherwise, "cue_card" should be null.
+- Decide if this is the final question of the part or the test.
+- The "examiner_line" should be natural and appropriate for the context.
+`;
+
+    const responseText = await generateText(prompt);
+    const data = safeJsonParse(responseText);
+
+    if (!data || !data.examiner_line) {
+      console.error("AI failed to generate a valid step JSON.", responseText);
+      return res.status(500).json({ message: "AI failed to generate a valid step response." });
+    }
+
+    // Generate audio IDs for the complete response at once
+    data.input_ids = await getKokoroInputIds(data.examiner_line);
+
+    // [DEBUG LOG] Log the final data being sent back to the client
+    console.log("--- handleExamStep: OUTGOING RESPONSE ---");
+    // Don't log the full input_ids array as it's very long
+    console.log(JSON.stringify({ ...data, input_ids_length: data.input_ids?.length }, null, 2));
+    console.log("-------------------------------------");
+
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Error processing exam step:", error);
+    res.status(500).json({ message: "Server error during exam step." });
+  }
+};
+
+/**
+ * @desc    Analyze a full exam transcript and save the result
+ * @route   POST /api/exam/analyze
+ * @access  Private
+ */
+const analyzeExam = async (req, res) => {
+  const { transcript } = req.body;
+  const userId = req.user._id;
+
+  // [DEBUG LOG] Log the incoming transcript for /analyze
+  console.log("--- analyzeExam: INCOMING REQUEST ---");
+  console.log(JSON.stringify(req.body, null, 2));
+  console.log("------------------------------------");
+
+  try {
+    const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
+
+    const prompt = `You are an expert IELTS examiner. Analyze the following speaking test transcript. Provide a detailed evaluation for each of the four criteria (Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, Pronunciation). For each criterion, give a band score and constructive feedback.
+    
+    IMPORTANT: If the user's speech in the transcript is insufficient, nonsensical, or completely empty, you MUST still provide a full analysis. In this case, assign a low band score (e.g., 1.0) for each criterion and provide feedback explaining that the score is low due to a lack of sufficient speech to analyze.
+    
+    Finally, calculate the overall band score.
+    
+    CRITICAL: Your entire response must be ONLY a single, valid JSON object using this exact structure, with no extra text or explanations before or after the JSON:
+    {"overallBand": <number>, "criteria": [{"criterionName": "Fluency & Coherence", "bandScore": <number>, "feedback": "...", "examples": [{"userQuote": "...", "suggestion": "...", "type": "Fluency"}]}, ...]}`;
+
+    const responseText = await generateText(prompt);
+    const analysisData = safeJsonParse(responseText);
+
+    if (!analysisData || !analysisData.criteria || !analysisData.overallBand) {
+      console.error("AI failed to generate a valid analysis JSON.", responseText);
+      return res.status(500).json({ message: "AI failed to generate a valid analysis." });
+    }
+
+    // Defensive programming to ensure 'type' field exists
+    analysisData.criteria.forEach((criterion) => {
+      if (criterion.examples && Array.isArray(criterion.examples)) {
+        criterion.examples.forEach((example) => {
+          if (!example.type) {
+            if (criterion.criterionName.includes("Fluency")) example.type = "Fluency";
+            else if (criterion.criterionName.includes("Lexical")) example.type = "Vocabulary";
+            else if (criterion.criterionName.includes("Grammar")) example.type = "Grammar";
+            else if (criterion.criterionName.includes("Pronunciation"))
+              example.type = "Pronunciation";
+            else example.type = "General";
+          }
+        });
+      }
+    });
+
+    const newExamResult = new ExamResult({
+      userId,
+      transcript,
+      overallBand: analysisData.overallBand,
+      criteria: analysisData.criteria,
+    });
+
+    const savedResult = await newExamResult.save();
+
+    // [DEBUG LOG] Log the successful result ID before sending
+    console.log("--- analyzeExam: SUCCESS ---");
+    console.log(`Successfully saved and sending resultId: ${savedResult._id}`);
+    console.log("--------------------------");
+
+    res.status(201).json({ resultId: savedResult._id });
+  } catch (error) {
+    // [DEBUG LOG] Enhanced error logging
+    console.error("--- analyzeExam: CATCH BLOCK ERROR ---");
+    console.error(error);
+    console.error("------------------------------------");
+    res.status(500).json({ message: "Server error during exam analysis." });
+  }
+};
+
+/**
+ * @desc    Get a summary list of a user's past exams
+ * @route   GET /api/exam/history
+ * @access  Private
+ */
+const getExamHistory = async (req, res) => {
+  try {
+    const history = await ExamResult.find({ userId: req.user._id })
+      .select("_id overallBand createdAt")
+      .sort({ createdAt: -1 });
+
+    const historySummaries = history.map((item) => ({
+      id: item._id,
+      examDate: item.createdAt.getTime(),
+      overallBand: item.overallBand,
+    }));
+
+    res.json({ history: historySummaries });
+  } catch (error) {
+    console.error("Error fetching exam history:", error);
+    res.status(500).json({ message: "Server error fetching history." });
+  }
+};
+
+/**
+ * @desc    Get the full details of a specific exam result
+ * @route   GET /api/exam/result/:resultId
+ * @access  Private
+ */
+const getExamResultDetails = async (req, res) => {
+  try {
+    const result = await ExamResult.findOne({
+      _id: req.params.resultId,
+      userId: req.user._id,
+    });
+
+    if (!result) {
+      return res.status(404).json({ message: "Exam result not found or permission denied." });
+    }
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching exam result details:", error);
+    res.status(500).json({ message: "Server error fetching result details." });
+  }
+};
+
+module.exports = {
+  startExam,
+  handleExamStep,
+  analyzeExam,
+  getExamHistory,
+  getExamResultDetails,
+};
+// {PATH_TO_PROJECT}/api/controllers/multilevelExamController.js
+
+const MultilevelExamResult = require("../models/multilevelExamResultModel.js");
+const User = require("../models/userModel.js"); // Needed for updating usage
+const { generateText, safeJsonParse } = require("../utils/gemini.js");
+const OFFERINGS = require("../config/offerings"); // <-- The new centralized config
+
+// Import content models
+const Part1_1_Question = require("../models/content/Part1_1_QuestionModel");
+const Part1_2_Set = require("../models/content/Part1_2_SetModel");
+const Part2_Set = require("../models/content/Part2_SetModel");
+const Part3_Topic = require("../models/content/Part3_TopicModel");
+
+/**
+ * @desc    Generate a new complete multilevel exam
+ * @route   GET /api/exam/multilevel/new
+ * @access  Private
+ */
+const generateNewExam = async (req, res) => {
+  try {
+    const p1_1_Promise = Part1_1_Question.aggregate([{ $sample: { size: 3 } }]);
+    const p1_2_Promise = Part1_2_Set.aggregate([{ $sample: { size: 1 } }]);
+    const p2_Promise = Part2_Set.aggregate([{ $sample: { size: 1 } }]);
+    const p3_Promise = Part3_Topic.aggregate([{ $sample: { size: 1 } }]);
+
+    const [part1_1, part1_2, part2, part3] = await Promise.all([
+      p1_1_Promise,
+      p1_2_Promise,
+      p2_Promise,
+      p3_Promise,
+    ]);
+
+    if (part1_1.length < 3 || !part1_2[0] || !part2[0] || !part3[0]) {
+      return res
+        .status(500)
+        .json({ message: "Could not assemble a full exam. Not enough content in DB." });
+    }
+    res.status(200).json({ part1_1, part1_2: part1_2[0], part2: part2[0], part3: part3[0] });
+  } catch (error) {
+    console.error("Error generating new multilevel exam:", error);
+    res.status(500).json({ message: "Server error while generating exam." });
+  }
+};
+
+// --- Helper object to define prompts and scoring for each part ---
+const partAnalysisConfig = {
+  P1_1: {
+    maxScore: 12,
+    partName: "Part 1.1",
+    promptFocus:
+      "Detailed feedback for Part 1.1 performance, focusing on fluency, relevance, and clarity for short personal questions.",
+  },
+  P1_2: {
+    maxScore: 22,
+    partName: "Part 1.2",
+    promptFocus:
+      "Detailed feedback for Part 1.2, focusing on description, comparison, and speculative language related to the pictures.",
+  },
+  P2: {
+    maxScore: 18,
+    partName: "Part 2",
+    promptFocus:
+      "Detailed feedback for Part 2, assessing the ability to structure a 2-minute monologue and develop ideas based on the cue card.",
+  },
+  P3: {
+    maxScore: 20,
+    partName: "Part 3",
+    promptFocus:
+      "Detailed feedback for Part 3, evaluating the construction of a balanced argument using the provided for/against points.",
+  },
+};
+
+// Helper function to reset daily counts if the last reset was on a different day (UTC)
+const resetDailyUsageIfNeeded = (usageObject) => {
+  const now = new Date();
+  const lastReset = new Date(usageObject.lastReset);
+  if (
+    lastReset.getUTCFullYear() !== now.getUTCFullYear() ||
+    lastReset.getUTCMonth() !== now.getUTCMonth() ||
+    lastReset.getUTCDate() !== now.getUTCDate()
+  ) {
+    usageObject.count = 0;
+    usageObject.lastReset = now;
+  }
+};
+
+/**
+ * @desc    Analyze a full or partial multilevel exam transcript and save the result
+ * @route   POST /api/exam/multilevel/analyze
+ * @access  Private
+ */
+const analyzeExam = async (req, res) => {
+  // The user object is attached by our `protect` and `checkSubscriptionStatus` middleware
+  const user = req.user;
+  const { transcript, examContentIds, practicePart } = req.body;
+  const isSinglePartPractice = !!practicePart;
+
+  if (!transcript || transcript.length === 0) {
+    return res.status(400).json({ message: "Transcript is required for analysis." });
+  }
+
+  // --- TIER & USAGE CHECK LOGIC ---
+  const { tier } = user.subscription;
+  const limits = OFFERINGS[tier]; // Get limits for the user's current tier
+
+  if (tier === "free") {
+    // Make sure usage objects exist
+    user.dailyUsage = user.dailyUsage || {};
+    user.dailyUsage.fullExams = user.dailyUsage.fullExams || { count: 0, lastReset: new Date() };
+    user.dailyUsage.partPractices = user.dailyUsage.partPractices || {
+      count: 0,
+      lastReset: new Date(),
+    };
+
+    // Reset counters if it's a new day
+    resetDailyUsageIfNeeded(user.dailyUsage.fullExams);
+    resetDailyUsageIfNeeded(user.dailyUsage.partPractices);
+
+    if (isSinglePartPractice) {
+      if (user.dailyUsage.partPractices.count >= limits.dailyPartPractices) {
+        return res
+          .status(403)
+          .json({
+            message: `You have used all ${limits.dailyPartPractices} of your free part practices for today. Upgrade for unlimited access.`,
+          });
+      }
+      user.dailyUsage.partPractices.count += 1;
+    } else {
+      // Full Exam
+      if (user.dailyUsage.fullExams.count >= limits.dailyFullExams) {
+        return res
+          .status(403)
+          .json({
+            message: `You have used your ${limits.dailyFullExams} free full mock exam for today. Upgrade for more.`,
+          });
+      }
+      user.dailyUsage.fullExams.count += 1;
+    }
+    // We must save the updated user object with the new counts
+    await user.save();
+  }
+
+  // NOTE: A complete implementation for Silver tier's monthly limit would require adding
+  // a `monthlyUsage` object to the user model and a `resetMonthlyUsageIfNeeded` helper.
+
+  try {
+    const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
+    let prompt;
+
+    if (isSinglePartPractice && partAnalysisConfig[practicePart]) {
+      const config = partAnalysisConfig[practicePart];
+      prompt = `
+You are an expert examiner for a structured, multilevel English speaking test.
+The user is practicing a single part of the exam: ${config.partName}. The maximum score for this part is ${config.maxScore}.
+Analyze the following speaking test transcript. The user's speech may be minimal or nonsensical; score it accordingly.
+
+TRANSCRIPT:
+---
+${formattedTranscript}
+---
+
+CRITICAL: Your entire response must be ONLY a single, valid JSON object using this exact structure, with no extra text or explanations.
+
+{
+  "part": "${config.partName}",
+  "score": <number>,
+  "feedback": "${config.promptFocus}"
+}
+`;
+    } else {
+      prompt = `
+You are an expert examiner for a structured, multilevel English speaking test. The maximum score is 72.
+Analyze the following speaking test transcript. The user's speech may be minimal or nonsensical; score it accordingly.
+
+The exam has 4 parts:
+- Part 1.1: 3 personal questions (${partAnalysisConfig.P1_1.maxScore} points total)
+- Part 1.2: Picture comparison (${partAnalysisConfig.P1_2.maxScore} points total)
+- Part 2: Single picture monologue (${partAnalysisConfig.P2.maxScore} points total)
+- Part 3: Argumentative monologue (${partAnalysisConfig.P3.maxScore} points total)
+
+Based on the transcript, provide a score and constructive feedback for each part. Calculate the final total score (out of 72).
+
+TRANSCRIPT:
+---
+${formattedTranscript}
+---
+
+CRITICAL: Your entire response must be ONLY a single, valid JSON object using this exact structure, with no extra text or explanations.
+
+{
+  "totalScore": <number>,
+  "feedbackBreakdown": [
+    { "part": "Part 1.1", "score": <number>, "feedback": "${partAnalysisConfig.P1_1.promptFocus}" },
+    { "part": "Part 1.2", "score": <number>, "feedback": "${partAnalysisConfig.P1_2.promptFocus}" },
+    { "part": "Part 2", "score": <number>, "feedback": "${partAnalysisConfig.P2.promptFocus}" },
+    { "part": "Part 3", "score": <number>, "feedback": "${partAnalysisConfig.P3.promptFocus}" }
+  ]
+}
+`;
+    }
+
+    const responseText = await generateText(prompt);
+    const analysisData = safeJsonParse(responseText);
+
+    let totalScore;
+    let feedbackBreakdown;
+
+    if (isSinglePartPractice) {
+      if (!analysisData || typeof analysisData.score === "undefined" || !analysisData.feedback) {
+        throw new Error("AI failed to generate a valid single-part analysis JSON.");
+      }
+      totalScore = analysisData.score;
+      feedbackBreakdown = [analysisData];
+    } else {
+      if (!analysisData || !analysisData.totalScore || !analysisData.feedbackBreakdown) {
+        throw new Error("AI failed to generate a valid full-exam analysis JSON.");
+      }
+      totalScore = analysisData.totalScore;
+      feedbackBreakdown = analysisData.feedbackBreakdown;
+    }
+
+    const newExamResult = new MultilevelExamResult({
+      userId: user._id,
+      transcript,
+      totalScore,
+      feedbackBreakdown,
+      examContent: examContentIds,
+      practicedPart: isSinglePartPractice ? practicePart : "FULL",
+    });
+
+    const savedResult = await newExamResult.save();
+    res.status(201).json({ resultId: savedResult._id });
+  } catch (error) {
+    console.error("Error during exam analysis:", error);
+    res.status(500).json({ message: error.message || "Server error during exam analysis." });
+  }
+};
+
+/**
+ * @desc    Get the user's exam history for Multilevel, filtered by subscription tier
+ * @route   GET /api/exam/multilevel/history
+ * @access  Private
+ */
+const getExamHistory = async (req, res) => {
+  try {
+    const user = req.user;
+    const { tier } = user.subscription;
+    const limits = OFFERINGS[tier];
+
+    const dateFilter = {};
+
+    if (limits.historyRetentionDays !== Infinity) {
+      const now = new Date();
+      const retentionStartDate = new Date(now.setDate(now.getDate() - limits.historyRetentionDays));
+      dateFilter.createdAt = { $gte: retentionStartDate };
+    }
+
+    const query = {
+      userId: req.user._id,
+      ...dateFilter,
+    };
+
+    const history = await MultilevelExamResult.find(query)
+      .select("_id totalScore createdAt practicedPart")
+      .sort({ createdAt: -1 });
+
+    const historySummaries = history.map((item) => ({
+      id: item._id,
+      examDate: item.createdAt.getTime(),
+      totalScore: item.totalScore,
+      practicePart: item.practicedPart,
+    }));
+
+    res.json({ history: historySummaries });
+  } catch (error) {
+    console.error("Error fetching history:", error);
+    res.status(500).json({ message: "Server error fetching history." });
+  }
+};
+
+/**
+ * @desc    Get the details of a single Multilevel exam result
+ * @route   GET /api/exam/multilevel/result/:resultId
+ * @access  Private
+ */
+const getExamResultDetails = async (req, res) => {
+  try {
+    const result = await MultilevelExamResult.findOne({
+      _id: req.params.resultId,
+      userId: req.user._id,
+    });
+    if (!result) return res.status(404).json({ message: "Result not found." });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: "Server error fetching result details." });
+  }
+};
+
+module.exports = {
+  generateNewExam,
+  analyzeExam,
+  getExamHistory,
+  getExamResultDetails,
+};
+// {PATH_TO_PROJECT}/api/controllers/subscriptionController.js
+
+const User = require("../models/userModel");
+const { verifyPurchase } = require("../services/paymentService");
+
+/**
+ * @desc    Verify a purchase from any provider and grant entitlements.
+ * @route   POST /api/subscriptions/verify-purchase
+ * @access  Private
+ */
+const verifyAndGrantAccess = async (req, res) => {
+  const { provider, token } = req.body;
+  if (!provider || !token) {
+    return res.status(400).json({ message: "Provider and token are required." });
+  }
+
+  try {
+    const user = await User.findById(req.user.id);
+    const result = await verifyPurchase(provider, token, user);
+
+    if (result.success) {
+      res.status(200).json({ message: result.message, subscription: result.subscription });
+    } else {
+      res.status(400).json({ message: result.message });
+    }
+  } catch (error) {
+    console.error("Error in verifyAndGrantAccess controller:", error);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+/**
+ * @desc    Allow a user to start their one-time Gold free trial.
+ * @route   POST /api/subscriptions/start-trial
+ * @access  Private
+ */
+const startGoldTrial = async (req, res) => {
+  const user = await User.findById(req.user.id);
+
+  if (user.subscription.tier !== "free") {
+    return res.status(400).json({ message: "Trials are only for free users." });
+  }
+
+  if (user.subscription.hasUsedGoldTrial) {
+    return res.status(400).json({ message: "Free trial has already been used." });
+  }
+
+  // In a real app, you might require them to link a card first, even for a trial.
+  // For now, we just grant it.
+
+  const oneMonthFromNow = new Date();
+  oneMonthFromNow.setMonth(oneMonthFromNow.getMonth() + 1);
+
+  user.subscription.tier = "gold";
+  user.subscription.expiresAt = oneMonthFromNow;
+  user.subscription.hasUsedGoldTrial = true;
+
+  await user.save();
+
+  res
+    .status(200)
+    .json({
+      message: "Gold trial started! You have access for 1 month.",
+      subscription: user.subscription,
+    });
+};
+
+module.exports = {
+  verifyAndGrantAccess,
+  startGoldTrial,
+};
+const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
+const OneTimeToken = require('../models/oneTimeTokenModel');
+
+const TELEGRAM_API = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}`;
+const SERVER_BASE_URL = process.env.SERVER_URL;
+
+const handleWebhook = async (req, res) => {
+  const update = req.body;
+
+  if (update.message && update.message.text === '/start') {
+    const message = update.message;
+    const userFrom = message.from;
+    const chat = message.chat;
+
+    if (!SERVER_BASE_URL) {
+      console.error("FATAL: SERVER_URL environment variable is not set.");
+      return res.sendStatus(500);
+    }
+    
+    console.log(`Received /start command from user: ${userFrom.first_name} (ID: ${userFrom.id})`);
+
+    try {
+      const token = uuidv4();
+      const redirectUrl = `${SERVER_BASE_URL}/api/auth/telegram/redirect?token=${token}`;
+      const messageText = `✅ Welcome! Tap the button below to securely log in to the Multilevel App. This button will expire in 5 minutes.`;
+
+      const sentMessageResponse = await axios.post(`${TELEGRAM_API}/sendMessage`, {
+        chat_id: chat.id,
+        text: messageText,
+        reply_markup: {
+          inline_keyboard: [[{ text: "Log In to App", login_url: { url: redirectUrl } }]]
+        }
+      });
+
+      // You correctly store the ID in a variable named `botMessageId`.
+      const botMessageId = sentMessageResponse.data.result.message_id;
+
+      if (!botMessageId) {
+        throw new Error("Failed to get message_id from Telegram response.");
+      }
+      
+      const userMessageId = message.message_id; 
+
+      // --- THIS IS THE FIX ---
+      // Use the correct variable name `botMessageId` when creating the document.
+      await OneTimeToken.create({
+        token: token,
+        telegramId: userFrom.id,
+        botMessageId: botMessageId,   // Corrected from `messageId`
+        userMessageId: userMessageId,
+      });
+      // --- END OF FIX ---
+
+    } catch (error) {
+      console.error("Error processing /start command:", error.response ? error.response.data : error.message);
+      await axios.post(`${TELEGRAM_API}/sendMessage`, {
+        chat_id: chat.id,
+        text: 'Sorry, an error occurred. Please try again later.'
+      });
+    }
+  }
+
+  res.sendStatus(200);
+};
+
+module.exports = { handleWebhook };
+const asyncHandler = require("express-async-handler");
+const Word = require("../models/wordModel");
+
+// @desc    Get all distinct CEFR levels
+// @route   GET /api/wordbank/levels
+// @access  Public
+const getLevels = asyncHandler(async (req, res) => {
+  const levels = await Word.distinct("cefrLevel");
+  res.json(levels.sort()); // Sort them e.g., A1, A2, B1...
+});
+
+// @desc    Get all distinct topics for a given level
+// @route   GET /api/wordbank/topics?level=B2
+// @access  Public
+const getTopics = asyncHandler(async (req, res) => {
+  const { level } = req.query;
+  if (!level) {
+    res.status(400);
+    throw new Error("Level query parameter is required");
+  }
+  const topics = await Word.distinct("topic", { cefrLevel: level });
+  res.json(topics.sort());
+});
+
+// @desc    Get words for a given level and topic
+// @route   GET /api/wordbank/words?level=B2&topic=Technology
+// @access  Public
+const getWords = asyncHandler(async (req, res) => {
+  const { level, topic } = req.query;
+  if (!level || !topic) {
+    res.status(400);
+    throw new Error("Level and topic query parameters are required");
+  }
+  const words = await Word.find({ cefrLevel: level, topic: topic }).select(
+    "-createdAt -updatedAt -__v"
+  );
+  res.json(words);
+});
+
+module.exports = { getLevels, getTopics, getWords };
+// {PATH_TO_PROJECT}/api/middleware/adminMiddleware.js
+
+const jwt = require("jsonwebtoken");
+const Admin = require("../models/AdminModel"); // Import the new Admin model
+
+// Middleware to protect admin routes
+const protectAdmin = async (req, res, next) => {
+  let token;
+
+  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+    try {
+      token = req.headers.authorization.split(" ")[1];
+
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET_ADMIN); // Use a DIFFERENT secret for admins
+
+      // Get admin user from the token and attach to request
+      req.admin = await Admin.findById(decoded.id).select("-password");
+
+      if (!req.admin) {
+        return res.status(401).json({ message: "Not authorized, admin not found" });
+      }
+
+      next();
+    } catch (error) {
+      console.error("Admin token verification failed:", error);
+      res.status(401).json({ message: "Not authorized, token failed" });
+    }
+  }
+
+  if (!token) {
+    res.status(401).json({ message: "Not authorized, no token" });
+  }
+};
+
+module.exports = { protectAdmin };
+// {PATH_TO_PROJECT}/api/middleware/authMiddleware.js
+const jwt = require("jsonwebtoken");
+const User = require("../models/userModel"); // Adjust path as needed
+
+const protect = async (req, res, next) => {
+  let token;
+
+  // Check for token in Authorization header (Bearer scheme)
+  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+    try {
+      // Get token from header
+      token = req.headers.authorization.split(" ")[1];
+
+      // Verify token
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      // Get user from the token payload (excluding password)
+      // Attach user to the request object for use in subsequent routes
+      req.user = await User.findById(decoded.id).select("-password");
+
+      if (!req.user) {
+        // Handle case where user associated with token doesn't exist anymore
+        return res.status(401).json({ message: "Not authorized, user not found" });
+      }
+
+      next(); // Proceed to the protected route
+    } catch (error) {
+      console.error("Token verification failed:", error);
+      res.status(401).json({ message: "Not authorized, token failed" });
+    }
+  }
+
+  if (!token) {
+    res.status(401).json({ message: "Not authorized, no token" });
+  }
+};
+
+module.exports = { protect };
+// {PATH_TO_PROJECT}/api/middleware/errorMiddleware.js
+
+// Handle 404 Not Found errors
+const notFound = (req, res, next) => {
+  const error = new Error(`Not Found - ${req.originalUrl}`);
+  res.status(404);
+  next(error); // Pass error to the next error handler
+};
+
+// General error handler
+const errorHandler = (err, req, res, next) => {
+  // Sometimes an error might come through with a 200 status code
+  // If it does, set it to 500 Internal Server Error
+  const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  res.status(statusCode);
+
+  console.error("ERROR STACK:", err.stack); // Log stack trace for debugging
+
+  res.json({
+    message: err.message,
+    // Optionally include stack trace in development environment only
+    stack: process.env.NODE_ENV === "production" ? null : err.stack,
+  });
+};
+
+module.exports = { notFound, errorHandler };
+// {PATH_TO_PROJECT}/api/middleware/subscriptionMiddleware.js
+
+const User = require("../models/userModel");
+
+// This middleware checks if a user's paid subscription has expired.
+// If it has, it reverts them to the 'free' tier.
+// It should be placed AFTER the `protect` middleware.
+const checkSubscriptionStatus = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    // Check for expiration ONLY if they are on a paid tier and have an expiration date.
+    if (
+      user.subscription.tier !== "free" &&
+      user.subscription.expiresAt &&
+      user.subscription.expiresAt < new Date()
+    ) {
+      console.log(`Subscription for user ${user.email} has expired. Reverting to free.`);
+      user.subscription.tier = "free";
+      user.subscription.expiresAt = null;
+      // Also clear the provider ID if it was a recurring subscription that ended.
+      user.subscription.providerSubscriptionId = null;
+      await user.save();
+    }
+
+    // Attach the potentially updated user object to the request for use in subsequent controllers.
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error("Error in checkSubscriptionStatus middleware:", error);
+    res.status(500).json({ message: "Server error while checking subscription." });
+  }
+};
+
+module.exports = { checkSubscriptionStatus };
+// {PATH_TO_PROJECT}/api/models/content/Part1_1_QuestionModel.js
+
+const mongoose = require("mongoose");
+
+const part1_1_Schema = new mongoose.Schema({
+  questionText: { type: String, required: true },
+  audioUrl: { type: String, required: true }, // URL to audio file on CDN
+  tags: [String],
+});
+
+module.exports = mongoose.model("Part1.1Question", part1_1_Schema);
+// {PATH_TO_PROJECT}/api/models/content/Part1_2_SetModel.js
+
+const mongoose = require("mongoose");
+
+const questionSchema = new mongoose.Schema(
+  {
+    text: { type: String, required: true },
+    audioUrl: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const part1_2_Schema = new mongoose.Schema({
+  image1Url: { type: String, required: true },
+  image2Url: { type: String, required: true },
+  imageDescription: { type: String, required: true }, // For internal reference
+  questions: [questionSchema], // Should contain 3 questions
+  tags: [String],
+});
+
+module.exports = mongoose.model("Part1.2Set", part1_2_Schema);
+// {PATH_TO_PROJECT}/api/models/content/Part2_SetModel.js
+
+const mongoose = require("mongoose");
+
+const questionSchema = new mongoose.Schema(
+  {
+    text: { type: String, required: true },
+    audioUrl: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const part2_Schema = new mongoose.Schema({
+  imageUrl: { type: String, required: false }, // Optional, can be null
+  imageDescription: { type: String, required: false }, // For internal reference
+  questions: [questionSchema], // Should contain 3 questions
+  tags: [String],
+});
+
+module.exports = mongoose.model("Part2Set", part2_Schema);
+// {PATH_TO_PROJECT}/api/models/content/Part3_TopicModel.js
+
+const mongoose = require("mongoose");
+
+const part3_Schema = new mongoose.Schema({
+  topic: { type: String, required: true },
+  forPoints: { type: [String], required: true }, // e.g., ["Point A", "Point B", "Point C"]
+  againstPoints: { type: [String], required: true },
+  tags: [String],
+});
+
+module.exports = mongoose.model("Part3Topic", part3_Schema);
+const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
+
+const adminSchema = new mongoose.Schema(
+  {
+    email: {
+      type: String,
+      required: [true, "Please provide an email"],
+      unique: true,
+      lowercase: true,
+      trim: true,
+    },
+    password: {
+      type: String,
+      required: [true, "Please provide a password"],
+      minlength: 8,
+      select: false, // Don't send password in API responses by default
+    },
+    role: {
+      type: String,
+      default: "admin",
+      immutable: true, // This field cannot be changed after creation
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Hash password before saving
+adminSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
+    return next();
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// Method to compare entered password with hashed password
+adminSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+module.exports = mongoose.model("Admin", adminSchema);
+// {PATH_TO_PROJECT}/api/models/ieltsExamResultModel.js
+const mongoose = require("mongoose");
+
+const transcriptEntrySchema = new mongoose.Schema(
+  {
+    speaker: {
+      type: String,
+      enum: ["Examiner", "User"],
+      required: true,
+    },
+    text: {
+      type: String,
+      required: true,
+    },
+  },
+  { _id: false }
+);
+
+const feedbackExampleSchema = new mongoose.Schema(
+  {
+    userQuote: { type: String, required: true },
+    suggestion: { type: String, required: true },
+    type: { type: String, required: true }, // e.g., "Grammar", "Vocabulary"
+  },
+  { _id: false }
+);
+
+const scoreCriterionSchema = new mongoose.Schema(
+  {
+    criterionName: { type: String, required: true }, // e.g., "Fluency & Coherence"
+    bandScore: { type: Number, required: true },
+    feedback: { type: String, required: true },
+    examples: [feedbackExampleSchema],
+  },
+  { _id: false }
+);
+
+const examResultSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    overallBand: {
+      type: Number,
+      required: true,
+    },
+    criteria: [scoreCriterionSchema],
+    transcript: [transcriptEntrySchema],
+  },
+  {
+    timestamps: true, // Adds createdAt and updatedAt automatically
+  }
+);
+
+module.exports = mongoose.model("IeltsExamResult", examResultSchema);
+// {PATH_TO_PROJECT}/api/models/multilevelExamResultModel.js
+
+const mongoose = require("mongoose");
+
+const transcriptEntrySchema = new mongoose.Schema(
+  {
+    speaker: { type: String, enum: ["Examiner", "User"], required: true },
+    text: { type: String, required: true },
+    // part is optional and might not be used, but keeping it doesn't hurt
+    part: { type: String, enum: ["1.1", "1.2", "2", "3"] },
+  },
+  { _id: false }
+);
+
+const feedbackSchema = new mongoose.Schema(
+  {
+    part: { type: String, required: true },
+    score: { type: Number, required: true },
+    feedback: { type: String, required: true },
+  },
+  { _id: false }
+);
+
+const multilevelExamResultSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    totalScore: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 72, // This is still the theoretical max for a full exam
+    },
+    feedbackBreakdown: [feedbackSchema],
+    transcript: [transcriptEntrySchema],
+    examContent: {
+      part1_1: [mongoose.Schema.Types.ObjectId],
+      part1_2: mongoose.Schema.Types.ObjectId,
+      part2: mongoose.Schema.Types.ObjectId,
+      part3: mongoose.Schema.Types.ObjectId,
+    },
+    // --- NEW FIELD ---
+    practicedPart: {
+      type: String,
+      enum: ["FULL", "P1_1", "P1_2", "P2", "P3"],
+      default: "FULL",
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+module.exports = mongoose.model("MultilevelExamResult", multilevelExamResultSchema);
+const mongoose = require("mongoose");
+
+const oneTimeTokenSchema = new mongoose.Schema({
+  token: { type: String, required: true, unique: true, index: true },
+  telegramId: { type: Number, required: true },
+  botMessageId: { type: Number, required: true }, // Renamed for clarity: The ID of the bot's message
+  userMessageId: { type: Number, required: true }, // <-- NEW FIELD: The ID of the user's /start message
+  createdAt: { type: Date, expires: "5m", default: Date.now },
+});
+
+module.exports = mongoose.model("OneTimeToken", oneTimeTokenSchema);
+const mongoose = require("mongoose");
+
+const userSchema = new mongoose.Schema(
+  {
+    // Email is optional and not a unique identifier. It's just profile data.
+    email: {
+      type: String,
+      lowercase: true,
+      trim: true,
+    },
+
+    // The method used to create and log in to the account.
+    authProvider: {
+      type: String,
+      required: true,
+      enum: ["google", "telegram", "apple"], // List of supported providers
+    },
+
+    // --- Provider-Specific Unique IDs ---
+    // We use sparse indexes to allow multiple documents to have a null value for these fields,
+    // but enforce that any non-null value must be unique across the collection.
+
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    telegramId: {
+      type: Number,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+    appleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+
+    // --- Profile Information (can be populated from providers) ---
+    firstName: {
+      type: String,
+    },
+    username: {
+      // Specifically for Telegram's @username
+      type: String,
+    },
+
+    // --- Subscription & Monetization Logic ---
+    subscription: {
+      tier: {
+        type: String,
+        enum: ["free", "silver", "gold"],
+        default: "free",
+      },
+      // The date when the current subscription or one-time purchase expires.
+      expiresAt: {
+        type: Date,
+        default: null,
+      },
+      // For auto-renewing subscriptions, this is the ID from the payment provider.
+      providerSubscriptionId: {
+        type: String,
+        default: null,
+      },
+      // Tracks if the user has already activated their one-time Gold trial.
+      hasUsedGoldTrial: {
+        type: Boolean,
+        default: false,
+      },
+    },
+
+    // --- Usage Tracking for Freemium Limits ---
+    dailyUsage: {
+      fullExams: {
+        count: { type: Number, default: 0 },
+        lastReset: { type: Date, default: () => new Date() },
+      },
+      partPractices: {
+        count: { type: Number, default: 0 },
+        lastReset: { type: Date, default: () => new Date() },
+      },
+    },
+    // Note: For Silver tier's monthly limit, you would add a similar 'monthlyUsage' object here.
+  },
+  { timestamps: true }
+); // Adds createdAt and updatedAt automatically
+
+module.exports = mongoose.model("User", userSchema);
+const mongoose = require("mongoose");
+
+const wordSchema = new mongoose.Schema(
+  {
+    word: { type: String, required: true, unique: true, index: true },
+    cefrLevel: {
+      type: String,
+      required: true,
+      enum: ["A1", "A2", "B1", "B2", "C1", "C2"],
+    },
+    topic: { type: String, required: true },
+    translation: { type: String, required: true },
+    example1: { type: String },
+    example1Translation: { type: String },
+    example2: { type: String },
+    example2Translation: { type: String },
+  },
+  { timestamps: true }
+);
+
+const Word = mongoose.model("Word", wordSchema);
+
+module.exports = Word;
+const express = require("express");
+const multer = require("multer");
+
+// Import all required middleware and controllers
+const { protectAdmin } = require("../middleware/adminMiddleware");
+const { loginAdmin } = require("../controllers/adminAuthController");
+const {
+  uploadPart1_1,
+  uploadPart1_2,
+  uploadPart2,
+  uploadPart3,
+  uploadWordBankWord,
+} = require("../controllers/adminContentController");
+
+const router = express.Router();
+
+// Configure multer for in-memory storage, which is required by our storage service.
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // Optional: Set a file size limit (e.g., 10MB)
+});
+
+// --- Public Admin Authentication Route ---
+// This route is not protected, allowing admins to log in.
+router.post("/auth/login", loginAdmin);
+
+// --- Protected Content Management Routes ---
+// The `protectAdmin` middleware is applied to all subsequent routes in this file.
+// Any request to these endpoints must include a valid admin JWT.
+router.use(protectAdmin);
+
+/**
+ * @route   POST /api/admin/content/part1.1
+ * @desc    Uploads a single question for Part 1.1
+ * @access  Private (Admin only)
+ * @expects A `multipart/form-data` request with:
+ *          - A text field named `questionText`
+ *          - A single file field named `audio`
+ */
+router.post("/content/part1.1", upload.single("audio"), uploadPart1_1);
+
+/**
+ * @route   POST /api/admin/content/part1.2
+ * @desc    Uploads a complete set for Part 1.2
+ * @access  Private (Admin only)
+ * @expects A `multipart/form-data` request with multiple fields.
+ *          The `upload.fields()` middleware handles these specifically.
+ */
+router.post(
+  "/content/part1.2",
+  upload.fields([
+    { name: "image1", maxCount: 1 },
+    { name: "image2", maxCount: 1 },
+    { name: "audio1", maxCount: 1 },
+    { name: "audio2", maxCount: 1 },
+    { name: "audio3", maxCount: 1 },
+  ]),
+  uploadPart1_2
+);
+
+/**
+ * @route   POST /api/admin/content/part2
+ * @desc    Uploads a complete set for Part 2
+ * @access  Private (Admin only)
+ * @expects A `multipart/form-data` request with two named files.
+ */
+router.post(
+  "/content/part2",
+  upload.fields([
+    { name: "image", maxCount: 1 },
+    { name: "audio", maxCount: 1 }, // This is the combined audio for all 3 questions
+  ]),
+  uploadPart2
+);
+
+/**
+ * @route   POST /api/admin/content/part3
+ * @desc    Uploads a complete topic for Part 3
+ * @access  Private (Admin only)
+ * @expects A `multipart/form-data` request with:
+ *          - Text fields for topic, forPoints, againstPoints
+ *          - An optional single file field named `image`
+ */
+router.post("/content/part3", upload.single("image"), uploadPart3);
+
+
+/**
+ * @route   POST /api/admin/wordbank/add
+ * @desc    Uploads a new word for the Word Bank
+ * @access  Private (Admin only)
+ * @expects A `multipart/form-data` request with text fields.
+ *          `upload.none()` is used because we are only expecting text fields,
+ *          but they are sent as form-data from the frontend.
+ */
+router.post("/wordbank/add", upload.none(), uploadWordBankWord);
+
+module.exports = router;
+// {PATH_TO_PROJECT}/api/routes/authRoutes.js
+const express = require("express");
+const {
+  getUserProfile,
+  googleSignIn,
+  deleteUserProfile,
+  verifyTelegramToken,
+  telegramRedirect,
+} = require("../controllers/authController"); // Adjust path
+const { protect } = require("../middleware/authMiddleware"); // Adjust path
+
+const router = express.Router();
+
+// --- Social Sign-In route ---
+router.post("/google-signin", googleSignIn);
+
+router.post("/verify-telegram-token", verifyTelegramToken);
+router.get("/telegram/redirect", telegramRedirect);
+
+router
+  .route("/profile")
+  .get(protect, getUserProfile) // GET /api/auth/profile
+  .delete(protect, deleteUserProfile); // DELETE /api/auth/profile
+
+module.exports = router;
+// {PATH_TO_PROJECT}/api/routes/ieltsExamRoutes.js
+const express = require("express");
+const {
+  startExam,
+  handleExamStep, // Changed from handleExamStepStream
+  analyzeExam,
+  getExamHistory,
+  getExamResultDetails,
+} = require("../controllers/ieltsExamController");
+const { protect } = require("../middleware/authMiddleware");
+
+const router = express.Router();
+
+// Apply protect middleware to all exam routes to ensure user is logged in
+router.use(protect);
+
+// Define the routes
+router.post("/start", startExam);
+router.post("/step", handleExamStep); // Changed from /step-stream
+router.post("/analyze", analyzeExam);
+router.get("/history", getExamHistory);
+router.get("/result/:resultId", getExamResultDetails);
+
+module.exports = router;
+// {PATH_TO_PROJECT}/api/routes/multilevelExamRoutes.js
+
+const express = require("express");
+const {
+  generateNewExam,
+  analyzeExam,
+  getExamHistory,
+  getExamResultDetails,
+} = require("../controllers/multilevelExamController");
+const { protect } = require("../middleware/authMiddleware");
+const { checkSubscriptionStatus } = require("../middleware/subscriptionMiddleware"); // Import the new middleware
+
+const router = express.Router();
+
+// This order is important:
+// 1. `protect` ensures we have a user from a valid token.
+// 2. `checkSubscriptionStatus` uses that user to update their tier if it expired.
+router.use(protect);
+router.use(checkSubscriptionStatus);
+
+router.get("/new", generateNewExam);
+router.post("/analyze", analyzeExam); // This controller will now have the latest user status
+router.get("/history", getExamHistory); // This controller is now filtered by tier
+router.get("/result/:resultId", getExamResultDetails);
+
+module.exports = router;
+// {PATH_TO_PROJECT}/api/routes/subscriptionRoutes.js
+
+const express = require("express");
+const router = express.Router();
+const { protect } = require("../middleware/authMiddleware");
+const { verifyAndGrantAccess, startGoldTrial } = require("../controllers/subscriptionController");
+
+// All subscription routes should be protected
+router.use(protect);
+
+router.post("/verify-purchase", verifyAndGrantAccess);
+router.post("/start-trial", startGoldTrial);
+
+module.exports = router;
+const express = require("express");
+const router = express.Router();
+const { handleWebhook } = require("../controllers/telegramWebhookController");
+
+// This endpoint must be public for Telegram to reach it.
+// Use a hard-to-guess path for simple security.
+router.post(`/${process.env.TELEGRAM_BOT_TOKEN}`, handleWebhook);
+
+module.exports = router;
+const express = require("express");
+const { getLevels, getTopics, getWords } = require("../controllers/wordBankController");
+const router = express.Router();
+
+router.route("/levels").get(getLevels);
+router.route("/topics").get(getTopics);
+router.route("/words").get(getWords);
+
+module.exports = router;
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
+const Admin = require("../models/AdminModel"); // Adjust path if needed
+
+dotenv.config({ path: "../.env" }); // Load environment variables
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("MongoDB Connected...");
+  } catch (error) {
+    console.error(`Error: ${error.message}`);
+    process.exit(1);
+  }
+};
+
+const createAdmin = async () => {
+  await connectDB();
+
+  try {
+    const email = process.argv[2];
+    const password = process.argv[3];
+
+    if (!email || !password) {
+      console.error("Please provide an email and password.");
+      console.log("Usage: node scripts/createAdmin.js <email> <password>");
+      process.exit(1);
+    }
+
+    const adminExists = await Admin.findOne({ email });
+
+    if (adminExists) {
+      console.error("An admin with this email already exists.");
+      process.exit(1);
+    }
+
+    const admin = await Admin.create({
+      email,
+      password,
+    });
+
+    console.log("Admin User Created Successfully!");
+    console.log(`Email: ${admin.email}`);
+    process.exit(0);
+  } catch (error) {
+    console.error(`Error creating admin: ${error.message}`);
+    process.exit(1);
+  }
+};
+
+createAdmin();
+// {PATH_TO_PROJECT}/api/services/paymentService.js
+
+const PLANS = require("../config/plans");
+const User = require("../models/userModel");
+
+// --- Provider-Specific Implementations (Stubs for now) ---
+
+/**
+ * Placeholder for Google Play Billing verification.
+ * In a real scenario, this would use the `googleapis` library to verify a purchase token.
+ * @returns {Promise<{success: boolean, planId: string, error?: string}>}
+ */
+const verifyGooglePurchase = async (purchaseToken) => {
+  console.log(`[Google] Verifying purchase token: ${purchaseToken}`);
+  // TODO: Add actual Google Play Developer API verification logic here.
+  // You would call the API to confirm the token is valid and get the product/subscription ID.
+
+  // For now, we simulate a successful verification for a one-time gold purchase.
+  if (purchaseToken === "fake_google_token_gold_one_time") {
+    return { success: true, planId: "gold_one_time_month" };
+  }
+  return { success: false, error: "Invalid Google purchase token." };
+};
+
+/**
+ * Placeholder for Payme transaction verification.
+ * This would involve calling the Payme Merchant API to check a transaction's status.
+ * @returns {Promise<{success: boolean, planId: string, error?: string}>}
+ */
+const verifyPaymePurchase = async (transactionId) => {
+  console.log(`[Payme] Verifying transaction ID: ${transactionId}`);
+  // TODO: Add actual Payme API verification logic.
+
+  // Simulate success
+  if (transactionId === "fake_payme_trans_id_gold_one_time") {
+    return { success: true, planId: "gold_one_time_month" };
+  }
+  return { success: false, error: "Invalid Payme transaction." };
+};
+
+/**
+ * Placeholder for Click transaction verification.
+ * @returns {Promise<{success: boolean, planId: string, error?: string}>}
+ */
+const verifyClickPurchase = async (transactionId) => {
+  console.log(`[Click] Verifying transaction ID: ${transactionId}`);
+  // TODO: Add actual Click API verification logic.
+
+  // Simulate success
+  if (transactionId === "fake_click_trans_id_gold_one_time") {
+    return { success: true, planId: "gold_one_time_month" };
+  }
+  return { success: false, error: "Invalid Click transaction." };
+};
+
+/**
+ * Placeholder for Paynet transaction verification.
+ * @returns {Promise<{success: boolean, planId: string, error?: string}>}
+ */
+const verifyPaynetPurchase = async (transactionId) => {
+  console.log(`[Paynet] Verifying transaction ID: ${transactionId}`);
+  // TODO: Add actual Paynet API verification logic.
+
+  // Simulate success
+  if (transactionId === "fake_paynet_trans_id_gold_one_time") {
+    return { success: true, planId: "gold_one_time_month" };
+  }
+  return { success: false, error: "Invalid Paynet transaction." };
+};
+
+// --- The Main Handler ---
+
+/**
+ * The main function to process a purchase verification request from any provider.
+ * @param {string} provider - 'google', 'payme', 'paynet', or 'click'.
+ * @param {string} verificationToken - The token/ID from the client-side purchase.
+ * @param {object} user - The Mongoose user object.
+ * @returns {Promise<{success: boolean, message: string, subscription?: object}>}
+ */
+const verifyPurchase = async (provider, verificationToken, user) => {
+  let verificationResult;
+
+  switch (provider.toLowerCase()) {
+    case "google":
+      verificationResult = await verifyGooglePurchase(verificationToken);
+      break;
+    case "payme":
+      verificationResult = await verifyPaymePurchase(verificationToken);
+      break;
+    case "click":
+      verificationResult = await verifyClickPurchase(verificationToken);
+
+    case "paynet":
+      verificationResult = await verifyPaynetPurchase(verificationToken);
+      break;
+    default:
+      return { success: false, message: "Invalid payment provider." };
+  }
+
+  if (!verificationResult.success) {
+    return { success: false, message: verificationResult.error || "Purchase verification failed." };
+  }
+
+  // --- Grant Entitlements ---
+  const plan = PLANS[verificationResult.planId];
+  if (!plan) {
+    console.error(`FATAL: No plan found for verified planId: ${verificationResult.planId}`);
+    return { success: false, message: "Internal server error: Plan not configured." };
+  }
+
+  // Calculate new expiration date
+  const now = new Date();
+  // If the user already has an active subscription, extend it. Otherwise, start from now.
+  const startDate =
+    user.subscription.expiresAt && user.subscription.expiresAt > now
+      ? user.subscription.expiresAt
+      : now;
+  const newExpiresAt = new Date(startDate.setDate(startDate.getDate() + plan.durationDays));
+
+  // Update user's subscription
+  user.subscription.tier = plan.tier;
+  user.subscription.expiresAt = newExpiresAt;
+
+  await user.save();
+
+  console.log(
+    `User ${user.email} successfully upgraded to ${plan.tier} until ${newExpiresAt.toISOString()}`
+  );
+
+  return {
+    success: true,
+    message: `Successfully upgraded to ${plan.tier}!`,
+    subscription: user.subscription, // Return the updated subscription object to the client
+  };
+};
+
+module.exports = { verifyPurchase };
+const { createClient } = require("@supabase/supabase-js");
+const admin = require("firebase-admin");
+const { getStorage } = require("firebase-admin/storage");
+
+// --- Supabase Client Initialization ---
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+if (!supabaseUrl || !supabaseKey) {
+  console.warn("[Storage Service] Supabase URL or Key not found. Supabase uploads will fail.");
+}
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// --- Firebase Admin SDK Initialization ---
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
+    });
+    console.log("[Storage Service] Firebase Admin SDK initialized.");
+  } else {
+    console.warn(
+      "[Storage Service] FIREBASE_SERVICE_ACCOUNT_JSON not found. Firebase uploads will fail."
+    );
+  }
+} catch (error) {
+  console.error("[Storage Service] Failed to initialize Firebase Admin SDK:", error.message);
+}
+
+/**
+ * Supabase Upload Strategy
+ * @param {object} file - The file object from multer (req.file)
+ * @param {string} destinationPath - The folder path in the bucket (e.g., 'images' or 'audio')
+ * @returns {Promise<string>} The public URL of the uploaded file
+ */
+const uploadToSupabase = async (file, destinationPath) => {
+  if (!supabaseUrl) throw new Error("Supabase client not initialized.");
+
+  const fileName = `${Date.now()}-${file.originalname.replace(/\s/g, "_")}`;
+  const filePath = `${destinationPath}/${fileName}`;
+  const bucketName = "multilevel"; // Your bucket name in Supabase
+
+  const { data, error } = await supabase.storage.from(bucketName).upload(filePath, file.buffer, {
+    contentType: file.mimetype,
+    upsert: false,
+  });
+
+  if (error) {
+    console.error("Supabase Upload Error:", error);
+    throw new Error("Failed to upload file to Supabase.");
+  }
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(bucketName).getPublicUrl(data.path);
+  console.log(`[Supabase] File uploaded successfully: ${publicUrl}`);
+  return publicUrl;
+};
+
+/**
+ * Firebase Cloud Storage Upload Strategy
+ * @param {object} file - The file object from multer (req.file)
+ * @param {string} destinationPath - The folder path in the bucket (e.g., 'images' or 'audio')
+ * @returns {Promise<string>} The public URL of the uploaded file
+ */
+const uploadToFirebase = async (file, destinationPath) => {
+  if (!admin.apps.length) throw new Error("Firebase Admin SDK not initialized.");
+
+  const bucket = getStorage().bucket();
+  const fileName = `${Date.now()}-${file.originalname.replace(/\s/g, "_")}`;
+  const filePath = `${destinationPath}/${fileName}`;
+  const blob = bucket.file(filePath);
+
+  const blobStream = blob.createWriteStream({
+    metadata: {
+      contentType: file.mimetype,
+    },
+  });
+
+  return new Promise((resolve, reject) => {
+    blobStream.on("error", (err) => {
+      console.error("Firebase Upload Error:", err);
+      reject("Failed to upload file to Firebase.");
+    });
+
+    blobStream.on("finish", async () => {
+      // Make the file publicly readable.
+      await blob.makePublic();
+      const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+      console.log(`[Firebase] File uploaded successfully: ${publicUrl}`);
+      resolve(publicUrl);
+    });
+
+    blobStream.end(file.buffer);
+  });
+};
+
+/**
+ * The main upload function that acts as a strategy selector.
+ * @param {string} provider - 'supabase' or 'firebase'
+ * @param {object} file - The file object from multer
+ * @param {string} destinationPath - The subfolder for the file
+ * @returns {Promise<string>} The public URL of the uploaded file
+ */
+const uploadToCDN = (provider, file, destinationPath) => {
+  switch (provider.toLowerCase()) {
+    case "firebase":
+      return uploadToFirebase(file, destinationPath);
+    case "supabase":
+      return uploadToSupabase(file, destinationPath);
+    default:
+      console.error(`Invalid storage provider: ${provider}. Defaulting to placeholder.`);
+      // Fallback placeholder logic
+      return Promise.resolve(
+        `https://placeholder-cdn.com/${destinationPath}/${Date.now()}-${file.originalname}`
+      );
+  }
+};
+
+module.exports = { uploadToCDN };
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+if (!process.env.GEMINI_API_KEY) {
+  throw new Error("FATAL ERROR: GEMINI_API_KEY is not set.");
+}
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Using a standard, fast, and up-to-date model.
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+/**
+ * A robust JSON parser that extracts JSON from a string,
+ * even if it's wrapped in Markdown code blocks or other text.
+ * @param {string} text The raw text response from the LLM.
+ * @returns {object|null} The parsed JSON object, or null if no valid JSON is found.
+ */
+const safeJsonParse = (text) => {
+  if (!text) {
+    console.error("[safeJsonParse] Received null or empty text.");
+    return null;
+  }
+
+  try {
+    const startIndex = text.indexOf("{");
+    const endIndex = text.lastIndexOf("}");
+
+    if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {
+      console.error("[safeJsonParse] Failed to find a valid JSON object within the text.");
+      return null;
+    }
+
+    const jsonString = text.substring(startIndex, endIndex + 1);
+
+    // [DEBUG LOG] Log the extracted JSON string before parsing
+    console.log("[safeJsonParse] Attempting to parse extracted JSON string:");
+    console.log(jsonString);
+
+    const parsed = JSON.parse(jsonString);
+    console.log("[safeJsonParse] Successfully parsed JSON.");
+    return parsed;
+  } catch (error) {
+    const jsonString = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
+    console.error("[safeJsonParse] CRITICAL: Failed to parse extracted JSON string.", {
+      error: error.message,
+      attemptedString: jsonString,
+    });
+    return null;
+  }
+};
+
+/**
+ * Generates a single, non-streamed response from the Gemini model.
+ * @param {string} prompt The prompt to send to the model.
+ * @returns {Promise<string>} The text content of the response.
+ */
+async function generateText(prompt) {
+  // [DEBUG LOG] Log the prompt being sent to Gemini
+  console.log("\n----------- PROMPT TO GEMINI -----------");
+  console.log(prompt);
+  console.log("----------------------------------------\n");
+
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  // [DEBUG LOG] Log the raw response text from Gemini
+  console.log("\n---------- RAW RESPONSE FROM GEMINI ----------");
+  console.log(text);
+  console.log("------------------------------------------\n");
+
+  return text;
+}
+
+/**
+ * Generates a streamed text response from the Gemini model.
+ * @param {string} prompt The prompt to send to the model.
+ * @returns {Promise<import('@google/generative-ai').GenerateContentStreamResult>} The stream result object.
+ */
+async function generateTextStream(prompt) {
+  // Add logging here too if you ever use the streaming function
+  console.log("\n----------- STREAMING PROMPT TO GEMINI -----------");
+  console.log(prompt);
+  console.log("------------------------------------------------\n");
+
+  return model.generateContentStream({
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+  });
+}
+
+module.exports = {
+  generateText,
+  generateTextStream,
+  safeJsonParse,
+};
+// {PATH_TO_PROJECT}/api/utils/generateToken.js
+const jwt = require("jsonwebtoken");
+
+const generateToken = (userId) => {
+  return jwt.sign({ id: userId }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN,
+  });
+};
+
+module.exports = generateToken;
+// {PATH_TO_PROJECT}/api/utils/kokoro.js
+
+const axios = require("axios");
+
+const KOKORO_PREPROCESS_URL =
+  process.env.KOKORO_PREPROCESS_URL || "http://localhost:8000/preprocess";
+const DEFAULT_KOKORO_LANG_CODE = process.env.DEFAULT_KOKORO_LANG_CODE || "b";
+const DEFAULT_KOKORO_CONFIG_KEY = process.env.DEFAULT_KOKORO_CONFIG_KEY || "hexgrad/Kokoro-82M";
+
+/**
+ * Calls the Kokoro preprocessing service to get input_ids for a given text.
+ * @param {string} textToProcess The sentence to preprocess.
+ * @returns {Promise<number[]>} An array of input_ids, or an empty array on failure.
+ */
+async function getKokoroInputIds(textToProcess) {
+  if (!textToProcess) {
+    return [];
+  }
+  try {
+    console.log(`[Kokoro] Preprocessing text: "${textToProcess.substring(0, 50)}..."`);
+    const response = await axios.post(
+      KOKORO_PREPROCESS_URL,
+      {
+        text: textToProcess,
+        lang_code: DEFAULT_KOKORO_LANG_CODE,
+        config_key: DEFAULT_KOKORO_CONFIG_KEY,
+      },
+      { responseType: "json", timeout: 7000 }
+    );
+
+    const ids = response.data?.results?.[0]?.input_ids?.[0];
+    if (ids && Array.isArray(ids)) {
+      console.log(`[Kokoro] Successfully got ${ids.length} input_ids.`);
+      return ids;
+    }
+
+    console.warn("[Kokoro] Preprocessor did not return valid input_ids.");
+    return [];
+  } catch (error) {
+    console.error(`[Kokoro] Error calling preprocessor: ${error.message}`);
+    return [];
+  }
+}
+
+module.exports = { getKokoroInputIds };
+// {PATH_TO_PROJECT}/api/utils/sse.js
+
+function sendSseChunk(res, eventName, data) {
+  if (res.writableEnded) {
+    return;
+  }
+  try {
+    res.write(`event: ${eventName}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  } catch (e) {
+    console.error(`[SSE Helper] Error writing: ${e.message}`);
+    if (!res.writableEnded) {
+      res.end();
+    }
+  }
+}
+
+const sentenceTerminators = /[.!?\n]/;
+
+// Use module.exports to be consistent with the rest of the backend
+module.exports = {
+  sendSseChunk,
+  sentenceTerminators,
+};
+# {PATH_TO_PROJECT}/api/Dockerfile
+
+# Using alpine variants can result in smaller images, but might lack some tools.
+# 'bookworm' is based on Debian 12.
+FROM node:22-bookworm-slim
+
+# --- Environment Variables ---
+# Set the working directory in the container
+WORKDIR /usr/src/app
+
+# Set the Node environment to production (many libraries optimize for this)
+ENV NODE_ENV=production
+
+# --- Application Dependencies ---
+COPY package*.json ./
+
+# Install dependencies using npm ci (clean install, generally preferred for CI/production)
+# If you use yarn, replace with 'RUN yarn install --frozen-lockfile --production'
+RUN npm ci --only=production
+
+# --- Application Code ---
+# Bundle app source
+COPY . .
+
+# --- Expose Port ---
+EXPOSE 3000
+
+# --- Healthcheck ---
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:3000/ || exit 1
+
+# --- Run Command ---
+CMD ["npm", "start"]
