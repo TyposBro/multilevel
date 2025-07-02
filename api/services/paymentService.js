@@ -1,8 +1,34 @@
 // {PATH_TO_PROJECT}/api/services/paymentService.js
 const User = require("../models/userModel");
 const PLANS = require("../config/plans");
-// We will create stubs for provider-specific verification logic
-// In a real app, these would contain axios calls to the provider APIs
+const paymeService = require("./providers/paymeService");
+
+/**
+ * Initiates a payment process by dispatching to the correct provider service.
+ * THIS IS THE FUNCTION YOUR CONTROLLER IS LOOKING FOR.
+ * @param {string} provider - The name of the payment provider (e.g., 'payme').
+ * @param {string} planId - The ID of the plan to purchase (e.g., 'gold_monthly').
+ * @param {string} userId - The ID of the user.
+ * @returns {Promise<object>} The result from the provider service (e.g., { paymentUrl, receiptId }).
+ */
+const initiatePayment = async (provider, planId, userId) => {
+  const plan = PLANS[planId];
+  if (!plan) {
+    throw new Error("Plan not found");
+  }
+
+  switch (provider.toLowerCase()) {
+    case "payme":
+      // Delegate the creation task to the payme-specific service
+      return paymeService.createTransaction(plan, userId);
+
+    // case 'click':
+    //     return clickService.createTransaction(plan, userId);
+
+    default:
+      throw new Error(`Unsupported payment provider for creation: ${provider}`);
+  }
+};
 
 const verifyGooglePurchase = async (purchaseToken) => {
   console.log(`[Google] Verifying purchase token: ${purchaseToken}`);
@@ -20,17 +46,19 @@ const verifyGooglePurchase = async (purchaseToken) => {
 };
 
 const verifyPaymeTransaction = async (transactionId) => {
-  console.log(`[Payme] Verifying transaction: ${transactionId}`);
-  // TODO: Implement Payme's `receipts.check` logic here.
-  // This is where you would call the Payme API to confirm the transaction status.
-  // For now, simulate success.
-  if (transactionId.startsWith("fake_payme_trans_")) {
-    const planKey = transactionId.replace("fake_payme_trans_", "");
-    if (PLANS[planKey]) {
-      return { success: true, planId: planKey, state: 4 /* Paid */ };
-    }
+  // Instead of simulating, we call the actual service function.
+  const result = await paymeService.checkTransaction(transactionId);
+
+  // The transaction state for a successful payment in Payme is 4.
+  if (result && result.state === 4) {
+    return { success: true, planId: result.planId };
+  } else {
+    // Determine a more specific error message
+    const errorMessage = result
+      ? `Invalid Payme transaction state: ${result.state}`
+      : "Payme transaction not found.";
+    return { success: false, error: errorMessage };
   }
-  return { success: false, error: "Invalid Payme transaction." };
 };
 
 const verifyClickTransaction = async (transactionId) => {
@@ -111,4 +139,4 @@ const verifyPurchase = async (provider, verificationToken, user) => {
   };
 };
 
-module.exports = { verifyPurchase };
+module.exports = { verifyPurchase, initiatePayment };

@@ -1,17 +1,15 @@
-// {PATH_TO_PROJECT}/api/routes/paymentRoutes.js
-
 const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
-const { createPayment, getPaymentStatus } = require("../controllers/payments/paymentController");
+const { createPayment, verifyPayment } = require("../controllers/payments/paymentController");
 
 // All payment routes should be protected
 router.use(protect);
 
-// The client sends the provider in the request body
+// Route to create the payment and get the URL
 router.post("/create", createPayment);
 
-// The route now includes the provider for the status check
-router.get("/status/:provider/:transactionId", getPaymentStatus);
+// Route to verify the payment after user returns from Payme/Click
+router.post("/verify", verifyPayment);
 
 module.exports = router;

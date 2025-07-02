@@ -1,6 +1,8 @@
 package com.typosbro.multilevel.ui.screens.subscription
 
+import android.util.Log
 import android.widget.Toast
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +27,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -34,6 +37,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.viewmodels.SubscriptionViewModel
@@ -46,6 +52,40 @@ fun SubscriptionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val activity = LocalContext.current as ComponentActivity
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // This effect will run when the screen enters the composition
+    // and clean up when it leaves.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            // Check if the event is ON_RESUME
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // When the app resumes, it might be because the user
+                // is coming back from the Payme browser flow.
+                // We should check if there's a pending transaction to verify.
+
+                // TODO: Here you would first check your local storage
+                // if (paymentPrefManager.hasPendingTransaction()) {
+                //    viewModel.verifyPendingPurchase("payme")
+                // }
+
+                // For demonstration, we can log this event.
+                Log.d("SubscriptionScreen", "App Resumed. Time to check for pending payments.")
+            }
+        }
+
+        // Add the observer to the lifecycle
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        // The onDispose block is called when the composable leaves the screen
+        onDispose {
+            // Remove the observer to prevent memory leaks
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
 
     // Observe state for showing messages (Toast/Snackbar)
     LaunchedEffect(uiState.purchaseSuccessMessage) {
@@ -94,20 +134,15 @@ fun SubscriptionScreen(
                             "6-Month History Retention"
                         ),
                         onPayWithPayme = {
-                            // In a real app, you'd launch the Payme SDK here.
-                            // The SDK would return a transaction ID.
-                            // For simulation, we use a fake one.
-                            viewModel.verifyPurchase("payme", "fake_payme_trans", "silver_monthly")
+                            // Call the new function to start the web flow
+                            viewModel.createWebPayment(activity, "payme", "silver_monthly")
                         },
                         onPayWithClick = {
-                            viewModel.verifyPurchase("click", "fake_click_trans", "silver_monthly")
+                            viewModel.createWebPayment(activity, "click", "silver_monthly")
                         },
                         onPayWithGoogle = {
-                            viewModel.verifyPurchase(
-                                "google",
-                                "fake_google_token",
-                                "silver_monthly"
-                            )
+                            // Google Play flow is different and would use its own logic
+                            // For now, this is a placeholder.
                         }
                     )
                 }
@@ -121,13 +156,15 @@ fun SubscriptionScreen(
                             "Unlimited History Retention"
                         ),
                         onPayWithPayme = {
-                            viewModel.verifyPurchase("payme", "fake_payme_trans", "gold_monthly")
+                            // Call the new function to start the web flow
+                            viewModel.createWebPayment(activity, "payme", "silver_monthly")
                         },
                         onPayWithClick = {
-                            viewModel.verifyPurchase("click", "fake_click_trans", "gold_monthly")
+                            viewModel.createWebPayment(activity, "click", "silver_monthly")
                         },
                         onPayWithGoogle = {
-                            viewModel.verifyPurchase("google", "fake_google_token", "gold_monthly")
+                            // Google Play flow is different and would use its own logic
+                            // For now, this is a placeholder.
                         }
                     )
                 }

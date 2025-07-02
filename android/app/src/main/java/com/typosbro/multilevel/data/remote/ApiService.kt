@@ -5,6 +5,8 @@ import com.typosbro.multilevel.data.remote.models.AnalyzeExamRequest
 import com.typosbro.multilevel.data.remote.models.AnalyzeExamResponse
 import com.typosbro.multilevel.data.remote.models.ApiWord
 import com.typosbro.multilevel.data.remote.models.AuthResponse
+import com.typosbro.multilevel.data.remote.models.CreatePaymentRequest
+import com.typosbro.multilevel.data.remote.models.CreatePaymentResponse
 import com.typosbro.multilevel.data.remote.models.ExamHistorySummaryResponse
 import com.typosbro.multilevel.data.remote.models.ExamResultResponse
 import com.typosbro.multilevel.data.remote.models.ExamStepRequest
@@ -94,4 +96,7 @@ interface ApiService {
 
     @POST("subscriptions/verify-purchase")
     suspend fun verifyPurchase(@Body request: VerifyPurchaseRequest): Response<SubscriptionResponse>
+
+    @POST("payment/create")
+    suspend fun createPayment(@Body request: CreatePaymentRequest): Response<CreatePaymentResponse>
 }
