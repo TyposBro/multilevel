@@ -1,5 +1,3 @@
-// {PATH_TO_PROJECT}/api/routes/subscriptionRoutes.js
-
 const express = require("express");
 const router = express.Router();
 const { protect } = require("../middleware/authMiddleware");
@@ -9,6 +7,7 @@ const { verifyAndGrantAccess, startGoldTrial } = require("../controllers/subscri
 router.use(protect);
 
 router.post("/verify-purchase", verifyAndGrantAccess);
+// The start-trial route is good to keep
 router.post("/start-trial", startGoldTrial);
 
 module.exports = router;

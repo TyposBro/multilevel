@@ -67,6 +67,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
+    onNavigateToSubscription: () -> Unit,
     profileViewModel: ProfileViewModel = hiltViewModel(),
     authViewModel: AuthViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -201,7 +202,7 @@ fun ProfileScreen(
                             contentDescription = null
                         )
                     },
-                    modifier = Modifier.clickable { /* TODO: Navigate to subscription screen */ }
+                    modifier = Modifier.clickable { onNavigateToSubscription() }
                 )
             }
 

@@ -1,58 +1,114 @@
 // {PATH_TO_PROJECT}/api/services/paymentService.js
-const paymeService = require('./providers/paymeService');
-// const clickService = require('./providers/clickService'); // Future
-// const googlePlayService = require('./providers/googlePlayService'); // Future
-const PLANS = require('../config/plans');
+const User = require("../models/userModel");
+const PLANS = require("../config/plans");
+// We will create stubs for provider-specific verification logic
+// In a real app, these would contain axios calls to the provider APIs
 
-/**
- * Initiates a payment process by dispatching to the correct provider service.
- * @param {string} provider - The name of the payment provider (e.g., 'payme').
- * @param {string} planId - The ID of the plan to purchase (e.g., 'gold_monthly').
- * @param {string} userId - The ID of the user.
- * @returns {Promise<object>} The result from the provider service (e.g., { paymentUrl, receiptId }).
- */
-const initiatePayment = async (provider, planId, userId) => {
-    const plan = PLANS[planId];
-    if (!plan) {
-        throw new Error('Plan not found');
+const verifyGooglePurchase = async (purchaseToken) => {
+  console.log(`[Google] Verifying purchase token: ${purchaseToken}`);
+  // TODO: Add actual Google Play Developer API verification logic.
+  // This involves using the `googleapis` library.
+
+  // For now, simulate a successful verification.
+  if (purchaseToken.startsWith("fake_google_token_")) {
+    const planKey = purchaseToken.replace("fake_google_token_", "");
+    if (PLANS[planKey]) {
+      return { success: true, planId: planKey };
     }
+  }
+  return { success: false, error: "Invalid Google purchase token." };
+};
 
-    switch (provider.toLowerCase()) {
-        case 'payme':
-            return paymeService.createTransaction(plan, userId);
-        
-        // case 'click':
-        //     return clickService.createTransaction(plan, userId);
-        
-        // case 'google':
-        //     // Google Play is different; it's a verification flow.
-        //     throw new Error('Google Play purchases must be verified, not created on the server.');
-
-        default:
-            throw new Error('Unsupported payment provider');
+const verifyPaymeTransaction = async (transactionId) => {
+  console.log(`[Payme] Verifying transaction: ${transactionId}`);
+  // TODO: Implement Payme's `receipts.check` logic here.
+  // This is where you would call the Payme API to confirm the transaction status.
+  // For now, simulate success.
+  if (transactionId.startsWith("fake_payme_trans_")) {
+    const planKey = transactionId.replace("fake_payme_trans_", "");
+    if (PLANS[planKey]) {
+      return { success: true, planId: planKey, state: 4 /* Paid */ };
     }
+  }
+  return { success: false, error: "Invalid Payme transaction." };
+};
+
+const verifyClickTransaction = async (transactionId) => {
+  console.log(`[Click] Verifying transaction: ${transactionId}`);
+  // TODO: Implement Click's verification API logic here.
+  if (transactionId.startsWith("fake_click_trans_")) {
+    const planKey = transactionId.replace("fake_click_trans_", "");
+    if (PLANS[planKey]) {
+      return { success: true, planId: planKey, state: 0 /* Success */ };
+    }
+  }
+  return { success: false, error: "Invalid Click transaction." };
 };
 
 /**
- * Checks a payment's status by dispatching to the correct provider.
- * @param {string} provider - The name of the payment provider.
- * @param {string} transactionId - The transaction/receipt ID from the provider.
- * @returns {Promise<object>} The status result from the provider.
+ * Main verification function that dispatches to the correct provider.
+ * @param {string} provider - 'google', 'payme', or 'click'.
+ * @param {string} verificationToken - The token/ID from the client-side purchase.
+ * @param {object} user - The Mongoose user object.
+ * @returns {Promise<{success: boolean, message: string, subscription?: object}>}
  */
-const checkPaymentStatus = async (provider, transactionId) => {
-     switch (provider.toLowerCase()) {
-        case 'payme':
-            return paymeService.checkTransaction(transactionId);
-        
-        // case 'click':
-        //     return clickService.checkTransaction(transactionId);
+const verifyPurchase = async (provider, verificationToken, user) => {
+  let verificationResult;
 
-        default:
-            throw new Error('Unsupported payment provider for status check');
-    }
+  switch (provider.toLowerCase()) {
+    case "google":
+      verificationResult = await verifyGooglePurchase(verificationToken);
+      break;
+    case "payme":
+      verificationResult = await verifyPaymeTransaction(verificationToken);
+      break;
+    case "click":
+      verificationResult = await verifyClickTransaction(verificationToken);
+      break;
+    default:
+      return { success: false, message: "Invalid payment provider." };
+  }
+
+  if (!verificationResult.success) {
+    return { success: false, message: verificationResult.error || "Purchase verification failed." };
+  }
+
+  // --- Grant Entitlements ---
+  const plan = PLANS[verificationResult.planId];
+  if (!plan) {
+    console.error(`FATAL: No plan found for verified planId: ${verificationResult.planId}`);
+    return { success: false, message: "Internal server error: Plan not configured." };
+  }
+
+  // Calculate new expiration date
+  const now = new Date();
+  // If the user already has an active subscription, extend it. Otherwise, start from now.
+  const startDate =
+    user.subscription.expiresAt && user.subscription.expiresAt > now
+      ? user.subscription.expiresAt
+      : now;
+
+  const newExpiresAt = new Date(
+    new Date(startDate).setDate(startDate.getDate() + plan.durationDays)
+  );
+
+  // Update user's subscription in the database
+  user.subscription.tier = plan.tier;
+  user.subscription.expiresAt = newExpiresAt;
+  // For recurring subscriptions, you would also save the provider's subscription ID
+  // user.subscription.providerSubscriptionId = verificationResult.providerSubId;
+
+  await user.save();
+
+  console.log(
+    `User ${user._id} successfully upgraded to ${plan.tier} until ${newExpiresAt.toISOString()}`
+  );
+
+  return {
+    success: true,
+    message: `Successfully upgraded to ${plan.tier}!`,
+    subscription: user.subscription, // Return the updated subscription object
+  };
 };
 
-module.exports = {
-    initiatePayment,
-    checkPaymentStatus
-};
+module.exports = { verifyPurchase };

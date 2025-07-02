@@ -16,7 +16,9 @@ import com.typosbro.multilevel.data.remote.models.MultilevelExamHistorySummaryRe
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResultResponse
 import com.typosbro.multilevel.data.remote.models.OneTimeTokenRequest
+import com.typosbro.multilevel.data.remote.models.SubscriptionResponse
 import com.typosbro.multilevel.data.remote.models.UserProfileResponse
+import com.typosbro.multilevel.data.remote.models.VerifyPurchaseRequest
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -89,4 +91,7 @@ interface ApiService {
         @Query("level") level: String,
         @Query("topic") topic: String
     ): Response<List<ApiWord>>
+
+    @POST("subscriptions/verify-purchase")
+    suspend fun verifyPurchase(@Body request: VerifyPurchaseRequest): Response<SubscriptionResponse>
 }

@@ -2,9 +2,9 @@ package com.typosbro.multilevel.ui.screens
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -30,6 +30,7 @@ import com.typosbro.multilevel.ui.screens.practice.MultilevelPracticeHubScreen
 import com.typosbro.multilevel.ui.screens.practice.PracticeHubScreen
 import com.typosbro.multilevel.ui.screens.profile.ProfileScreen
 import com.typosbro.multilevel.ui.screens.progress.ProgressScreen
+import com.typosbro.multilevel.ui.screens.subscription.SubscriptionScreen
 import com.typosbro.multilevel.ui.screens.wordbank.ExploreLevelScreen
 import com.typosbro.multilevel.ui.screens.wordbank.ExploreTopicScreen
 import com.typosbro.multilevel.ui.screens.wordbank.WordBankScreen
@@ -40,6 +41,7 @@ object MainDestinations {
     const val WORDBANK_ROUTE = "wordbank"
     const val PROGRESS_ROUTE = "progress"
     const val PROFILE_ROUTE = "profile"
+    const val SUBSCRIPTION_ROUTE = "subscription"
 }
 
 object WordBankDestinations {
@@ -143,7 +145,13 @@ fun MainScreen(
                 )
             }
             composable(MainDestinations.PROFILE_ROUTE) {
-                ProfileScreen()
+                ProfileScreen(onNavigateToSubscription = {
+                    mainNavController.navigate(MainDestinations.SUBSCRIPTION_ROUTE)
+                })
+            }
+
+            composable(MainDestinations.SUBSCRIPTION_ROUTE) {
+                SubscriptionScreen(onNavigateBack = { mainNavController.popBackStack() })
             }
         }
     }
@@ -158,7 +166,11 @@ fun BottomNavigationBar(navController: NavHostController) {
 
     val items = listOf(
         Triple(practiceString, Icons.Default.Home, MainDestinations.PRACTICE_ROUTE),
-        Triple(vocabularyString, Icons.Default.MenuBook, MainDestinations.WORDBANK_ROUTE),
+        Triple(
+            vocabularyString,
+            Icons.AutoMirrored.Filled.MenuBook,
+            MainDestinations.WORDBANK_ROUTE
+        ),
         Triple(progressString, Icons.Default.History, MainDestinations.PROGRESS_ROUTE),
         Triple(profileString, Icons.Default.Person, MainDestinations.PROFILE_ROUTE)
     )

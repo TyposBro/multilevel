@@ -1,5 +1,4 @@
 // {PATH_TO_PROJECT}/api/controllers/subscriptionController.js
-
 const User = require("../models/userModel");
 const { verifyPurchase } = require("../services/paymentService");
 
@@ -9,14 +8,22 @@ const { verifyPurchase } = require("../services/paymentService");
  * @access  Private
  */
 const verifyAndGrantAccess = async (req, res) => {
-  const { provider, token } = req.body;
-  if (!provider || !token) {
-    return res.status(400).json({ message: "Provider and token are required." });
+  // Client sends the provider and the token from the SDK
+  const { provider, token, planId } = req.body;
+  if (!provider || !token || !planId) {
+    return res.status(400).json({ message: "Provider, token, and planId are required." });
   }
 
   try {
     const user = await User.findById(req.user.id);
-    const result = await verifyPurchase(provider, token, user);
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    // We pass the planId within the token for simulation purposes
+    const verificationToken = `${token}_${planId}`;
+
+    const result = await verifyPurchase(provider, verificationToken, user);
 
     if (result.success) {
       res.status(200).json({ message: result.message, subscription: result.subscription });
@@ -57,12 +64,10 @@ const startGoldTrial = async (req, res) => {
 
   await user.save();
 
-  res
-    .status(200)
-    .json({
-      message: "Gold trial started! You have access for 1 month.",
-      subscription: user.subscription,
-    });
+  res.status(200).json({
+    message: "Gold trial started! You have access for 1 month.",
+    subscription: user.subscription,
+  });
 };
 
 module.exports = {
