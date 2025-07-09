@@ -1,22 +1,12 @@
-// {PATH_TO_PROJECT}/src/utils/generateToken.js
-
 import { sign } from "hono/jwt";
 
-/**
- * Generates a JWT.
- * @param {object} c - The Hono context.
- * @param {object} payloadData - The data for the payload (e.g., { id: '...', email: '...' }).
- * @param {boolean} [isAdmin=false] - Whether to use the admin secret.
- * @returns {Promise<string>} The generated JWT.
- */
-export const generateToken = async (c, payloadData, isAdmin = false) => {
-  // Combine the incoming payload with the expiration time
+export const generateToken = async (c, userId, isAdmin = false) => {
   const payload = {
-    ...payloadData,
+    id: userId,
     exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 1 day expiry
   };
 
-  const secretKeyName = isAdmin ? "JWT_SECRET_ADMIN" : "JWT_SECRET_ADMIN";
+  const secretKeyName = isAdmin ? "JWT_SECRET_ADMIN" : "JWT_SECRET";
   const secret = c.env[secretKeyName];
 
   if (!secret) {
@@ -24,6 +14,9 @@ export const generateToken = async (c, payloadData, isAdmin = false) => {
     throw new Error(`Server configuration error: Missing JWT secret.`);
   }
 
+  // THIS IS THE CRITICAL FIX
+  // Explicitly set the algorithm to HS256
   const token = await sign(payload, secret, "HS256");
+
   return token;
 };
