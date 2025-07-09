@@ -1,0 +1,57 @@
+# {PATH_TO_PROJECT}/wrangler.toml
+
+# The name of your worker service
+name = "typosbro-multilevel-api"
+
+# The entry point of your application
+main = "src/index.js"
+
+# Ensures compatibility with modern Worker features
+compatibility_date = "2024-05-30"
+
+# ==============================================================================
+#  Bindings to Cloudflare Resources
+# ==============================================================================
+# These connect your code to Cloudflare services like D1 (database) and R2 (storage).
+# You create these resources via the `wrangler` CLI.
+
+# --- Storage Binding (Cloudflare R2) ---
+# Command: `npx wrangler r2 bucket create multilevel-cdn`
+[[r2_buckets]]
+binding = "CDN_BUCKET" # Variable name in your code: c.env.CDN_BUCKET
+bucket_name = "multilevel-cdn" # The actual name of the R2 bucket
+
+# --- Database Binding (Cloudflare D1) ---
+# NOTE: The MONGO_URI is now replaced by this D1 binding.
+# Command: `npx wrangler d1 create typosbro-db`
+[[d1_databases]]
+binding = "DB" # Variable name in your code: c.env.DB
+database_name = "typosbro-db"
+database_id = "your-d1-database-id-goes-here" # Get this from the output of the create command
+
+# ==============================================================================
+#  Public Environment Variables
+# ==============================================================================
+# These variables are NOT secret and can be stored in version control.
+[vars]
+# You can define different environments (e.g., [env.production], [env.staging])
+# For simplicity, we'll define them globally here.
+ENVIRONMENT = "development" # Change to "production" for deployments
+
+# --- General Config ---
+JWT_EXPIRES_IN = "1d"
+JWT_EXPIRES_IN_ADMIN = "1d"
+SERVER_URL = "https://your-worker-url.workers.dev" # IMPORTANT: Update after first deploy
+TELEGRAM_BOT_USERNAME = "milliy_technology_bot"
+GOOGLE_CLIENT_ID = "118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com"
+R2_PUBLIC_URL = "https://your-r2-public-url.com" # IMPORTANT: Set this after making your R2 bucket public
+
+# --- Service URLs ---
+KOKORO_TTS_SERVICE_URL = "http://127.0.0.1:5005/synthesize"
+PAYME_CHECKOUT_URL_LIVE = "https://checkout.paycom.uz"
+PAYME_CHECKOUT_URL_TEST = "https://checkout.test.paycom.uz"
+
+# --- DEPRECATED/REPLACED VARIABLES ---
+# PORT is not needed; Cloudflare manages this.
+# MONGO_URI is replaced by the D1 binding above.
+# SUPABASE_URL/FIREBASE_STORAGE_BUCKET are replaced by R2_PUBLIC_URL.
