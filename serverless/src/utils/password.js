@@ -22,7 +22,7 @@ export async function hashPassword(password) {
     {
       name: "PBKDF2",
       salt: salt,
-      iterations: 250000, // A high iteration count is crucial for security.
+      iterations: 50000, // A high iteration count is crucial for security.
       hash: "SHA-256",
     },
     key,
@@ -63,7 +63,7 @@ export async function verifyPassword(password, storedHash) {
     ]);
 
     const hashBuf = await crypto.subtle.deriveBits(
-      { name: "PBKDF2", salt, iterations: 250000, hash: "SHA-256" },
+      { name: "PBKDF2", salt, iterations: 50000, hash: "SHA-256" },
       key,
       256
     );
