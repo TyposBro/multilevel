@@ -1,3 +1,18 @@
-node_modules/
-.env
+# Cloudflare Workers
 .wrangler
+.mf/
+
+# Node.js
+node_modules
+npm-debug.log
+*.log
+
+# macOS
+.DS_Store
+
+# IDE / Editor specific
+.idea/
+.vscode/
+
+# Temp files
+*.tmp
