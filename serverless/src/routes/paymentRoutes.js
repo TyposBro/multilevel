@@ -1,13 +1,13 @@
 // {PATH_TO_PROJECT}/src/routes/paymentRoutes.js
 
 import { Hono } from "hono";
-import { protect } from "../middleware/authMiddleware";
+import { protectAndLoadUser } from "../middleware/authMiddleware";
 import { createPayment, verifyPayment } from "../controllers/payments/paymentController";
 
 const paymentRoutes = new Hono();
 
 // All payment routes should be protected
-paymentRoutes.use("/*", protect);
+paymentRoutes.use("/*", protectAndLoadUser);
 
 // Route to create the payment and get the URL
 paymentRoutes.post("/create", createPayment);

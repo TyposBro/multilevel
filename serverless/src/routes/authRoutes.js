@@ -1,7 +1,5 @@
-// {PATH_TO_PROJECT}/src/routes/authRoutes.js
-
 import { Hono } from "hono";
-import { protect } from "../middleware/authMiddleware";
+import { protectAndLoadUser } from "../middleware/authMiddleware";
 import {
   getUserProfile,
   googleSignIn,
@@ -12,13 +10,14 @@ import {
 
 const authRoutes = new Hono();
 
-// --- Public Social Sign-In and Telegram Routes ---
+// Public routes
 authRoutes.post("/google-signin", googleSignIn);
 authRoutes.post("/verify-telegram-token", verifyTelegramToken);
 authRoutes.get("/telegram/redirect", telegramRedirect);
 
-// --- Protected Profile Route ---
-authRoutes.get("/profile", protect, getUserProfile);
-authRoutes.delete("/profile", protect, deleteUserProfile);
+// Group all protected routes under a sub-router
+// Use the new single middleware for the profile route
+authRoutes.get("/profile", protectAndLoadUser, getUserProfile);
+authRoutes.delete("/profile", protectAndLoadUser, deleteUserProfile);
 
 export default authRoutes;

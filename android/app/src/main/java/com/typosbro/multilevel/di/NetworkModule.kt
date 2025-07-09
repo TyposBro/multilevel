@@ -3,10 +3,7 @@ package com.typosbro.multilevel.di
 
 import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.data.remote.ApiService
-import com.typosbro.multilevel.data.remote.RetrofitClient
 import com.typosbro.multilevel.data.remote.interceptors.AuthInterceptor
-import com.typosbro.multilevel.data.repositories.AuthRepository
-import com.typosbro.multilevel.data.repositories.ChatRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,18 +20,22 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
+    private const val BASE_URL = "https://typosbro-multilevel-api.milliytechnology.workers.dev/api/"
+
+    // This is correct: It depends on SessionManager, which AppModule provides.
     @Provides
     @Singleton
     fun provideAuthInterceptor(sessionManager: SessionManager): AuthInterceptor {
         return AuthInterceptor(sessionManager)
     }
 
+    // Your named OkHttpClients are correct. They now depend on the Hilt-provided interceptor.
     @Provides
     @Singleton
     @Named("StandardOkHttpClient")
-    fun provideStandardOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient { // <-- Change parameter
+    fun provideStandardOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
         return OkHttpClient.Builder()
-            .addInterceptor(authInterceptor) // <-- Use the injected interceptor
+            .addInterceptor(authInterceptor)
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             })
@@ -47,40 +48,25 @@ object NetworkModule {
     @Provides
     @Singleton
     @Named("SseOkHttpClient")
-    fun provideSseOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient { // <-- Change parameter
+    fun provideSseOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
         return OkHttpClient.Builder()
-            .addInterceptor(authInterceptor) // <-- Use the injected interceptor
+            .addInterceptor(authInterceptor)
             .addInterceptor(HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             })
-            .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS) // No read timeout for SSE
-            .writeTimeout(30, TimeUnit.SECONDS)
-            .pingInterval(20, TimeUnit.SECONDS)
             .build()
     }
 
-
+    // This is correct: It depends on the named OkHttpClient.
     @Provides
     @Singleton
     fun provideApiService(@Named("StandardOkHttpClient") okHttpClient: OkHttpClient): ApiService {
         return Retrofit.Builder()
-            .baseUrl(RetrofitClient.BASE_URL)
-            .client(okHttpClient) // Use the standard client for regular API calls
+            .baseUrl(BASE_URL)
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(ApiService::class.java)
     }
-
-    @Provides
-    @Singleton
-    fun provideAuthRepository(apiService: ApiService): AuthRepository {
-        return AuthRepository(apiService)
-    }
-
-    @Provides
-    @Singleton
-    fun provideChatRepository(
-        apiService: ApiService,
-    ): ChatRepository = ChatRepository(apiService)
 }

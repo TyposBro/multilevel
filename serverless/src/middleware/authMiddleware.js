@@ -1,41 +1,51 @@
-// {PATH_TO_PROJECT}/src/middleware/authMiddleware.js
+import { verify } from "hono/jwt";
+import { db } from "../db/d1-client";
 
-import { jwt } from "hono/jwt";
-import { db } from "../db/d1-client"; // Using the new DB client stub
+export const protectAndLoadUser = async (c, next) => {
+  console.log("Entering manual protection middleware...");
 
-/**
- * Hono middleware to protect user routes.
- * 1. Verifies the JWT token.
- * 2. Fetches the user from the database.
- * 3. Attaches the user object to the context (`c.set('user', ...)`)
- */
-export const protect = (c, next) => {
-  // `hono/jwt` handles extracting the 'Bearer' token and verifying it.
-  const jwtMiddleware = jwt({
-    secret: c.env.JWT_SECRET,
-  });
+  const authHeader = c.req.header("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    console.log("No or malformed Authorization header found.");
+    return c.json({ message: "Authorization header is missing or malformed" }, 401);
+  }
 
-  // The second argument to `jwtMiddleware` is a function that runs *after* successful verification.
-  return jwtMiddleware(c, async () => {
-    try {
-      const payload = c.get("jwt_payload");
-      if (!payload || !payload.id) {
-        return c.json({ message: "Not authorized, token payload is invalid" }, 401);
-      }
+  const token = authHeader.substring(7); // Remove "Bearer "
+  const secret = c.env.JWT_SECRET;
 
-      // Replace Mongoose call with our new DB client function
-      const user = await db.getUserById(c.env.DB, payload.id);
+  if (!secret) {
+    console.error("FATAL: JWT_SECRET not found in environment for manual verification.");
+    return c.json({ message: "Server configuration error" }, 500);
+  }
 
-      if (!user) {
-        return c.json({ message: "Not authorized, user not found" }, 401);
-      }
+  try {
+    console.log(`Attempting to manually verify token starting with: ${token.substring(0, 10)}...`);
 
-      // Set the user object in the context for the next middleware or route handler
-      c.set("user", user);
-      await next();
-    } catch (error) {
-      console.error("Auth middleware error:", error);
-      return c.json({ message: "Not authorized, token failed" }, 401);
+    // Manually verify the token
+    const payload = await verify(token, secret, "HS256");
+
+    console.log("Manual verification successful. Payload:", JSON.stringify(payload));
+
+    if (!payload || !payload.id) {
+      console.log("Payload is missing 'id' field.");
+      return c.json({ message: "Invalid token payload" }, 401);
     }
-  });
+
+    const user = await db.getUserById(c.env.DB, payload.id);
+    if (!user) {
+      console.log(`User with id ${payload.id} not found in database.`);
+      return c.json({ message: "User not found" }, 401);
+    }
+
+    console.log("User successfully loaded from database.");
+    c.set("user", user);
+
+    // If everything is successful, proceed to the controller
+    await next();
+  } catch (error) {
+    // This will catch the specific error from the `verify` function
+    console.error("TOKEN VERIFICATION FAILED:", error.message);
+    console.error("Full error object:", JSON.stringify(error));
+    return c.json({ message: "Token is invalid or expired", error: error.message }, 401);
+  }
 };

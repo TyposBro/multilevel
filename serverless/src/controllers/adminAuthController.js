@@ -1,13 +1,9 @@
 // {PATH_TO_PROJECT}/src/controllers/adminAuthController.js
-import { db } from "../db/d1-client";
-import { generateToken } from "../utils/generateToken";
-import { verifyPassword } from "../utils/password"; // <-- Import our new utility
 
-/**
- * @desc    Authenticate admin & get token (Login)
- * @route   POST /api/admin/auth/login
- * @access  Public
- */
+import { db } from "../db/d1-client";
+import { generateToken } from "../utils/generateToken"; // This needs to be updated too
+import { verifyPassword } from "../utils/password";
+
 export const loginAdmin = async (c) => {
   try {
     const { email, password } = await c.req.json();
@@ -18,9 +14,10 @@ export const loginAdmin = async (c) => {
 
     const admin = await db.findAdminByEmail(c.env.DB, email);
 
-    // Use our new verification function
     if (admin && (await verifyPassword(password, admin.password))) {
-      const token = await generateToken(c, admin.id, true); // isAdmin = true
+      // --- THIS IS THE FIX ---
+      // Instead of just passing the ID, pass the whole admin object or a specific payload
+      const token = await generateToken(c, { id: admin.id, email: admin.email }, true); // Pass a payload object
 
       return c.json({
         id: admin.id,

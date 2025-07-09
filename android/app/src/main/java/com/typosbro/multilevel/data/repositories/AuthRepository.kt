@@ -11,10 +11,14 @@ import com.typosbro.multilevel.data.remote.models.UserProfileResponse
 import com.typosbro.multilevel.data.remote.models.safeApiCall
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
 // --- Auth Repository ---
-class AuthRepository(private val apiService: ApiService) {
-
+@Singleton // Make the repository a singleton
+class AuthRepository @Inject constructor( // <-- ADD @Inject constructor
+    private val apiService: ApiService
+) {
 
     suspend fun googleSignIn(request: GoogleSignInRequest): RepositoryResult<AuthResponse> =
         withContext(Dispatchers.IO) {

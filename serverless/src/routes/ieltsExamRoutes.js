@@ -1,7 +1,7 @@
 // {PATH_TO_PROJECT}/src/routes/ieltsExamRoutes.js
 
 import { Hono } from "hono";
-import { protect } from "../middleware/authMiddleware";
+import { protectAndLoadUser } from "../middleware/authMiddleware";
 import {
   startExam,
   handleExamStep,
@@ -13,7 +13,7 @@ import {
 const ieltsExamRoutes = new Hono();
 
 // Apply `protect` middleware to all routes in this file
-ieltsExamRoutes.use("/*", protect);
+ieltsExamRoutes.use("/*", protectAndLoadUser);
 
 // Define the routes
 ieltsExamRoutes.post("/start", startExam);

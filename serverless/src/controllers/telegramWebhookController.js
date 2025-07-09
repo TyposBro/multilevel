@@ -2,16 +2,10 @@
 
 import { db } from "../db/d1-client";
 
-/**
- * @desc    Handles incoming webhooks from Telegram.
- * @route   POST /api/telegram/webhook/:token
- * @access  Public
- */
 export const handleWebhook = async (c) => {
   const sentToken = c.req.param("token");
   const expectedToken = c.env.TELEGRAM_BOT_TOKEN;
 
-  // Basic security check to ensure the request is from Telegram
   if (sentToken !== expectedToken) {
     return c.json({ message: "Unauthorized" }, 401);
   }
@@ -32,10 +26,13 @@ export const handleWebhook = async (c) => {
         return c.newResponse(null, 500);
       }
 
+      console.log(`Received /start command from user: ${userFrom.first_name} (ID: ${userFrom.id})`);
+
       const token = crypto.randomUUID();
       const redirectUrl = `${SERVER_BASE_URL}/api/auth/telegram/redirect?token=${token}`;
       const messageText = `✅ Welcome! Tap the button below to securely log in to the Multilevel App. This button will expire in 5 minutes.`;
 
+      // --- START OF FIX ---
       const response = await fetch(`${TELEGRAM_API}/sendMessage`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -48,14 +45,28 @@ export const handleWebhook = async (c) => {
         }),
       });
 
-      const sentMessageData = await response.json();
-      const botMessageId = sentMessageData.result?.message_id;
+      // ALWAYS get the body, whether it's an error or success
+      const responseData = await response.json();
 
-      if (!botMessageId) {
-        throw new Error("Failed to get message_id from Telegram response.");
+      // Check if Telegram reported an error
+      if (!responseData.ok) {
+        console.error("Telegram API Error:", JSON.stringify(responseData));
+        // Throw a more informative error
+        throw new Error(`Telegram API responded with an error: ${responseData.description}`);
       }
 
-      // Use our D1 client to create the token
+      const botMessageId = responseData.result?.message_id;
+
+      if (!botMessageId) {
+        // This log will now contain the full response from Telegram, which will help us debug further
+        console.error(
+          "Could not find message_id in Telegram's response:",
+          JSON.stringify(responseData)
+        );
+        throw new Error("Failed to get message_id from Telegram response.");
+      }
+      // --- END OF FIX ---
+
       await db.createOneTimeToken(c.env.DB, {
         token,
         telegramId: userFrom.id,
@@ -64,11 +75,9 @@ export const handleWebhook = async (c) => {
       });
     }
   } catch (error) {
+    // This will now log the more specific error message from the 'throw' statements above
     console.error("Error processing /start command:", error.message);
-    // In case of an error, we don't want to throw and break the webhook flow.
-    // We just log it and respond successfully to Telegram.
   }
 
-  // Always respond to Telegram with a 200 OK to acknowledge receipt of the webhook.
   return c.newResponse(null, 200);
 };

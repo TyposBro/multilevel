@@ -3,11 +3,16 @@ package com.typosbro.multilevel.data.local
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
 
 // This class is now just a simple, direct wrapper around EncryptedSharedPreferences.
-class TokenManager(context: Context) {
+@Singleton
+class TokenManager @Inject constructor(@ApplicationContext context: Context) {
 
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
@@ -26,7 +31,7 @@ class TokenManager(context: Context) {
     }
 
     fun saveToken(token: String) {
-        sharedPreferences.edit().putString(AUTH_TOKEN_KEY, token).apply()
+        sharedPreferences.edit { putString(AUTH_TOKEN_KEY, token) }
     }
 
     fun getToken(): String? {
@@ -34,12 +39,11 @@ class TokenManager(context: Context) {
     }
 
     fun clearToken() {
-        sharedPreferences.edit().remove(AUTH_TOKEN_KEY).apply()
+        sharedPreferences.edit { remove(AUTH_TOKEN_KEY) }
     }
 
     fun hasToken(): Boolean {
         return getToken() != null
     }
 
-    // --- REMOVED THE tokenFlow callbackFlow ---
 }
