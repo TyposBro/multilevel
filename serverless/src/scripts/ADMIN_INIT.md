@@ -1,48 +1,44 @@
 # /src/scripts/ - Administrative Tasks
 
-In a Cloudflare Worker environment, we don't run local Node.js scripts to manipulate a remote database. Instead, we use the `wrangler` command-line tool to execute SQL commands directly against our D1 database.
+...
 
 ## How to Create a New Admin User
 
-1. **Hash the Password:**
-    First, you need to generate a secure hash for the admin's password. You can do this with a simple local Node.js script (since this part doesn't need to run on Cloudflare).
+1.  **Generate a Password Hash:**
+    Since the hashing now uses the Web Crypto API, you can generate a hash using a simple Deno script, a browser's developer console, or a simple local Node script.
 
-    * Create a temporary file `hash-password.js`:
-
+    *   Create a temporary file `hash-password.mjs`:
         ```javascript
-        const bcrypt = require('bcryptjs');
+        // hash-password.mjs
+        async function hashPassword(password) {
+          const passwordBuf = new TextEncoder().encode(password);
+          const salt = crypto.getRandomValues(new Uint8Array(16));
+          const key = await crypto.subtle.importKey('raw', passwordBuf, { name: 'PBKDF2' }, false, ['deriveBits']);
+          const hashBuf = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: 250000, hash: 'SHA-256' }, key, 256);
+          const hash = new Uint8Array(hashBuf);
+          const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+          const hashHex = Array.from(hash).map(b => b.toString(16).padStart(2, '0')).join('');
+          return `${saltHex}:${hashHex}`;
+        }
+
         const password = process.argv[2];
         if (!password) {
-          console.log('Usage: node hash-password.js <your-password-here>');
+          console.log('Usage: node hash-password.mjs <your-password-here>');
           process.exit(1);
         }
-        const salt = bcrypt.genSaltSync(10);
-        const hash = bcrypt.hashSync(password, salt);
-        console.log('Hashed Password:', hash);
-      ```
 
-    * Install bcrypt: `npm install bcryptjs`
-    * Run the script:
-
-        ```bash
-        node hash-password.js 'a-very-secure-password'
+        const hashedPassword = await hashPassword(password);
+        console.log('Hashed String:', hashedPassword);
         ```
+    *   Run the script (Node.js v18+ supports `crypto` globally):
+        ```bash
+        node hash-password.mjs 'a-very-secure-password'
+        ```
+    *   **Copy the output hash string.** It will look something like `a1b2c3...:d4e5f6...`.
 
-    * **Copy the output hash.** It will look something like `$2a$10$AbC...`.
-
-2. **Execute the SQL Command:**
-    Use the `wrangler d1 execute` command to insert the new admin into your `admins` table. Replace `<your-db-name>`, `<email>`, and `<hashed-password>` with your actual values.
-
-    ```bash
-    npx wrangler d1 execute <your-db-name> --command="INSERT INTO admins (id, email, password) VALUES ('your-uuid-here', '<email>', '<hashed-password>');"
-    ```
-
-    **Example:**
+2.  **Execute the SQL Command:**
+    Use `wrangler` to insert the new admin into your `admins` table.
 
     ```bash
-    npx wrangler d1 execute typosbro-db --command="INSERT INTO admins (id, email, password) VALUES ('a1b2c3d4-e5f6-7890-1234-567890abcdef', 'admin@example.com', '$2a$10$AbC...');"
+    npx wrangler d1 execute <your-db-name> --command="INSERT INTO admins (id, email, password) VALUES ('uuid-here', 'admin@example.com', 'paste-your-salt:hash-string-here');"
     ```
-
-    *You can generate a UUID for the `id` from any online generator.*
-
-This method is secure, repeatable, and aligns with the best practices for managing serverless databases.

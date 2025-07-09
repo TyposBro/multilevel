@@ -1,7 +1,7 @@
 // {PATH_TO_PROJECT}/src/controllers/adminAuthController.js
 import { db } from "../db/d1-client";
 import { generateToken } from "../utils/generateToken";
-import * as bcrypt from "bcryptjs"; // bcryptjs is compatible with workers
+import { verifyPassword } from "../utils/password"; // <-- Import our new utility
 
 /**
  * @desc    Authenticate admin & get token (Login)
@@ -18,8 +18,8 @@ export const loginAdmin = async (c) => {
 
     const admin = await db.findAdminByEmail(c.env.DB, email);
 
-    // Manually compare password since the `matchPassword` method is gone
-    if (admin && (await bcrypt.compare(password, admin.password))) {
+    // Use our new verification function
+    if (admin && (await verifyPassword(password, admin.password))) {
       const token = await generateToken(c, admin.id, true); // isAdmin = true
 
       return c.json({
