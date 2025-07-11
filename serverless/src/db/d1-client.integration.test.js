@@ -31,8 +31,6 @@ describe("D1 Client Integration Tests", () => {
       "users",
       "admins",
       "one_time_tokens",
-      "ielts_exam_results",
-      "multilevel_exam_results",
       "words",
       "content_part1_1",
       "content_part1_2",
@@ -119,42 +117,6 @@ describe("D1 Client Integration Tests", () => {
     });
   });
 
-  describe("IELTS Exam Functions", () => {
-    it("should create, retrieve history, and get details for an IELTS exam result", async () => {
-      const resultData = {
-        userId: testUser.id,
-        overallBand: 7.5,
-        criteria: [{ name: "Fluency" }],
-        transcript: [{ text: "hello" }],
-      };
-      const createdResult = await db.createIeltsExamResult(d1, resultData);
-      expect(createdResult.id).toBeDefined();
-      const history = await db.getIeltsExamHistory(d1, testUser.id);
-      expect(history).toHaveLength(1);
-      const details = await db.getIeltsExamResultDetails(d1, createdResult.id, testUser.id);
-      expect(details.criteria).toEqual([{ name: "Fluency" }]);
-    });
-  });
-
-  describe("Multilevel Exam Functions", () => {
-    it("should create, retrieve history, and get details for a Multilevel exam result", async () => {
-      const resultData = {
-        userId: testUser.id,
-        totalScore: 60,
-        feedbackBreakdown: [{ part: "P1" }],
-        transcript: [{ text: "hi" }],
-        examContent: { p1_id: 1 },
-        practicedPart: "FULL",
-      };
-      const createdResult = await db.createMultilevelExamResult(d1, resultData);
-      expect(createdResult.id).toBeDefined();
-      const history = await db.getMultilevelExamHistory(d1, testUser.id);
-      expect(history).toHaveLength(1);
-      const details = await db.getMultilevelExamResultDetails(d1, createdResult.id, testUser.id);
-      expect(details.examContent).toEqual({ p1_id: 1 });
-    });
-  });
-
   describe("Content Functions", () => {
     it("should create and get random content", async () => {
       const contentData = {
@@ -206,13 +168,6 @@ describe("D1 Client Integration Tests", () => {
     it("should return null for unsupported provider in findUserByProviderId", async () => {
       const result = await db.findUserByProviderId(d1, { provider: "facebook", id: "123" });
       expect(result).toBeNull();
-    });
-
-    it("should handle history retention date in getMultilevelExamHistory", async () => {
-      const sixDaysAgo = new Date();
-      sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
-      const history = await db.getMultilevelExamHistory(d1, testUser.id, sixDaysAgo.toISOString());
-      expect(history).toEqual([]);
     });
 
     it("should return null for an expired token in findOneTimeTokenAndDelete", async () => {
@@ -271,9 +226,6 @@ describe("D1 Client Integration Tests", () => {
       await expect(db.updateUserSubscription(mockFailingD1, "1", {})).rejects.toThrow();
       await expect(db.deleteUser(mockFailingD1, "1")).rejects.toThrow();
       await expect(db.findAdminByEmail(mockFailingD1, "e")).resolves.toBeNull();
-      await expect(db.createMultilevelExamResult(mockFailingD1, {})).rejects.toThrow();
-      await expect(db.getMultilevelExamHistory(mockFailingD1, "1")).resolves.toEqual([]);
-      await expect(db.getMultilevelExamResultDetails(mockFailingD1, "1", "1")).resolves.toBeNull();
       await expect(db.createOneTimeToken(mockFailingD1, {})).rejects.toThrow();
       await expect(db.findOneTimeTokenAndDelete(mockFailingD1, "t")).resolves.toBeNull();
       await expect(db.getWordBankLevels(mockFailingD1)).resolves.toEqual([]);
@@ -284,9 +236,6 @@ describe("D1 Client Integration Tests", () => {
       await expect(
         db.updateUserUsage(mockFailingD1, "1", { fullExams: {}, partPractices: {} })
       ).rejects.toThrow();
-      await expect(db.createIeltsExamResult(mockFailingD1, {})).rejects.toThrow();
-      await expect(db.getIeltsExamHistory(mockFailingD1, "1")).resolves.toEqual([]);
-      await expect(db.getIeltsExamResultDetails(mockFailingD1, "1", "1")).resolves.toBeNull();
     });
   });
 });

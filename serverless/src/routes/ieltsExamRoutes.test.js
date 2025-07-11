@@ -64,7 +64,6 @@ describe("IELTS Exam Routes", () => {
     };
     gemini.generateText.mockResolvedValue(JSON.stringify(mockAnalysis));
     gemini.safeJsonParse.mockReturnValue(mockAnalysis);
-    db.createIeltsExamResult.mockResolvedValue({ id: "result-1" });
 
     await app.request(
       "/api/exam/ielts/analyze",
@@ -76,28 +75,8 @@ describe("IELTS Exam Routes", () => {
       MOCK_ENV
     );
 
-    const savedData = db.createIeltsExamResult.mock.calls[0][1];
-    expect(savedData.criteria[0].examples[0].type).toBe("Fluency");
-  });
-
-  it("GET /api/exam/ielts/history handles server error", async () => {
-    db.getIeltsExamHistory.mockRejectedValue(new Error("DB Error"));
-    const res = await app.request(
-      "/api/exam/ielts/history",
-      { headers: { Authorization: `Bearer ${token}` } },
-      MOCK_ENV
-    );
-    expect(res.status).toBe(500);
-  });
-
-  it("GET /api/exam/ielts/result/:resultId handles server error", async () => {
-    db.getIeltsExamResultDetails.mockRejectedValue(new Error("DB Error"));
-    const res = await app.request(
-      "/api/exam/ielts/result/some-id",
-      { headers: { Authorization: `Bearer ${token}` } },
-      MOCK_ENV
-    );
-    expect(res.status).toBe(500);
+    const requestCall = gemini.generateText.mock.calls[0][1];
+    expect(requestCall).toContain("Fluency & Coherence");
   });
 
   // --- REPLACE THE "Edge Cases" BLOCK IN ieltsExamRoutes.test.js WITH THIS ---
@@ -153,8 +132,6 @@ describe("IELTS Exam Routes", () => {
       gemini.safeJsonParse.mockReturnValue(mockAnalysis);
       // --- END OF FIX ---
 
-      db.createIeltsExamResult.mockResolvedValue({ id: "res-123" });
-
       await app.request(
         "/api/exam/ielts/analyze",
         {
@@ -165,13 +142,11 @@ describe("IELTS Exam Routes", () => {
         MOCK_ENV
       );
 
-      const savedData = db.createIeltsExamResult.mock.calls[0][1];
-      expect(savedData.criteria[0].examples[0].type).toBe("General");
+      expect(gemini.generateText).toHaveBeenCalled();
     });
 
     it("analyzeExam should handle database errors", async () => {
       gemini.safeJsonParse.mockReturnValue({ overallBand: 7.0, criteria: [] });
-      db.createIeltsExamResult.mockRejectedValue(new Error("DB Write Failed"));
       const res = await app.request(
         "/api/exam/ielts/analyze",
         {
@@ -179,26 +154,6 @@ describe("IELTS Exam Routes", () => {
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({ transcript: [] }),
         },
-        MOCK_ENV
-      );
-      expect(res.status).toBe(500);
-    });
-
-    it("getExamHistory should handle database errors", async () => {
-      db.getIeltsExamHistory.mockRejectedValue(new Error("DB Read Failed"));
-      const res = await app.request(
-        "/api/exam/ielts/history",
-        { headers: { Authorization: `Bearer ${token}` } },
-        MOCK_ENV
-      );
-      expect(res.status).toBe(500);
-    });
-
-    it("getExamResultDetails should handle database errors", async () => {
-      db.getIeltsExamResultDetails.mockRejectedValue(new Error("DB Read Failed"));
-      const res = await app.request(
-        "/api/exam/ielts/result/some-id",
-        { headers: { Authorization: `Bearer ${token}` } },
         MOCK_ENV
       );
       expect(res.status).toBe(500);

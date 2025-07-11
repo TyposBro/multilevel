@@ -23,7 +23,6 @@ describe("Multilevel Exam Routes", () => {
       JSON.stringify({ totalScore: 55, feedbackBreakdown: [] })
     );
     gemini.safeJsonParse.mockImplementation((text) => (text ? JSON.parse(text) : null));
-    db.createMultilevelExamResult.mockResolvedValue({ id: "result-xyz" });
     db.updateUserUsage.mockResolvedValue({});
     db.updateUserSubscription.mockResolvedValue({});
     db.getRandomContent.mockResolvedValue([]); // Default to empty to prevent false positives
@@ -68,7 +67,7 @@ describe("Multilevel Exam Routes", () => {
           body: JSON.stringify({
             transcript: [{ speaker: "User", text: "Hello" }],
             practicePart: null,
-            examContentIds: {},
+            examContent: {},
           }),
           // --- END OF FIX ---
         },
@@ -93,7 +92,7 @@ describe("Multilevel Exam Routes", () => {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+          body: JSON.stringify({ transcript: [{}], examContent: {} }),
         },
         MOCK_ENV
       );
@@ -114,7 +113,7 @@ describe("Multilevel Exam Routes", () => {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContentIds: {} }),
+          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContent: {} }),
         },
         MOCK_ENV
       );
@@ -137,7 +136,7 @@ describe("Multilevel Exam Routes", () => {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+          body: JSON.stringify({ transcript: [{}], examContent: {} }),
         },
         MOCK_ENV
       );
@@ -163,7 +162,7 @@ describe("Multilevel Exam Routes", () => {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContentIds: {} }),
+          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContent: {} }),
         },
         MOCK_ENV
       );
@@ -187,7 +186,7 @@ describe("Multilevel Exam Routes", () => {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+          body: JSON.stringify({ transcript: [{}], examContent: {} }),
         },
         MOCK_ENV
       );
@@ -195,49 +194,6 @@ describe("Multilevel Exam Routes", () => {
       expect(await res.json()).toEqual({
         message: "AI failed to generate a valid full-exam analysis JSON.",
       });
-    });
-  });
-
-  describe("GET /api/exam/multilevel/history", () => {
-    it("should get history successfully", async () => {
-      const mockUser = { id: "user-1", subscription_tier: "free" };
-      db.getUserById.mockResolvedValue(mockUser);
-      db.getMultilevelExamHistory.mockResolvedValue([]);
-      const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
-      const res = await app.request(
-        "/api/exam/multilevel/history",
-        { headers: { Authorization: `Bearer ${token}` } },
-        MOCK_ENV
-      );
-      expect(res.status).toBe(200);
-    });
-  });
-
-  describe("GET /api/exam/multilevel/result/:resultId", () => {
-    it("should get result details successfully", async () => {
-      const mockUser = { id: "user-1", subscription_tier: "free" };
-      db.getUserById.mockResolvedValue(mockUser);
-      db.getMultilevelExamResultDetails.mockResolvedValue({ id: "res1" });
-      const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
-      const res = await app.request(
-        "/api/exam/multilevel/result/res1",
-        { headers: { Authorization: `Bearer ${token}` } },
-        MOCK_ENV
-      );
-      expect(res.status).toBe(200);
-    });
-
-    it("should return 404 if result is not found", async () => {
-      const mockUser = { id: "user-1", subscription_tier: "free" };
-      db.getUserById.mockResolvedValue(mockUser);
-      db.getMultilevelExamResultDetails.mockResolvedValue(null);
-      const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
-      const res = await app.request(
-        "/api/exam/multilevel/result/res1",
-        { headers: { Authorization: `Bearer ${token}` } },
-        MOCK_ENV
-      );
-      expect(res.status).toBe(404);
     });
   });
 
@@ -258,7 +214,7 @@ describe("Multilevel Exam Routes", () => {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+          body: JSON.stringify({ transcript: [{}], examContent: {} }),
         },
         MOCK_ENV
       );
@@ -287,7 +243,7 @@ describe("Multilevel Exam Routes", () => {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContentIds: {} }),
+          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContent: {} }),
         },
         MOCK_ENV
       );
@@ -299,7 +255,6 @@ describe("Multilevel Exam Routes", () => {
 
     it("should return 500 if database fails during exam analysis", async () => {
       // This covers the main `catch` block in `analyzeExam`.
-      db.createMultilevelExamResult.mockRejectedValue(new Error("DB write failed"));
       const user = {
         id: "user-1",
         subscription_tier: "gold",
@@ -313,43 +268,13 @@ describe("Multilevel Exam Routes", () => {
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+          body: JSON.stringify({ transcript: [{}], examContent: {} }),
         },
         MOCK_ENV
       );
 
       expect(res.status).toBe(500);
       expect(await res.json()).toEqual({ message: "DB write failed" });
-    });
-
-    it("should return 500 if database fails when fetching history", async () => {
-      // This covers the `catch` block in `getExamHistory`.
-      db.getMultilevelExamHistory.mockRejectedValue(new Error("DB read failed"));
-      const user = { id: "user-1", subscription_tier: "free" };
-      db.getUserById.mockResolvedValue(user);
-      const token = await generateToken({ env: MOCK_ENV }, user.id);
-
-      const res = await app.request(
-        "/api/exam/multilevel/history",
-        { headers: { Authorization: `Bearer ${token}` } },
-        MOCK_ENV
-      );
-      expect(res.status).toBe(500);
-    });
-
-    it("should return 500 if database fails when fetching result details", async () => {
-      // This covers the `catch` block in `getExamResultDetails`.
-      db.getMultilevelExamResultDetails.mockRejectedValue(new Error("DB read failed"));
-      const user = { id: "user-1", subscription_tier: "free" };
-      db.getUserById.mockResolvedValue(user);
-      const token = await generateToken({ env: MOCK_ENV }, user.id);
-
-      const res = await app.request(
-        "/api/exam/multilevel/result/some-id",
-        { headers: { Authorization: `Bearer ${token}` } },
-        MOCK_ENV
-      );
-      expect(res.status).toBe(500);
     });
   });
 });

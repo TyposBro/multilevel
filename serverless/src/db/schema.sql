@@ -36,35 +36,6 @@ CREATE TABLE IF NOT EXISTS admins (
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- IELTS Exam Results Table
-CREATE TABLE IF NOT EXISTS ielts_exam_results (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  overallBand REAL NOT NULL,
-  criteria TEXT NOT NULL,
-  transcript TEXT NOT NULL,
-  createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_ielts_exam_results_userId ON ielts_exam_results(userId);
-
--- Multilevel Exam Results Table
-CREATE TABLE IF NOT EXISTS multilevel_exam_results (
-  id TEXT PRIMARY KEY,
-  userId TEXT NOT NULL,
-  totalScore REAL NOT NULL,
-  feedbackBreakdown TEXT NOT NULL,
-  transcript TEXT NOT NULL,
-  examContent TEXT,
-  -- THIS IS THE NEW COLUMN --
-  practicedPart TEXT DEFAULT 'FULL' NOT NULL,
-  createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
-);
-
-CREATE INDEX IF NOT EXISTS idx_multilevel_exam_results_userId ON multilevel_exam_results(userId);
-
 -- One-Time Tokens for Telegram Login
 CREATE TABLE IF NOT EXISTS one_time_tokens (
     token TEXT PRIMARY KEY,

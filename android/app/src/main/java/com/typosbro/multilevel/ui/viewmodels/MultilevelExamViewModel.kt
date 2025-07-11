@@ -6,9 +6,8 @@ import androidx.annotation.RawRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.BuildConfig
+import com.typosbro.multilevel.BuildConfig // Import BuildConfig
 import com.typosbro.multilevel.R
-import com.typosbro.multilevel.data.remote.models.ExamContentIds
 import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
 import com.typosbro.multilevel.data.remote.models.RepositoryResult
@@ -303,81 +302,40 @@ class MultilevelExamViewModel @Inject constructor(
         concludeAndAnalyze()
     }
 
-    // In MultilevelExamViewModel.kt
-
     private fun concludeAndAnalyze() {
         _uiState.update { it.copy(stage = MultilevelExamStage.ANALYZING) }
         viewModelScope.launch {
-            // Get a stable reference to the state at the start of the coroutine.
-            val currentState = uiState.value
-            val examContent = currentState.examContent
-            val transcript = currentState.transcript
+            // --- START OF FIX ---
+            // Get a stable reference to the current transcript
+            var transcript = _uiState.value.transcript
 
-            // Defensive check: If for some reason examContent is null, we can't proceed.
-            if (examContent == null) {
-                _uiState.update {
-                    it.copy(
-                        stage = MultilevelExamStage.FINISHED_ERROR,
-                        error = "Cannot analyze exam: Exam content was not loaded."
-                    )
-                }
-                return@launch
+            // If we are in a debug build and the transcript is empty, inject a dummy entry.
+            if (BuildConfig.DEBUG && transcript.none { it.speaker == "User" }) {
+                Log.w(
+                    "ExamVM_Debug",
+                    "Empty transcript in DEBUG mode. Injecting dummy text for analysis."
+                )
+                val dummyEntry = TranscriptEntry(
+                    "User",
+                    "This is a dummy transcript to allow analysis to proceed during development testing without speaking."
+                )
+                transcript = transcript + dummyEntry
+                // Also update the state so if the user navigates back, they see this.
+                _uiState.update { it.copy(transcript = transcript) }
             }
-
-            // Conditionally build the contentIds object based on which part was practiced.
-            val contentIds = when (practicePart) {
-                PracticePart.FULL -> ExamContentIds(
-                    part1_1 = examContent.part1_1.map { it.id },
-                    part1_2 = examContent.part1_2.id,
-                    part2 = examContent.part2.id,
-                    part3 = examContent.part3.id
-                )
-
-                PracticePart.P1_1 -> ExamContentIds(
-                    part1_1 = examContent.part1_1.map { it.id },
-                    part1_2 = null,
-                    part2 = null,
-                    part3 = null
-                )
-
-                PracticePart.P1_2 -> ExamContentIds(
-                    part1_1 = null,
-                    part1_2 = examContent.part1_2.id,
-                    part2 = null,
-                    part3 = null
-                )
-
-                PracticePart.P2 -> ExamContentIds(
-                    part1_1 = null,
-                    part1_2 = null,
-                    part2 = examContent.part2.id,
-                    part3 = null
-                )
-
-                PracticePart.P3 -> ExamContentIds(
-                    part1_1 = null,
-                    part1_2 = null,
-                    part2 = null,
-                    // --- THIS IS THE KEY FIX ---
-                    // Ensure that `examContent.part3` is not null before accessing `.id`.
-                    // The server-side logic handles this, but client-side is good practice.
-                    part3 = examContent.part3?.id
-                )
-            }
+            // --- END OF FIX ---
 
             val partString = if (practicePart == PracticePart.FULL) null else practicePart.name
 
-            // Log the request payload before sending
-            Log.d(
-                "ExamVM_Analysis",
-                "Sending analysis request: practicePart=$partString, contentIds=$contentIds, transcript size=${transcript.size}"
+            val request = MultilevelAnalyzeRequest(
+                transcript = transcript,
+                examContent = _uiState.value.examContent,
+                practicePart = partString
             )
-
-            val request = MultilevelAnalyzeRequest(transcript, contentIds, partString)
 
             when (val result = repository.analyzeExam(request)) {
                 is RepositoryResult.Success -> {
-                    _uiState.update { it.copy(finalResultId = result.data.resultId) }
+                    _uiState.update { it.copy(finalResultId = result.data) }
                 }
 
                 is RepositoryResult.Error -> {
@@ -402,17 +360,8 @@ class MultilevelExamViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isRecording = false) }
-                playStartSpeakingSound()
-                var transcribedText = transcribeBufferedAudio()
-
-                // Inject dummy text in DEBUG mode if user didn't speak
-                if (BuildConfig.DEBUG && transcribedText.isBlank()) {
-                    Log.w("ExamVM_Debug", "Empty transcript in DEBUG mode. Injecting dummy text.")
-                    val dummyText =
-                        "This is a dummy transcript for testing purposes to allow the flow to continue without speaking."
-                    addTranscript("User", dummyText)
-                    transcribedText = dummyText
-                } else if (transcribedText.isNotBlank()) {
+                val transcribedText = transcribeBufferedAudio()
+                if (transcribedText.isNotBlank()) {
                     addTranscript("User", transcribedText)
                 }
 

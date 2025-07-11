@@ -6,8 +6,10 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
+import com.typosbro.multilevel.data.local.AppDatabase
+import com.typosbro.multilevel.data.local.IeltsExamResultDao
+import com.typosbro.multilevel.data.local.MultilevelExamResultDao
 import com.typosbro.multilevel.data.local.WordDao
-import com.typosbro.multilevel.data.local.WordDatabase
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -30,13 +32,25 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideWordDatabase(@ApplicationContext context: Context): WordDatabase {
-        return WordDatabase.getDatabase(context)
+    fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase {
+        return AppDatabase.getDatabase(context)
     }
 
     @Provides
     @Singleton
-    fun provideWordDao(database: WordDatabase): WordDao {
+    fun provideWordDao(database: AppDatabase): WordDao {
         return database.wordDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideIeltsExamResultDao(database: AppDatabase): IeltsExamResultDao {
+        return database.ieltsExamResultDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideMultilevelExamResultDao(database: AppDatabase): MultilevelExamResultDao {
+        return database.multilevelExamResultDao()
     }
 }

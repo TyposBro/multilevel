@@ -2,13 +2,15 @@ package com.typosbro.multilevel.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
+import com.typosbro.multilevel.data.local.IeltsExamResultEntity
+import com.typosbro.multilevel.data.local.MultilevelExamResultEntity
 import com.typosbro.multilevel.data.repositories.ChatRepository
 import com.typosbro.multilevel.data.repositories.MultilevelExamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -48,16 +50,12 @@ class ProgressViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProgressUiState())
-    val uiState = _uiState.asStateFlow()
+    val uiState: StateFlow<ProgressUiState> = _uiState.asStateFlow()
 
     // A helper map to define max scores for the chart
     private val multilevelMaxScores = mapOf(
         "FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0
     )
-
-    init {
-        loadAllHistories()
-    }
 
     fun selectTab(type: ExamType) {
         _uiState.update { it.copy(selectedTab = type) }
@@ -65,75 +63,65 @@ class ProgressViewModel @Inject constructor(
 
     // NEW function to handle sub-category selection
     fun selectMultilevelPart(part: String) {
-        _uiState.update { it.copy(selectedMultilevelPart = part) }
-    }
-
-
-    private fun loadAllHistories() {
-        _uiState.update { it.copy(isLoading = true) }
-        viewModelScope.launch {
-            // Fetch both histories in parallel for better performance
-            // CORRECTED variable names for clarity
-            val multilevelDeferred = async { multilevelExamRepository.getExamHistory() }
-            val ieltsDeferred = async { ieltsRepository.getExamHistorySummary() }
-
-            val multilevelResult = multilevelDeferred.await()
-            val ieltsResult = ieltsDeferred.await()
-
-            var ieltsHistory: List<GenericExamResultSummary> = emptyList()
-            var multilevelHistoryMap: Map<String, List<GenericExamResultSummary>> = emptyMap()
-            var error: String? = null
-
-            // Process IELTS results
-            when (ieltsResult) {
-                is RepositoryResult.Success -> {
-                    ieltsHistory = ieltsResult.data.history.map { summary ->
-                        GenericExamResultSummary(
-                            id = summary.id,
-                            examDate = summary.examDate,
-                            score = summary.overallBand,
-                            scoreLabel = "Overall Band: ${summary.overallBand}",
-                            type = ExamType.IELTS
-                        )
-                    }.sortedByDescending { it.examDate }
-                }
-
-                is RepositoryResult.Error -> error = ieltsResult.message
-            }
-
-            // Process Multilevel results
-            when (multilevelResult) {
-                is RepositoryResult.Success -> {
-                    multilevelHistoryMap = multilevelResult.data.history.map { summary ->
-                        val maxScore =
-                            multilevelMaxScores[summary.practicePart] ?: summary.totalScore
-                        GenericExamResultSummary(
-                            id = summary.id,
-                            examDate = summary.examDate,
-                            score = summary.totalScore.toDouble(),
-                            scoreLabel = "Score: ${summary.totalScore} / ${maxScore.toInt()}",
-                            type = ExamType.MULTILEVEL,
-                            practicePart = summary.practicePart
-                        )
-                    }.sortedByDescending { it.examDate }
-                        .groupBy { it.practicePart } // The key change: grouping by part
-                }
-
-                is RepositoryResult.Error -> error =
-                    error ?: multilevelResult.message // Keep first error
-            }
-
-            _uiState.update {
-                it.copy(
-                    isLoading = false,
-                    ieltsHistory = ieltsHistory,
-                    multilevelHistory = multilevelHistoryMap,
-                    error = error,
-                    // Ensure a valid part is selected, default to FULL if available
-                    selectedMultilevelPart = if (multilevelHistoryMap.containsKey("FULL")) "FULL" else multilevelHistoryMap.keys.firstOrNull()
-                        ?: "FULL"
-                )
-            }
+        _uiState.update {
+            it.copy(selectedMultilevelPart = part)
         }
     }
+
+    init {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+            combine(
+                ieltsRepository.getLocalHistorySummary(),
+                multilevelExamRepository.getLocalHistorySummary()
+            ) { ieltsResults, multilevelResults ->
+                // *** FIX: Call the renamed functions ***
+                val ieltsHistory = ieltsResults.toIeltsGenericSummary()
+                val multilevelHistoryMap =
+                    multilevelResults.toMultilevelGenericSummary().groupBy { it.practicePart }
+
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        ieltsHistory = ieltsHistory,
+                        multilevelHistory = multilevelHistoryMap,
+                        // Ensure a valid part is selected, default to FULL if available
+                        selectedMultilevelPart = if (multilevelHistoryMap.containsKey("FULL")) "FULL" else multilevelHistoryMap.keys.firstOrNull()
+                            ?: "FULL"
+                    )
+                }
+            }.collect { }
+        }
+    }
+}
+
+// *** FIX: Renamed function ***
+private fun List<MultilevelExamResultEntity>.toMultilevelGenericSummary(): List<GenericExamResultSummary> {
+    val multilevelMaxScores =
+        mapOf("FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0)
+    return this.map { summary ->
+        val maxScore =
+            multilevelMaxScores[summary.practicedPart] ?: summary.totalScore
+        GenericExamResultSummary(
+            id = summary.id,
+            examDate = summary.createdAt.toLong(),
+            score = summary.totalScore.toDouble(),
+            scoreLabel = "Score: ${summary.totalScore} / ${maxScore.toInt()}",
+            type = ExamType.MULTILEVEL,
+            practicePart = summary.practicedPart
+        )
+    }.sortedByDescending { it.examDate }
+}
+
+// *** FIX: Renamed function ***
+private fun List<IeltsExamResultEntity>.toIeltsGenericSummary(): List<GenericExamResultSummary> {
+    return this.map { summary ->
+        GenericExamResultSummary(
+            id = summary.id,
+            examDate = summary.createdAt.toLong(),
+            score = summary.overallBand,
+            scoreLabel = "Overall Band: ${summary.overallBand}",
+            type = ExamType.IELTS
+        )
+    }.sortedByDescending { it.examDate }
 }

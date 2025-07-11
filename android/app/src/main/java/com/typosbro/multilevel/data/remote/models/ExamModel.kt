@@ -21,6 +21,7 @@ data class ExamStepRequest(
     @SerializedName("transcriptContext") val transcriptContext: String,
     @SerializedName("questionCountInPart") val questionCountInPart: Int
 )
+
 /**
  * The response from the server for each step of the exam.
  */
@@ -47,13 +48,3 @@ data class CueCard(
 data class AnalyzeExamRequest(
     @SerializedName("transcript") val transcript: List<TranscriptEntry>
 )
-
-/**
- * The immediate response after requesting analysis.
- * Since analysis can take time, the server just returns an ID
- * that can be used later to fetch the full results.
- */
-data class AnalyzeExamResponse(
-    @SerializedName("resultId") val resultId: String
-)
-

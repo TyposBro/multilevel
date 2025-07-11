@@ -76,7 +76,7 @@ export const generateNewExam = async (c) => {
 export const analyzeExam = async (c) => {
   try {
     const user = c.get("user"); // Attached by `protect` and `checkSubscriptionStatus` middleware
-    const { transcript, examContentIds, practicePart } = await c.req.json();
+    const { transcript, examContent, practicePart } = await c.req.json();
     const isSinglePartPractice = !!practicePart;
 
     if (!transcript || transcript.length === 0) {
@@ -87,7 +87,10 @@ export const analyzeExam = async (c) => {
     const tier = user.subscription_tier;
     const limits = OFFERINGS[tier];
 
-    if (tier === "free") {
+    // --- START OF FIX ---
+    // Only enforce free tier limits if the environment is NOT development.
+    if (c.env.ENVIRONMENT !== "development" && tier === "free") {
+      // --- END OF FIX ---
       const fullExamsUsage = resetDailyUsageIfNeeded(
         user.dailyUsage_fullExams_count,
         user.dailyUsage_fullExams_lastReset
@@ -183,74 +186,18 @@ export const analyzeExam = async (c) => {
       feedbackBreakdown = analysisData.feedbackBreakdown;
     }
 
-    const savedResult = await db.createMultilevelExamResult(c.env.DB, {
+    const resultResponse = {
+      _id: crypto.randomUUID(),
       userId: user.id,
-      transcript,
       totalScore,
       feedbackBreakdown,
-      examContent: examContentIds,
-      practicedPart: isSinglePartPractice ? practicePart : "FULL",
-    });
+      transcript,
+      createdAt: new Date().toISOString(),
+    };
 
-    return c.json({ resultId: savedResult.id }, 201);
+    return c.json(resultResponse, 201);
   } catch (error) {
     console.error("Error during multilevel exam analysis:", error);
     return c.json({ message: error.message || "Server error during exam analysis." }, 500);
-  }
-};
-
-/**
- * @desc    Get the user's exam history for Multilevel, filtered by subscription tier.
- * @route   GET /api/exam/multilevel/history
- * @access  Private
- */
-export const getExamHistory = async (c) => {
-  try {
-    const user = c.get("user");
-    const tier = user.subscription_tier;
-    const limits = OFFERINGS[tier];
-
-    let retentionStartDateISO = null;
-    if (limits.historyRetentionDays !== Infinity) {
-      const now = new Date();
-      const retentionStartDate = new Date(now.setDate(now.getDate() - limits.historyRetentionDays));
-      retentionStartDateISO = retentionStartDate.toISOString();
-    }
-
-    const history = await db.getMultilevelExamHistory(c.env.DB, user.id, retentionStartDateISO);
-
-    const historySummaries = history.map((item) => ({
-      id: item.id,
-      examDate: new Date(item.createdAt).getTime(),
-      totalScore: item.totalScore,
-      practicePart: item.practicedPart,
-    }));
-
-    return c.json({ history: historySummaries });
-  } catch (error) {
-    console.error("Error fetching multilevel history:", error);
-    return c.json({ message: "Server error fetching history." }, 500);
-  }
-};
-
-/**
- * @desc    Get the details of a single Multilevel exam result.
- * @route   GET /api/exam/multilevel/result/:resultId
- * @access  Private
- */
-export const getExamResultDetails = async (c) => {
-  try {
-    const resultId = c.req.param("resultId");
-    const user = c.get("user");
-    const result = await db.getMultilevelExamResultDetails(c.env.DB, resultId, user.id);
-
-    if (!result) {
-      return c.json({ message: "Result not found or permission denied." }, 404);
-    }
-    // The db client already parses the JSON fields, so it's ready to be sent.
-    return c.json(result);
-  } catch (error) {
-    console.error("Error fetching multilevel result details:", error);
-    return c.json({ message: "Server error fetching result details." }, 500);
   }
 };

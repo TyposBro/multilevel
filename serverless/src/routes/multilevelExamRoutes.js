@@ -3,12 +3,7 @@
 import { Hono } from "hono";
 import { protectAndLoadUser } from "../middleware/authMiddleware";
 import { checkSubscriptionStatus } from "../middleware/subscriptionMiddleware";
-import {
-  generateNewExam,
-  analyzeExam,
-  getExamHistory,
-  getExamResultDetails,
-} from "../controllers/multilevelExamController";
+import { generateNewExam, analyzeExam } from "../controllers/multilevelExamController";
 
 const multilevelExamRoutes = new Hono();
 
@@ -17,7 +12,5 @@ multilevelExamRoutes.use("*", protectAndLoadUser, checkSubscriptionStatus);
 
 multilevelExamRoutes.get("/new", generateNewExam);
 multilevelExamRoutes.post("/analyze", analyzeExam);
-multilevelExamRoutes.get("/history", getExamHistory);
-multilevelExamRoutes.get("/result/:resultId", getExamResultDetails);
 
 export default multilevelExamRoutes;

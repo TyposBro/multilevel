@@ -451,7 +451,7 @@ class ExamViewModel @Inject constructor(
                         it.copy(
                             currentPart = ExamPart.ANALYSIS_COMPLETE,
                             isLoading = false,
-                            finalResultId = result.data.resultId
+                            finalResultId = result.data
                         )
                     }
                 }

@@ -46,15 +46,8 @@ data class QuestionAudio(
 
 data class MultilevelAnalyzeRequest(
     val transcript: List<TranscriptEntry>, // Can reuse from IELTS models
-    val examContentIds: ExamContentIds,
-    val practicePart: String? = null
-)
-
-data class ExamContentIds(
-    @SerializedName("part1_1") val part1_1: List<String>?,
-    @SerializedName("part1_2") val part1_2: String?,
-    @SerializedName("part2") val part2: String?,
-    @SerializedName("part3") val part3: String?
+    val examContent: MultilevelExamResponse?, // Send the full content for context
+    val practicePart: String? = null // e.g., "FULL", "P1_1"
 )
 
 // --- Models for displaying the multilevel results ---
