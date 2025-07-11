@@ -5,16 +5,17 @@ export default defineWorkersProject({
   test: {
     name: "integration",
     include: ["src/**/*.integration.test.js"],
-    // This tells the integration test runner to use the special types
-    // which enables the `cloudflare:test` module.
     tsconfig: "tests/tsconfig.json",
+    // --- THIS IS THE FIX ---
+    // Use setupFiles to run schema migration inside the isolated test environment.
+    setupFiles: ["./tests/apply-migrations.js"],
+    // We no longer need the globalSetup for this project.
+    // --- END OF FIX ---
     poolOptions: {
       workers: {
         singleWorker: true,
         wrangler: { configPath: "./wrangler.toml" },
       },
     },
-    // The global setup is only needed for integration tests
-    globalSetup: ["tests/setup.js"],
   },
 });
