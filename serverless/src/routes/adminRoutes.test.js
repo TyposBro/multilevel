@@ -1,5 +1,6 @@
 // serverless/src/routes/adminRoutes.test.js
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { sign } from "hono/jwt";
 import app from "../index";
 import { generateToken } from "../utils/generateToken";
 import { db } from "../db/d1-client";
@@ -137,5 +138,122 @@ describe("Admin Routes", () => {
         imageUrl: null,
       })
     );
+  });
+
+  // serverless/src/routes/adminRoutes.test.js
+  // ... (keep existing mocks and describe block) ...
+
+  // ... (keep existing happy path and validation tests) ...
+
+  it("should return 500 on database error during part1.1 upload", async () => {
+    uploadToCDN.mockResolvedValue("http://fake.url");
+    // Simulate DB failure
+    db.createContent.mockRejectedValue(new Error("DB Error"));
+    const token = await generateToken({ env: MOCK_ADMIN_ENV }, mockAdmin, true);
+
+    const formData = new FormData();
+    formData.append("questionText", "text");
+    formData.append("audio", new File([""], "f.mp3"));
+
+    const res = await app.request(
+      "/api/admin/content/part1.1",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+      MOCK_ADMIN_ENV
+    );
+
+    expect(res.status).toBe(500);
+  });
+
+  it("should return 500 on database error during word bank upload", async () => {
+    db.createContent.mockRejectedValue(new Error("DB Error"));
+    const token = await generateToken({ env: MOCK_ADMIN_ENV }, mockAdmin, true);
+
+    const formData = new FormData();
+    formData.append("word", "test");
+    formData.append("translation", "test");
+    formData.append("cefrLevel", "A1");
+    formData.append("topic", "test");
+
+    const res = await app.request(
+      "/api/admin/wordbank/add",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+      MOCK_ADMIN_ENV
+    );
+
+    expect(res.status).toBe(500);
+  });
+
+  it("should return 409 if word already exists", async () => {
+    // The UNIQUE constraint error message
+    db.createContent.mockRejectedValue(new Error("UNIQUE constraint failed"));
+    const token = await generateToken({ env: MOCK_ADMIN_ENV }, mockAdmin, true);
+
+    const formData = new FormData();
+    formData.append("word", "test");
+    formData.append("translation", "test");
+    formData.append("cefrLevel", "A1");
+    formData.append("topic", "test");
+
+    const res = await app.request(
+      "/api/admin/wordbank/add",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+      MOCK_ADMIN_ENV
+    );
+
+    expect(res.status).toBe(409);
+  });
+
+  it("should return 401 if token is valid but admin not in DB", async () => {
+    // Arrange
+    // Mock the DB to return null, as if the admin was deleted
+    db.findAdminByEmail.mockResolvedValue(null);
+    const token = await generateToken({ env: MOCK_ADMIN_ENV }, mockAdmin, true);
+
+    // Act
+    const res = await app.request(
+      "/api/admin/content/part1.1",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ADMIN_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.message).toBe("Admin not found");
+  });
+
+  it("should return 401 if token payload is invalid", async () => {
+    // Arrange: Generate a token with a bad payload (no id)
+    const token = await sign({ user: "bad-payload" }, MOCK_ADMIN_ENV.JWT_SECRET_ADMIN);
+
+    // Act
+    const res = await app.request(
+      "/api/admin/content/part1.1",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ADMIN_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.message).toBe("Token payload is invalid");
+  });
+
+  it("should return 500 on database error during admin lookup", async () => {
+    // Arrange
+    db.findAdminByEmail.mockRejectedValue(new Error("DB connection lost"));
+    const token = await generateToken({ env: MOCK_ADMIN_ENV }, mockAdmin, true);
+
+    // Act
+    const res = await app.request(
+      "/api/admin/content/part1.1",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ADMIN_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.message).toBe("Server error during admin authorization");
   });
 });

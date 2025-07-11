@@ -84,4 +84,24 @@ describe("Auth Routes & Middleware", () => {
     expect(db.deleteUser).toHaveBeenCalledOnce();
     expect(db.deleteUser).toHaveBeenCalledWith(MOCK_ENV.DB, mockUser.id);
   });
+
+  it("should return 500 if JWT_SECRET is not configured", async () => {
+    // Arrange: Create a mock environment WITHOUT the JWT_SECRET
+    const MOCK_BAD_ENV = { DB: db };
+    const token = "any-token";
+
+    // Act
+    const res = await app.request(
+      "/api/auth/profile",
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      MOCK_BAD_ENV // Use the bad environment
+    );
+
+    // Assert
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.message).toBe("Server configuration error");
+  });
 });

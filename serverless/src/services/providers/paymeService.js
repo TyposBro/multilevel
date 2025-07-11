@@ -10,24 +10,17 @@
 export const createTransaction = async (c, plan, userId) => {
   const isProduction = c.env.ENVIRONMENT === "production";
   const PAYME_API_URL = isProduction
-    ? c.env.PAYME_CHECKOUT_URL_LIVE
-    : c.env.PAYME_CHECKOUT_URL_TEST;
+    ? "https://checkout.paycom.uz"
+    : "https://checkout.test.paycom.uz";
   const basePaymentUrl = isProduction ? "https://checkout.paycom.uz" : "https://test.paycom.uz";
 
   const requestId = Date.now();
-
-  const fiscalData = {
-    /* ... your fiscal data ... */
-  };
+  const fiscalData = {};
 
   try {
     const response = await fetch(PAYME_API_URL, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Note: Payme's 'X-Auth' is typically a merchant ID, not a secret key.
-        // If it requires a key, it should be a secret. Double-check Payme docs.
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: requestId,
         method: "receipts.create",
@@ -41,15 +34,23 @@ export const createTransaction = async (c, plan, userId) => {
 
     const data = await response.json();
 
+    // --- START OF FIX ---
+    // If there's a Payme-specific error, throw it now.
     if (data.error) {
       throw new Error(`Payme API Error: ${data.error.message}`);
     }
 
+    // On success, return the data.
     const receipt = data.result.receipt;
     const paymentUrl = `${basePaymentUrl}/${receipt._id}`;
-
     return { paymentUrl, receiptId: receipt._id };
+    // --- END OF FIX ---
   } catch (error) {
+    // This catch block now only handles network errors or JSON parsing errors.
+    // If the error is our specific Payme API error, re-throw it. Otherwise, wrap it.
+    if (error.message.startsWith("Payme API Error:")) {
+      throw error;
+    }
     console.error("Payme Service Error:", error.message);
     throw new Error("Failed to create Payme transaction.");
   }
@@ -64,8 +65,8 @@ export const createTransaction = async (c, plan, userId) => {
 export const checkTransaction = async (c, receiptId) => {
   const isProduction = c.env.ENVIRONMENT === "production";
   const PAYME_API_URL = isProduction
-    ? c.env.PAYME_CHECKOUT_URL_LIVE
-    : c.env.PAYME_CHECKOUT_URL_TEST;
+    ? "https://checkout.paycom.uz"
+    : "https://checkout.test.paycom.uz";
   const MERCHANT_ID = isProduction ? c.env.PAYME_MERCHANT_ID_LIVE : c.env.PAYME_MERCHANT_ID_TEST;
   const SECRET_KEY = isProduction ? c.env.PAYME_SECRET_KEY_LIVE : c.env.PAYME_SECRET_KEY_TEST;
 
@@ -87,8 +88,8 @@ export const checkTransaction = async (c, receiptId) => {
 
     const data = await response.json();
 
+    // --- START OF FIX ---
     if (data.error) {
-      console.error("[Payme Service] receipts.check API error:", data.error);
       throw new Error(`Payme API Error: ${data.error.message}`);
     }
 
@@ -99,7 +100,11 @@ export const checkTransaction = async (c, receiptId) => {
       state: result.state,
       planId: accountInfo ? accountInfo.value : undefined,
     };
+    // --- END OF FIX ---
   } catch (error) {
+    if (error.message.startsWith("Payme API Error:")) {
+      throw error;
+    }
     console.error("[Payme Service] Failed to check Payme transaction status:", error.message);
     throw new Error("Failed to check Payme transaction status.");
   }

@@ -98,6 +98,25 @@ describe("D1 Client Integration Tests", () => {
       const foundUser = await db.getUserById(d1, testUser.id);
       expect(foundUser).toBeNull();
     });
+
+    it("should find a user by telegram provider ID", async () => {
+      // 1. Create a user specifically with a telegramId
+      const telegramUser = await db.createUser(d1, {
+        authProvider: "telegram",
+        telegramId: 98765,
+      });
+
+      // 2. Call the function with the 'telegram' provider
+      const foundUser = await db.findUserByProviderId(d1, {
+        provider: "telegram",
+        id: 98765,
+      });
+
+      // 3. Assert that the correct user was found
+      expect(foundUser).toBeDefined();
+      expect(foundUser.id).toBe(telegramUser.id);
+      expect(foundUser.telegramId).toBe(98765);
+    });
   });
 
   describe("IELTS Exam Functions", () => {

@@ -96,4 +96,78 @@ describe("Subscription Routes", () => {
     // Ensure the database was NOT updated
     expect(db.updateUserSubscription).not.toHaveBeenCalled();
   });
+
+  it("should revert an expired GOLD subscription to FREE", async () => {
+    // Arrange
+    const now = new Date("2024-02-01T00:00:00.000Z");
+    const oneDayAgo = new Date("2024-01-31T00:00:00.000Z");
+    vi.setSystemTime(now); // Set the current time to AFTER the expiry date
+
+    const mockExpiredUser = {
+      id: "expired-user-789",
+      subscription_tier: "gold",
+      subscription_expiresAt: oneDayAgo.toISOString(), // Expired yesterday!
+      subscription_hasUsedGoldTrial: 1,
+    };
+    db.getUserById.mockResolvedValue(mockExpiredUser);
+
+    // Mock the reversion call
+    const revertedUser = {
+      ...mockExpiredUser,
+      subscription_tier: "free",
+      subscription_expiresAt: null,
+    };
+    db.updateUserSubscription.mockResolvedValue(revertedUser);
+
+    const token = await generateToken({ env: MOCK_ENV }, mockExpiredUser.id);
+
+    // We'll call the /start-trial endpoint. The sub check middleware runs first.
+    // The endpoint itself will fail with a 400, which is fine. We are testing the middleware.
+    // Act
+    const res = await app.request(
+      "/api/subscriptions/start-trial",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      MOCK_ENV
+    );
+
+    // Assert that the reversion happened
+    expect(db.updateUserSubscription).toHaveBeenCalledOnce();
+    expect(db.updateUserSubscription).toHaveBeenCalledWith(MOCK_ENV.DB, mockExpiredUser.id, {
+      tier: "free",
+      expiresAt: null,
+      providerSubscriptionId: null,
+      hasUsedGoldTrial: 1, // Make sure trial status is preserved
+    });
+
+    // The final response from the controller is secondary, but we can check it
+    expect(res.status).toBe(400); // Because a user on a 'free' tier can't start a trial if they've used it
+  });
+
+  it("should return 500 if DB fails during subscription status check", async () => {
+    // Arrange
+    const expiredUser = {
+      id: "u1",
+      subscription_tier: "gold",
+      subscription_expiresAt: "2020-01-01T00:00:00.000Z",
+    };
+    db.getUserById.mockResolvedValue(expiredUser);
+    // Simulate the reversion call failing
+    db.updateUserSubscription.mockRejectedValue(new Error("DB write failed"));
+    const token = await generateToken({ env: MOCK_ENV }, expiredUser.id);
+
+    // Act
+    const res = await app.request(
+      "/api/subscriptions/start-trial",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.message).toBe("Server error while checking subscription.");
+  });
 });

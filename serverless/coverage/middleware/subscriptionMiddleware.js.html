@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">53.84% </span>
+                <span class="strong">92.3% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>7/13</span>
+                <span class='fraction'>12/13</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">57.14% </span>
+                <span class="strong">85.71% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>4/7</span>
+                <span class='fraction'>6/7</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">53.84% </span>
+                <span class="strong">92.3% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>7/13</span>
+                <span class='fraction'>12/13</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line medium'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -120,10 +120,10 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">45x</span>
-<span class="cline-any cline-yes">15x</span>
-<span class="cline-any cline-yes">15x</span>
-<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">59x</span>
+<span class="cline-any cline-yes">67x</span>
+<span class="cline-any cline-yes">67x</span>
+<span class="cline-any cline-yes">67x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -131,32 +131,32 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">67x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">67x</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">26x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">54x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// {PATH_TO_PROJECT}/src/middleware/subscriptionMiddleware.js
@@ -181,13 +181,13 @@ export const checkSubscriptionStatus = async (c, next) =&gt; {
     const hasExpired =
       user.subscription_tier !== "free" &amp;&amp;
       user.subscription_expiresAt &amp;&amp;
-<span class="branch-2 cbranch-no" title="branch not covered" >      new Date(user.subscription_expiresAt) &lt; new Date();</span>
+      new Date(user.subscription_expiresAt) &lt; new Date();
 &nbsp;
-    <span class="missing-if-branch" title="if path not taken" >I</span>if (hasExpired) {
-<span class="cstat-no" title="statement not covered" >      console.log(`Subscription for user ${user.id} has expired. Reverting to free.`);</span>
+    if (hasExpired) {
+      console.log(`Subscription for user ${user.id} has expired. Reverting to free.`);
 &nbsp;
       // Call the actual database function to update the user's subscription
-      const updatedUser = <span class="cstat-no" title="statement not covered" >await db.updateUserSubscription(c.env.DB, user.id, {</span>
+      const updatedUser = await db.updateUserSubscription(c.env.DB, user.id, {
         tier: "free",
         expiresAt: null, // Pass null to clear the date
         providerSubscriptionId: null, // Pass null to clear the provider ID
@@ -196,15 +196,15 @@ export const checkSubscriptionStatus = async (c, next) =&gt; {
 &nbsp;
       // IMPORTANT: Set the *updated* user object back into the context
       // so that downstream controllers have the latest subscription status.
-<span class="cstat-no" title="statement not covered" >      c.set("user", updatedUser);</span>
+      c.set("user", updatedUser);
     }
     // --- END OF FIX ---
 &nbsp;
     // Pass control to the next handler in the chain (e.g., the final controller).
     await next();
   } catch (error) {
-<span class="cstat-no" title="statement not covered" >    console.error("Error in checkSubscriptionStatus middleware:", error);</span>
-<span class="cstat-no" title="statement not covered" >    return c.json({ message: "Server error while checking subscription." }, 500);</span>
+    console.error("Error in checkSubscriptionStatus middleware:", error);
+    return c.json({ message: "Server error while checking subscription." }, 500);
   }
 };
 &nbsp;</pre></td></tr></table></pre>
@@ -214,7 +214,7 @@ export const checkSubscriptionStatus = async (c, next) =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-07-11T07:24:04.395Z
+                at 2025-07-11T07:45:18.770Z
             </div>
         <script src="../prettify.js"></script>
         <script>
