@@ -14,10 +14,12 @@ CREATE TABLE IF NOT EXISTS users (
   subscription_expiresAt TEXT,
   subscription_providerId TEXT,
   subscription_hasUsedGoldTrial INTEGER DEFAULT 0 NOT NULL,
+  -- START OF NEW COLUMNS --
   dailyUsage_fullExams_count INTEGER DEFAULT 0,
   dailyUsage_fullExams_lastReset TEXT,
   dailyUsage_partPractices_count INTEGER DEFAULT 0,
   dailyUsage_partPractices_lastReset TEXT,
+  -- END OF NEW COLUMNS --
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
   updatedAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -55,6 +57,7 @@ CREATE TABLE IF NOT EXISTS multilevel_exam_results (
   feedbackBreakdown TEXT NOT NULL,
   transcript TEXT NOT NULL,
   examContent TEXT,
+  -- THIS IS THE NEW COLUMN --
   practicedPart TEXT DEFAULT 'FULL' NOT NULL,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
   FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE

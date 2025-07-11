@@ -1,0 +1,7 @@
+org.vosk.models-pngs-0 /home/ched54/Documents/android/multilevel/android/models/build/generated/res/pngs/release
+org.vosk.models-resValues-1 /home/ched54/Documents/android/multilevel/android/models/build/generated/res/resValues/release
+org.vosk.models-mergeReleaseResources-2 /home/ched54/Documents/android/multilevel/android/models/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+org.vosk.models-mergeReleaseResources-3 /home/ched54/Documents/android/multilevel/android/models/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+org.vosk.models-release-4 /home/ched54/Documents/android/multilevel/android/models/build/intermediates/merged_res/release/mergeReleaseResources
+org.vosk.models-main-5 /home/ched54/Documents/android/multilevel/android/models/src/main/res
+org.vosk.models-release-6 /home/ched54/Documents/android/multilevel/android/models/src/release/res

@@ -6,6 +6,7 @@ import androidx.annotation.RawRes
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.typosbro.multilevel.BuildConfig
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.data.remote.models.ExamContentIds
 import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
@@ -43,18 +44,31 @@ enum class MultilevelExamStage {
     PART3_PREP, PART3_SPEAKING, ANALYZING, FINISHED_ERROR
 }
 
+//
+//object MULTILEVEL_TIMEOUTS {
+//    const val PART1_1_PREP = 5
+//    const val PART1_1_ANSWER = 30
+//    const val PART1_2_PREP_FIRST = 10
+//    const val PART1_2_PREP_FOLLOWUP = 5
+//    const val PART1_2_ANSWER_FIRST = 45
+//    const val PART1_2_ANSWER_FOLLOWUP = 30
+//    const val PART2_PREP = 60
+//    const val PART2_SPEAKING = 120
+//    const val PART3_PREP = 60
+//    const val PART3_SPEAKING = 120
+//}
 
 object MULTILEVEL_TIMEOUTS {
-    const val PART1_1_PREP = 5
-    const val PART1_1_ANSWER = 30
-    const val PART1_2_PREP_FIRST = 10
-    const val PART1_2_PREP_FOLLOWUP = 5
-    const val PART1_2_ANSWER_FIRST = 45
-    const val PART1_2_ANSWER_FOLLOWUP = 30
-    const val PART2_PREP = 60
-    const val PART2_SPEAKING = 120
-    const val PART3_PREP = 60
-    const val PART3_SPEAKING = 120
+    const val PART1_1_PREP = 3
+    const val PART1_1_ANSWER = 3
+    const val PART1_2_PREP_FIRST = 3
+    const val PART1_2_PREP_FOLLOWUP = 3
+    const val PART1_2_ANSWER_FIRST = 3
+    const val PART1_2_ANSWER_FOLLOWUP = 3
+    const val PART2_PREP = 3
+    const val PART2_SPEAKING = 3
+    const val PART3_PREP = 3
+    const val PART3_SPEAKING = 3
 }
 
 data class MultilevelUiState(
@@ -118,7 +132,6 @@ class MultilevelExamViewModel @Inject constructor(
                         PracticePart.FULL, PracticePart.P1_1 -> {
                             _uiState.update { it.copy(stage = MultilevelExamStage.INTRO) }
                             playInstructionAndWait(R.raw.multilevel_part1_intro)
-                            playStartSpeakingSound()
                             startPart1_1()
                         }
 
@@ -190,7 +203,6 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart1_2() {
         viewModelScope.launch {
-            // This function is now only called when chaining from Part 1.1 in a FULL exam.
             _uiState.update { it.copy(stage = MultilevelExamStage.PART1_2_INTRO) }
             playInstructionAndWait(R.raw.multilevel_part1_2_intro)
             processPart1_2_Question()
@@ -231,7 +243,6 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart2() {
         viewModelScope.launch {
-            // This function is now only called when chaining from Part 1.2 in a FULL exam.
             _uiState.update { it.copy(stage = MultilevelExamStage.PART2_INTRO) }
             playInstructionAndWait(R.raw.multilevel_part2_intro)
             startPart2_Prep()
@@ -257,14 +268,9 @@ class MultilevelExamViewModel @Inject constructor(
     private suspend fun startPart2_Speaking() {
         _uiState.update { it.copy(stage = MultilevelExamStage.PART2_SPEAKING) }
         playStartSpeakingSound()
-        recorder.start()
-        _uiState.update { it.copy(isRecording = true) }
         startTimer(duration = MULTILEVEL_TIMEOUTS.PART2_SPEAKING)
 
-        val transcribedText = stopRecordingAndTranscribe()
-        if (transcribedText.isNotBlank()) {
-            addTranscript("User", transcribedText)
-        }
+        stopRecordingAndTranscribe() // This handles recording internally now
 
         if (practicePart == PracticePart.FULL) {
             startPart3()
@@ -275,7 +281,6 @@ class MultilevelExamViewModel @Inject constructor(
 
     private fun startPart3() {
         viewModelScope.launch {
-            // This function is now only called when chaining from Part 2 in a FULL exam.
             _uiState.update { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
             playInstructionAndWait(R.raw.multilevel_part3_intro)
             startPart3_Prep()
@@ -291,31 +296,84 @@ class MultilevelExamViewModel @Inject constructor(
     private suspend fun startPart3_Speaking() {
         _uiState.update { it.copy(stage = MultilevelExamStage.PART3_SPEAKING) }
         playStartSpeakingSound()
-        recorder.start()
-        _uiState.update { it.copy(isRecording = true) }
         startTimer(duration = MULTILEVEL_TIMEOUTS.PART3_SPEAKING)
 
-        val transcribedText = stopRecordingAndTranscribe()
-        if (transcribedText.isNotBlank()) {
-            addTranscript("User", transcribedText)
-        }
+        stopRecordingAndTranscribe() // This handles recording internally now
 
         concludeAndAnalyze()
     }
 
+    // In MultilevelExamViewModel.kt
+
     private fun concludeAndAnalyze() {
         _uiState.update { it.copy(stage = MultilevelExamStage.ANALYZING) }
         viewModelScope.launch {
-            val examContent = uiState.value.examContent ?: return@launch
-            val contentIds = ExamContentIds(
-                part1_1 = examContent.part1_1.map { it.id },
-                part1_2 = examContent.part1_2.id,
-                part2 = examContent.part2.id,
-                part3 = examContent.part3.id
-            )
-            // Add the specific practice part to the request, or null for a full exam
+            // Get a stable reference to the state at the start of the coroutine.
+            val currentState = uiState.value
+            val examContent = currentState.examContent
+            val transcript = currentState.transcript
+
+            // Defensive check: If for some reason examContent is null, we can't proceed.
+            if (examContent == null) {
+                _uiState.update {
+                    it.copy(
+                        stage = MultilevelExamStage.FINISHED_ERROR,
+                        error = "Cannot analyze exam: Exam content was not loaded."
+                    )
+                }
+                return@launch
+            }
+
+            // Conditionally build the contentIds object based on which part was practiced.
+            val contentIds = when (practicePart) {
+                PracticePart.FULL -> ExamContentIds(
+                    part1_1 = examContent.part1_1.map { it.id },
+                    part1_2 = examContent.part1_2.id,
+                    part2 = examContent.part2.id,
+                    part3 = examContent.part3.id
+                )
+
+                PracticePart.P1_1 -> ExamContentIds(
+                    part1_1 = examContent.part1_1.map { it.id },
+                    part1_2 = null,
+                    part2 = null,
+                    part3 = null
+                )
+
+                PracticePart.P1_2 -> ExamContentIds(
+                    part1_1 = null,
+                    part1_2 = examContent.part1_2.id,
+                    part2 = null,
+                    part3 = null
+                )
+
+                PracticePart.P2 -> ExamContentIds(
+                    part1_1 = null,
+                    part1_2 = null,
+                    part2 = examContent.part2.id,
+                    part3 = null
+                )
+
+                PracticePart.P3 -> ExamContentIds(
+                    part1_1 = null,
+                    part1_2 = null,
+                    part2 = null,
+                    // --- THIS IS THE KEY FIX ---
+                    // Ensure that `examContent.part3` is not null before accessing `.id`.
+                    // The server-side logic handles this, but client-side is good practice.
+                    part3 = examContent.part3?.id
+                )
+            }
+
             val partString = if (practicePart == PracticePart.FULL) null else practicePart.name
-            val request = MultilevelAnalyzeRequest(uiState.value.transcript, contentIds, partString)
+
+            // Log the request payload before sending
+            Log.d(
+                "ExamVM_Analysis",
+                "Sending analysis request: practicePart=$partString, contentIds=$contentIds, transcript size=${transcript.size}"
+            )
+
+            val request = MultilevelAnalyzeRequest(transcript, contentIds, partString)
 
             when (val result = repository.analyzeExam(request)) {
                 is RepositoryResult.Success -> {
@@ -334,38 +392,9 @@ class MultilevelExamViewModel @Inject constructor(
         }
     }
 
-    private suspend fun startAnswerTimer(prepTime: Int, answerTime: Int) {
-        timerJob?.cancel()
-        val newTimerJob = viewModelScope.launch {
-            _uiState.update { it.copy(isRecording = false) }
-            for (i in prepTime downTo 1) {
-                _uiState.update { it.copy(timerValue = i) }
-                delay(1000)
-            }
-            _uiState.update { it.copy(timerValue = 0) }
-
-            playStartSpeakingSound()
-            recorder.start()
-            _uiState.update { it.copy(isRecording = true) }
-            for (i in answerTime downTo 1) {
-                _uiState.update { it.copy(timerValue = i) }
-                delay(1000)
-            }
-            _uiState.update { it.copy(timerValue = 0) }
-
-            val transcribedText = stopRecordingAndTranscribe()
-            if (transcribedText.isNotBlank()) {
-                addTranscript("User", transcribedText)
-            }
-        }
-        timerJob = newTimerJob
-        newTimerJob.join()
-    }
-
-    private suspend fun stopRecordingAndTranscribe(): String {
-        return suspendCancellableCoroutine { continuation ->
-            transcriptionContinuation = continuation
-            recorder.stop()
+    override fun onDataReceived(samples: FloatArray) {
+        synchronized(audioDataBuffer) {
+            audioDataBuffer.add(samples)
         }
     }
 
@@ -373,13 +402,21 @@ class MultilevelExamViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 _uiState.update { it.copy(isRecording = false) }
-                // Play a sound to indicate recording has stopped, as requested.
                 playStartSpeakingSound()
-                val transcribedText = transcribeBufferedAudio()
-                val cleanText =
-                    if (transcribedText.isBlank() || transcribedText.all { !it.isLetter() }) "" else transcribedText
-                Log.d("ExamVM", "Recording stopped. Transcribed: '$cleanText'")
-                transcriptionContinuation?.resume(cleanText)
+                var transcribedText = transcribeBufferedAudio()
+
+                // Inject dummy text in DEBUG mode if user didn't speak
+                if (BuildConfig.DEBUG && transcribedText.isBlank()) {
+                    Log.w("ExamVM_Debug", "Empty transcript in DEBUG mode. Injecting dummy text.")
+                    val dummyText =
+                        "This is a dummy transcript for testing purposes to allow the flow to continue without speaking."
+                    addTranscript("User", dummyText)
+                    transcribedText = dummyText
+                } else if (transcribedText.isNotBlank()) {
+                    addTranscript("User", transcribedText)
+                }
+
+                transcriptionContinuation?.resume(transcribedText)
             } catch (e: Exception) {
                 Log.e("ExamVM", "Error in onRecordingStopped", e)
                 transcriptionContinuation?.resume("")
@@ -389,8 +426,41 @@ class MultilevelExamViewModel @Inject constructor(
         }
     }
 
+    private suspend fun stopRecordingAndTranscribe(): String {
+        return suspendCancellableCoroutine { continuation ->
+            transcriptionContinuation = continuation
+            recorder.stop()
+        }
+    }
+
+    private suspend fun startAnswerTimer(prepTime: Int, answerTime: Int) {
+        timerJob?.cancel()
+        val newTimerJob = viewModelScope.launch {
+            _uiState.update { it.copy(isRecording = false) }
+            startTimer(duration = prepTime)
+
+            playStartSpeakingSound()
+            startTimer(duration = answerTime)
+
+            stopRecordingAndTranscribe()
+        }
+        timerJob = newTimerJob
+        newTimerJob.join()
+    }
+
     private suspend fun startTimer(duration: Int) {
         timerJob?.cancel()
+        val isSpeakingStage = uiState.value.stage == MultilevelExamStage.PART1_1_QUESTION ||
+                uiState.value.stage == MultilevelExamStage.PART1_2_COMPARE ||
+                uiState.value.stage == MultilevelExamStage.PART1_2_FOLLOWUP ||
+                uiState.value.stage == MultilevelExamStage.PART2_SPEAKING ||
+                uiState.value.stage == MultilevelExamStage.PART3_SPEAKING
+
+        if (isSpeakingStage && !recorder.isRecording) {
+            recorder.start()
+            _uiState.update { it.copy(isRecording = true) }
+        }
+
         val newTimerJob = viewModelScope.launch {
             for (i in duration downTo 1) {
                 _uiState.update { it.copy(timerValue = i) }
@@ -400,12 +470,6 @@ class MultilevelExamViewModel @Inject constructor(
         }
         timerJob = newTimerJob
         newTimerJob.join()
-    }
-
-    override fun onDataReceived(samples: FloatArray) {
-        synchronized(audioDataBuffer) {
-            audioDataBuffer.add(samples)
-        }
     }
 
     private suspend fun transcribeBufferedAudio(): String {
@@ -454,8 +518,6 @@ class MultilevelExamViewModel @Inject constructor(
 
     private suspend fun playInstructionAndWait(@RawRes resId: Int) {
         try {
-            // This function should ONLY play the instruction and wait.
-            // The "start speaking" sound is handled by the functions that actually start a speaking timer.
             AudioPlayer.playFromRawAndWait(context, resId)
         } catch (e: Exception) {
             Log.e("ExamVM", "Instruction audio failed to play", e)

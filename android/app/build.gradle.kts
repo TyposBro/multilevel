@@ -7,7 +7,6 @@ plugins {
     alias(libs.plugins.kotlin.ksp)
     alias(libs.plugins.hilt.android)
     alias(libs.plugins.google.services)
-
 }
 
 android {
@@ -57,6 +56,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true  // ADD THIS LINE to enable BuildConfig generation
     }
 
     // DEBUG Keystore

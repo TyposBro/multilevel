@@ -51,10 +51,10 @@ data class MultilevelAnalyzeRequest(
 )
 
 data class ExamContentIds(
-    @SerializedName("part1_1") val part1_1: List<String>,
-    @SerializedName("part1_2") val part1_2: String,
-    @SerializedName("part2") val part2: String,
-    @SerializedName("part3") val part3: String
+    @SerializedName("part1_1") val part1_1: List<String>?,
+    @SerializedName("part1_2") val part1_2: String?,
+    @SerializedName("part2") val part2: String?,
+    @SerializedName("part3") val part3: String?
 )
 
 // --- Models for displaying the multilevel results ---

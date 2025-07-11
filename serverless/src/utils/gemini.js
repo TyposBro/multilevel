@@ -1,5 +1,4 @@
 // {PATH_TO_PROJECT}/src/utils/gemini.js
-
 const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 /**
@@ -44,7 +43,11 @@ export async function generateText(c, prompt) {
     throw new Error("FATAL ERROR: GEMINI_API_KEY is not set in wrangler.toml secrets.");
   }
 
-  const model = "gemini-2.5-flash-latest";
+  // --- THIS IS THE FIX ---
+  // The correct model name is "gemini-2.0-flash".
+  const model = "gemini-2.0-flash";
+  // --- END OF FIX ---
+
   const url = `${GEMINI_API_BASE_URL}/${model}:generateContent?key=${apiKey}`;
 
   console.log("\n----------- PROMPT TO GEMINI -----------");

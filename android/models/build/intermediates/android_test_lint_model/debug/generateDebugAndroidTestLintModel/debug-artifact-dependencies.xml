@@ -1,0 +1,14 @@
+<dependencies>
+  <compile
+      roots=":@@:models::debug">
+    <dependency
+        name=":@@:models::debug"
+        simpleName="multilevel:models"/>
+  </compile>
+  <package
+      roots=":@@:models::debug">
+    <dependency
+        name=":@@:models::debug"
+        simpleName="multilevel:models"/>
+  </package>
+</dependencies>

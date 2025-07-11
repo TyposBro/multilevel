@@ -1,4 +1,4 @@
-// {PATH_TO_PROJECT}/src/db/d1-client.js
+// serverless/src/db/d1-client.js
 
 export const db = {
   // --- User Functions ---
@@ -105,6 +105,38 @@ export const db = {
     }
   },
 
+  async updateUserUsage(d1, userId, usageData) {
+    const { fullExams, partPractices } = usageData;
+    const now = new Date().toISOString();
+    try {
+      await d1
+        .prepare(
+          `
+                UPDATE users
+                SET
+                    dailyUsage_fullExams_count = ?,
+                    dailyUsage_fullExams_lastReset = ?,
+                    dailyUsage_partPractices_count = ?,
+                    dailyUsage_partPractices_lastReset = ?,
+                    updatedAt = ?
+                WHERE id = ?
+            `
+        )
+        .bind(
+          fullExams.count,
+          fullExams.lastReset,
+          partPractices.count,
+          partPractices.lastReset,
+          now,
+          userId
+        )
+        .run();
+    } catch (e) {
+      console.error("D1 updateUserUsage Error:", e.message);
+      throw new Error("Failed to update user usage stats.");
+    }
+  },
+
   // --- Admin Functions ---
 
   async findAdminByEmail(d1, email) {
@@ -116,7 +148,109 @@ export const db = {
     }
   },
 
-  // --- Exam Result Functions ---
+  // --- Token Functions ---
+
+  async createOneTimeToken(d1, tokenData) {
+    const { token, telegramId, botMessageId, userMessageId } = tokenData;
+    try {
+      await d1
+        .prepare(
+          "INSERT INTO one_time_tokens (token, telegramId, botMessageId, userMessageId) VALUES (?, ?, ?, ?)"
+        )
+        .bind(token, telegramId, botMessageId, userMessageId)
+        .run();
+    } catch (e) {
+      console.error("D1 createOneTimeToken Error:", e.message);
+      throw new Error("Failed to create one-time token.");
+    }
+  },
+
+  async findOneTimeTokenAndDelete(d1, token) {
+    try {
+      const foundToken = await d1
+        .prepare("SELECT * FROM one_time_tokens WHERE token = ?")
+        .bind(token)
+        .first();
+
+      if (foundToken) {
+        // Parse the UTC timestamp string correctly from D1
+        const utcTimestampString = foundToken.createdAt.replace(" ", "T") + "Z";
+        const createdAtDate = new Date(utcTimestampString);
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+        if (createdAtDate < fiveMinutesAgo) {
+          await d1.prepare("DELETE FROM one_time_tokens WHERE token = ?").bind(token).run();
+          return null; // Token is expired
+        }
+
+        // Token is valid, so delete it and return it
+        await d1.prepare("DELETE FROM one_time_tokens WHERE token = ?").bind(token).run();
+        return foundToken;
+      }
+
+      return null; // Token not found
+    } catch (e) {
+      console.error("D1 findOneTimeTokenAndDelete Error:", e.message);
+      return null;
+    }
+  },
+
+  // --- IELTS Exam Functions ---
+
+  async createIeltsExamResult(d1, resultData) {
+    const resultId = crypto.randomUUID();
+    const { userId, overallBand, criteria, transcript } = resultData;
+    try {
+      const stmt = d1
+        .prepare(
+          `
+                INSERT INTO ielts_exam_results (id, userId, overallBand, criteria, transcript)
+                VALUES (?, ?, ?, ?, ?)
+                RETURNING id
+            `
+        )
+        .bind(resultId, userId, overallBand, JSON.stringify(criteria), JSON.stringify(transcript));
+      return await stmt.first();
+    } catch (e) {
+      console.error("D1 createIeltsExamResult Error:", e.message);
+      throw new Error("Failed to save IELTS exam result.");
+    }
+  },
+
+  async getIeltsExamHistory(d1, userId) {
+    try {
+      const { results } = await d1
+        .prepare(
+          "SELECT id, overallBand, createdAt FROM ielts_exam_results WHERE userId = ? ORDER BY createdAt DESC"
+        )
+        .bind(userId)
+        .all();
+      return results;
+    } catch (e) {
+      console.error("D1 getIeltsExamHistory Error:", e.message);
+      return [];
+    }
+  },
+
+  async getIeltsExamResultDetails(d1, resultId, userId) {
+    try {
+      const result = await d1
+        .prepare("SELECT * FROM ielts_exam_results WHERE id = ? AND userId = ?")
+        .bind(resultId, userId)
+        .first();
+
+      if (result) {
+        if (result.criteria) result.criteria = JSON.parse(result.criteria);
+        if (result.transcript) result.transcript = JSON.parse(result.transcript);
+      }
+      return result;
+    } catch (e) {
+      console.error("D1 getIeltsExamResultDetails Error:", e.message);
+      return null;
+    }
+  },
+
+  // --- Multilevel Exam Functions ---
 
   async createMultilevelExamResult(d1, resultData) {
     const resultId = crypto.randomUUID();
@@ -193,57 +327,6 @@ export const db = {
     }
   },
 
-  // --- Token Functions ---
-
-  async createOneTimeToken(d1, tokenData) {
-    const { token, telegramId, botMessageId, userMessageId } = tokenData;
-    try {
-      await d1
-        .prepare(
-          "INSERT INTO one_time_tokens (token, telegramId, botMessageId, userMessageId) VALUES (?, ?, ?, ?)"
-        )
-        .bind(token, telegramId, botMessageId, userMessageId)
-        .run();
-    } catch (e) {
-      console.error("D1 createOneTimeToken Error:", e.message);
-      throw new Error("Failed to create one-time token.");
-    }
-  },
-
-  async findOneTimeTokenAndDelete(d1, token) {
-    try {
-      const foundToken = await d1
-        .prepare("SELECT * FROM one_time_tokens WHERE token = ?")
-        .bind(token)
-        .first();
-
-      if (foundToken) {
-        // --- START OF FIX ---
-        // D1 stores timestamps as UTC strings like '2024-07-11 16:20:00'.
-        // The `new Date()` constructor can misinterpret this as local time.
-        // To parse it correctly as UTC, we must replace the space with a 'T' and append 'Z'.
-        const utcTimestampString = foundToken.createdAt.replace(" ", "T") + "Z";
-        const createdAtDate = new Date(utcTimestampString);
-        // --- END OF FIX ---
-
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-
-        if (createdAtDate < fiveMinutesAgo) {
-          await d1.prepare("DELETE FROM one_time_tokens WHERE token = ?").bind(token).run();
-          return null;
-        }
-
-        await d1.prepare("DELETE FROM one_time_tokens WHERE token = ?").bind(token).run();
-        return foundToken;
-      }
-
-      return null;
-    } catch (e) {
-      console.error("D1 findOneTimeTokenAndDelete Error:", e.message);
-      return null;
-    }
-  },
-
   // --- Word Bank Functions ---
 
   async getWordBankLevels(d1) {
@@ -293,11 +376,13 @@ export const db = {
         .bind(size)
         .all();
 
+      // Automatically parse JSON fields if they exist
       if (results.length > 0) {
         results.forEach((r) => {
           if (r.questions) r.questions = JSON.parse(r.questions);
           if (r.forPoints) r.forPoints = JSON.parse(r.forPoints);
           if (r.againstPoints) r.againstPoints = JSON.parse(r.againstPoints);
+          if (r.tags) r.tags = JSON.parse(r.tags);
         });
       }
 
@@ -327,94 +412,6 @@ export const db = {
     } catch (e) {
       console.error(`D1 createContent for ${tableName} Error:`, e.message);
       throw new Error(`Failed to create content in ${tableName}`);
-    }
-  },
-
-  async updateUserUsage(d1, userId, usageData) {
-    const { fullExams, partPractices } = usageData;
-    const now = new Date().toISOString();
-    try {
-      await d1
-        .prepare(
-          `
-                UPDATE users
-                SET
-                    dailyUsage_fullExams_count = ?,
-                    dailyUsage_fullExams_lastReset = ?,
-                    dailyUsage_partPractices_count = ?,
-                    dailyUsage_partPractices_lastReset = ?,
-                    updatedAt = ?
-                WHERE id = ?
-            `
-        )
-        .bind(
-          fullExams.count,
-          fullExams.lastReset,
-          partPractices.count,
-          partPractices.lastReset,
-          now,
-          userId
-        )
-        .run();
-    } catch (e) {
-      console.error("D1 updateUserUsage Error:", e.message);
-      throw new Error("Failed to update user usage stats.");
-    }
-  },
-
-  // --- IELTS Exam Functions ---
-
-  async createIeltsExamResult(d1, resultData) {
-    const resultId = crypto.randomUUID();
-    const { userId, overallBand, criteria, transcript } = resultData;
-
-    try {
-      const stmt = d1
-        .prepare(
-          `
-                INSERT INTO ielts_exam_results (id, userId, overallBand, criteria, transcript)
-                VALUES (?, ?, ?, ?, ?)
-                RETURNING id
-            `
-        )
-        .bind(resultId, userId, overallBand, JSON.stringify(criteria), JSON.stringify(transcript));
-      return await stmt.first();
-    } catch (e) {
-      console.error("D1 createIeltsExamResult Error:", e.message);
-      throw new Error("Failed to save IELTS exam result.");
-    }
-  },
-
-  async getIeltsExamHistory(d1, userId) {
-    try {
-      const { results } = await d1
-        .prepare(
-          "SELECT id, overallBand, createdAt FROM ielts_exam_results WHERE userId = ? ORDER BY createdAt DESC"
-        )
-        .bind(userId)
-        .all();
-      return results;
-    } catch (e) {
-      console.error("D1 getIeltsExamHistory Error:", e.message);
-      return [];
-    }
-  },
-
-  async getIeltsExamResultDetails(d1, resultId, userId) {
-    try {
-      const result = await d1
-        .prepare("SELECT * FROM ielts_exam_results WHERE id = ? AND userId = ?")
-        .bind(resultId, userId)
-        .first();
-
-      if (result) {
-        if (result.criteria) result.criteria = JSON.parse(result.criteria);
-        if (result.transcript) result.transcript = JSON.parse(result.transcript);
-      }
-      return result;
-    } catch (e) {
-      console.error("D1 getIeltsExamResultDetails Error:", e.message);
-      return null;
     }
   },
 };
