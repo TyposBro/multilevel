@@ -1,45 +1,19 @@
-// serverless/src/db/d1-client.integration.test.js
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import { unstable_dev, getMiniflareBindings } from "wrangler";
+import { describe, it, expect, beforeEach } from "vitest";
+// 1. Import `env` from the special "cloudflare:test" module
+import { env } from "cloudflare:test";
 import { db } from "./d1-client";
-import { readFileSync } from "fs";
-import path from "path";
 
+// This describe block contains tests that run against a live, in-memory D1 database.
+// The test runner (`@cloudflare/vitest-pool-workers`) automatically starts
+// the worker and provides the bindings via `env`. We don't need to do it manually.
 describe("D1 Client Integration Tests", () => {
-  let worker;
-  let d1; // This will hold our D1 binding
+  let d1;
 
-  beforeAll(async () => {
-    // Start a dev worker, which will provide a real D1 instance.
-    worker = await unstable_dev("src/index.js", {
-      experimental: { disableExperimentalWarning: true },
-    });
-
-    // --- START OF FIX ---
-    // Use getMiniflareBindings to reliably get the D1 binding.
-    const bindings = await getMiniflareBindings();
-    d1 = bindings.DB;
-    // --- END OF FIX ---
-
-    // Ensure the binding was found before proceeding
-    if (!d1) {
-      throw new Error("Could not get D1 binding from Miniflare.");
-    }
-
-    // Apply the schema to the (now confirmed to exist) D1 instance.
-    const schema = readFileSync(path.resolve(__dirname, "./schema.sql"), "utf-8");
-    await d1.exec(schema);
-  });
-
-  afterAll(async () => {
-    if (worker) {
-      await worker.stop();
-    }
-  });
-
-  // Before each test, clear all data to ensure tests are isolated.
+  // 2. Before each test, get the D1 binding from the magical `env` object.
+  //    Your global `tests/setup.js` has already applied the schema.
   beforeEach(async () => {
-    // Use batching for efficiency
+    d1 = env.DB;
+    // Clear all data to ensure tests are isolated.
     await d1.batch([
       d1.prepare("DELETE FROM users"),
       d1.prepare("DELETE FROM admins"),
@@ -49,8 +23,8 @@ describe("D1 Client Integration Tests", () => {
     ]);
   });
 
-  // --- Your tests below this line are correct and do not need changes ---
-  // They will now run because `d1` is correctly initialized.
+  // 3. Your tests now work perfectly, as `d1` is a real D1 binding.
+  //    No other changes are needed here.
 
   it("should create a user and then retrieve it by ID", async () => {
     const userData = { email: "test@example.com", authProvider: "google", googleId: "google-123" };
