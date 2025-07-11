@@ -54,12 +54,20 @@ export const uploadPart1_2 = async (c) => {
     const audio2 = formData.get("audio2");
     const audio3 = formData.get("audio3");
 
+    // --- ROBUST VALIDATION ---
     if (!question1 || !question2 || !question3 || !imageDescription) {
       return c.json({ message: "All text fields are required." }, 400);
     }
-    if (!image1 || !image2 || !audio1 || !audio2 || !audio3) {
+    if (
+      !(image1 instanceof File) ||
+      !(image2 instanceof File) ||
+      !(audio1 instanceof File) ||
+      !(audio2 instanceof File) ||
+      !(audio3 instanceof File)
+    ) {
       return c.json({ message: "All 5 files (2 images, 3 audio) are required." }, 400);
     }
+    // --- END ROBUST VALIDATION ---
 
     // Upload all files in parallel
     const [image1Url, image2Url, audio1Url, audio2Url, audio3Url] = await Promise.all([
@@ -104,12 +112,14 @@ export const uploadPart2 = async (c) => {
     const imageFile = formData.get("image"); // Optional
     const audioFile = formData.get("audio");
 
+    // --- ROBUST VALIDATION ---
     if (!question1 || !question2 || !question3) {
       return c.json({ message: "All three question text fields are required." }, 400);
     }
-    if (!(audioFile instanceof File)) {
+    if (!audioFile || !(audioFile instanceof File)) {
       return c.json({ message: "A single combined audio file is required." }, 400);
     }
+    // --- END ROBUST VALIDATION ---
 
     let imageUrl = null;
     if (imageFile instanceof File) {
@@ -148,9 +158,11 @@ export const uploadPart3 = async (c) => {
     const againstPoints = formData.get("againstPoints");
     const imageFile = formData.get("image"); // Optional
 
+    // --- ROBUST VALIDATION ---
     if (!topic || !forPoints || !againstPoints) {
       return c.json({ message: "Topic, FOR points, and AGAINST points are required." }, 400);
     }
+    // --- END ROBUST VALIDATION ---
 
     let imageUrl = null;
     if (imageFile instanceof File) {
@@ -185,12 +197,14 @@ export const uploadWordBankWord = async (c) => {
     const wordData = Object.fromEntries(formData.entries());
     const { word, translation, cefrLevel, topic } = wordData;
 
+    // --- ROBUST VALIDATION ---
     if (!word || !translation || !cefrLevel || !topic) {
       return c.json(
         { message: "Please fill all required fields: word, translation, cefrLevel, and topic." },
         400
       );
     }
+    // --- END ROBUST VALIDATION ---
 
     const createdWord = await db.createContent(c.env.DB, "words", {
       word,
