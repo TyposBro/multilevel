@@ -1,3 +1,5 @@
+// This script uses the exact same algorithm as your worker's verifyPassword function.
+
 async function hashPassword(password) {
   const passwordBuf = new TextEncoder().encode(password);
   const salt = crypto.getRandomValues(new Uint8Array(16));
@@ -5,7 +7,7 @@ async function hashPassword(password) {
     "deriveBits",
   ]);
   const hashBuf = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations: 250000, hash: "SHA-256" },
+    { name: "PBKDF2", salt, iterations: 50000, hash: "SHA-256" },
     key,
     256
   );
@@ -19,11 +21,12 @@ async function hashPassword(password) {
   return `${saltHex}:${hashHex}`;
 }
 
-const password = process.argv[2];
-if (!password) {
-  console.log("Usage: node hash-password.mjs <your-password-here>");
+const passwordToHash = process.argv[2];
+if (!passwordToHash) {
+  console.error('Usage: node generate-admin-hash.mjs "Your-Secure-Password-Here"');
   process.exit(1);
 }
 
-const hashedPassword = await hashPassword(password);
-console.log("Hashed String:", hashedPassword);
+const hashedPassword = await hashPassword(passwordToHash);
+console.log("--- Copy the entire line below ---");
+console.log(hashedPassword);

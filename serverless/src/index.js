@@ -27,7 +27,7 @@ app.use(
 
       // --- ADD THESE LINES ---
       "http://localhost:5173", // Your admin panel's local dev server
-      "https://typosbro.github.io", // The live URL for your admin panel (if you have one)
+      "https://typosbro.github.io", // The live URL for your admin panel
       // --- END OF ADDED LINES ---
     ],
     // The rest of the configuration is likely fine
