@@ -170,4 +170,35 @@ describe("Subscription Routes", () => {
     const body = await res.json();
     expect(body.message).toBe("Server error while checking subscription.");
   });
+
+  it("POST /api/subscriptions/verify-purchase should fail with missing data", async () => {
+    // Define a user for this test case so we can generate a token.
+    const mockUserForTest = { id: "some-user-id" };
+    db.getUserById.mockResolvedValue(mockUserForTest);
+    const token = await generateToken({ env: MOCK_ENV }, mockUserForTest.id);
+
+    const res = await app.request(
+      "/api/subscriptions/verify-purchase",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "google" }), // Missing token and planId
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/subscriptions/start-trial should fail for a non-free user", async () => {
+    const mockGoldUser = { id: "gold-user", subscription_tier: "gold" };
+    db.getUserById.mockResolvedValue(mockGoldUser);
+    const token = await generateToken({ env: MOCK_ENV }, mockGoldUser.id);
+    const res = await app.request(
+      "/api/subscriptions/start-trial",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ message: "Trials are only for free users." });
+  });
 });

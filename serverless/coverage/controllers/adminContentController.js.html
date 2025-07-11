@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">63.04% </span>
+                <span class="strong">61.95% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>58/92</span>
+                <span class='fraction'>57/92</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">59.42% </span>
+                <span class="strong">47.82% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>41/69</span>
+                <span class='fraction'>33/69</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">62.22% </span>
+                <span class="strong">61.11% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>56/90</span>
+                <span class='fraction'>55/90</span>
             </div>
         
             
@@ -296,12 +296,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">59x</span>
+<span class="cline-any cline-yes">64x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">59x</span>
+<span class="cline-any cline-yes">64x</span>
 <span class="cline-any cline-yes">28x</span>
 <span class="cline-any cline-yes">28x</span>
 <span class="cline-any cline-yes">28x</span>
@@ -329,7 +329,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">59x</span>
+<span class="cline-any cline-yes">64x</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">14x</span>
@@ -349,16 +349,16 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">14x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">14x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -393,7 +393,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">59x</span>
+<span class="cline-any cline-yes">64x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -441,7 +441,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">59x</span>
+<span class="cline-any cline-yes">64x</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">14x</span>
 <span class="cline-any cline-yes">14x</span>
@@ -484,7 +484,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">59x</span>
+<span class="cline-any cline-yes">64x</span>
 <span class="cline-any cline-yes">28x</span>
 <span class="cline-any cline-yes">28x</span>
 <span class="cline-any cline-yes">28x</span>
@@ -576,17 +576,17 @@ export const uploadPart1_2 = async (c) =&gt; {
     const audio3 = formData.get("audio3");
 &nbsp;
     // --- ROBUST VALIDATION ---
-    <span class="missing-if-branch" title="if path not taken" >I</span>if (!question1 || !question2 || !question3 || !imageDescription) {
-<span class="cstat-no" title="statement not covered" >      return c.json({ message: "All text fields are required." }, 400);</span>
+    <span class="missing-if-branch" title="else path not taken" >E</span>if (!question1 || !question2 || <span class="branch-2 cbranch-no" title="branch not covered" >!question3 </span>|| <span class="branch-3 cbranch-no" title="branch not covered" >!imageDescription)</span> {
+      return c.json({ message: "All text fields are required." }, 400);
     }
-    <span class="missing-if-branch" title="else path not taken" >E</span>if (
+<span class="cstat-no" title="statement not covered" >    if (</span>
       !(image1 instanceof File) ||
       !(image2 instanceof File) ||
       !(audio1 instanceof File) ||
       !(audio2 instanceof File) ||
       !(audio3 instanceof File)
     ) {
-      return c.json({ message: "All 5 files (2 images, 3 audio) are required." }, 400);
+<span class="cstat-no" title="statement not covered" >      return c.json({ message: "All 5 files (2 images, 3 audio) are required." }, 400);</span>
     }
     // --- END ROBUST VALIDATION ---
 &nbsp;
@@ -754,7 +754,7 @@ export const uploadWordBankWord = async (c) =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-07-11T07:45:18.770Z
+                at 2025-07-11T07:57:21.492Z
             </div>
         <script src="../prettify.js"></script>
         <script>

@@ -60,4 +60,51 @@ describe("Telegram Webhook Route", () => {
     expect(global.fetch).toHaveBeenCalled();
     expect(db.createOneTimeToken).toHaveBeenCalledOnce();
   });
+
+  it("should handle Telegram API errors gracefully", async () => {
+    // Mock fetch to return a failed response from Telegram
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: false, description: "Chat not found" }), {
+          status: 400,
+        })
+      )
+    );
+
+    const res = await app.request(
+      "/api/telegram/webhook/test-bot-token",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: { text: "/start", from: { id: 1 }, chat: { id: 1 } } }),
+      },
+      MOCK_ENV
+    );
+
+    expect(res.status).toBe(200); // The webhook itself always returns 200
+    expect(db.createOneTimeToken).not.toHaveBeenCalled(); // But the DB call should not happen
+  });
+
+  it("should handle missing message_id from Telegram response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ ok: true, result: {} }), { status: 200 }) // No message_id in result
+      )
+    );
+
+    const res = await app.request(
+      "/api/telegram/webhook/test-bot-token",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: { text: "/start", from: { id: 1 }, chat: { id: 1 } } }),
+      },
+      MOCK_ENV
+    );
+
+    expect(res.status).toBe(200);
+    expect(db.createOneTimeToken).not.toHaveBeenCalled();
+  });
 });

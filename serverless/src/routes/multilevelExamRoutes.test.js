@@ -114,4 +114,44 @@ describe("Multilevel Exam Routes", () => {
     const body = await res.json();
     expect(body.message).toContain("all 3 of your free part practices");
   });
+
+  it("should return 500 if database fails during usage update", async () => {
+    const mockFreeUser = {
+      id: "free-user-1",
+      subscription_tier: "free",
+      dailyUsage_fullExams_count: 0,
+    };
+    db.getUserById.mockResolvedValue(mockFreeUser);
+    db.updateUserUsage.mockRejectedValue(new Error("DB Error")); // Simulate failure
+    const token = await generateToken({ env: MOCK_ENV }, mockFreeUser.id);
+
+    const res = await app.request(
+      "/api/exam/multilevel/analyze",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: [{ speaker: "User", text: "hello" }],
+          practicedPart: null,
+        }),
+      },
+      MOCK_ENV
+    );
+
+    expect(res.status).toBe(500); // It will fail when trying to update usage
+  });
+
+  it("should return 400 if transcript is missing", async () => {
+    const token = await generateToken({ env: MOCK_ENV }, { id: "user" });
+    const res = await app.request(
+      "/api/exam/multilevel/analyze",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: [] }), // Empty transcript
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(400);
+  });
 });

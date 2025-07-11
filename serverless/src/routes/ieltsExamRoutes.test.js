@@ -121,4 +121,43 @@ describe("IELTS Exam Routes", () => {
     expect(db.getIeltsExamResultDetails).toHaveBeenCalledOnce();
     expect(db.getIeltsExamResultDetails).toHaveBeenCalledWith(MOCK_ENV.DB, resultId, mockUser.id);
   });
+
+  it("should return 500 if Gemini fails to start an exam", async () => {
+    gemini.generateText.mockRejectedValue(new Error("API Down"));
+    const res = await app.request(
+      "/api/exam/ielts/start",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("should return 500 if Gemini returns invalid JSON during start", async () => {
+    gemini.generateText.mockResolvedValue("this is not json");
+    gemini.safeJsonParse.mockReturnValue(null);
+    const res = await app.request(
+      "/api/exam/ielts/start",
+      { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("should return 500 if database fails on analyze", async () => {
+    gemini.generateText.mockResolvedValue(JSON.stringify({ overallBand: 7.0, criteria: [] }));
+    gemini.safeJsonParse.mockReturnValue({ overallBand: 7.0, criteria: [] });
+    db.createIeltsExamResult.mockRejectedValue(new Error("DB Error"));
+
+    const res = await app.request(
+      "/api/exam/ielts/analyze",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: [] }),
+      },
+      MOCK_ENV
+    );
+
+    expect(res.status).toBe(500);
+  });
 });

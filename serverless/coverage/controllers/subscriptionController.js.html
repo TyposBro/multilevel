@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">44% </span>
+                <span class="strong">68% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>11/25</span>
+                <span class='fraction'>17/25</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">27.27% </span>
+                <span class="strong">63.63% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>3/11</span>
+                <span class='fraction'>7/11</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">50% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>1/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">44% </span>
+                <span class="strong">68% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>11/25</span>
+                <span class='fraction'>17/25</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line medium'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -147,24 +147,24 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">59x</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-yes">13x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -177,12 +177,12 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">59x</span>
-<span class="cline-any cline-yes">39x</span>
-<span class="cline-any cline-yes">39x</span>
+<span class="cline-any cline-yes">64x</span>
+<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">52x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">39x</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">52x</span>
+<span class="cline-any cline-yes">13x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -221,14 +221,14 @@ import { verifyPurchase } from "../services/paymentService";
  * @route   POST /api/subscriptions/verify-purchase
  * @access  Private
  */
-export const verifyAndGrantAccess = <span class="fstat-no" title="function not covered" >async </span>(c) =&gt; {
-<span class="cstat-no" title="statement not covered" >  try {</span>
+export const verifyAndGrantAccess = async (c) =&gt; {
+  try {
     // The user object is attached by our `protect` middleware.
-    const user = <span class="cstat-no" title="statement not covered" >c.get("user");</span>
-    const { provider, token, planId } = <span class="cstat-no" title="statement not covered" >await c.req.json();</span>
+    const user = c.get("user");
+    const { provider, token, planId } = await c.req.json();
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    if (!provider || !token || !planId) {</span>
-<span class="cstat-no" title="statement not covered" >      return c.json({ message: "Provider, token, and planId are required." }, 400);</span>
+    <span class="missing-if-branch" title="else path not taken" >E</span>if (!provider || !token || <span class="branch-2 cbranch-no" title="branch not covered" >!planId)</span> {
+      return c.json({ message: "Provider, token, and planId are required." }, 400);
     }
 &nbsp;
     // Pass the context 'c' to the service so it can access env vars.
@@ -255,8 +255,8 @@ export const startGoldTrial = async (c) =&gt; {
   try {
     const user = c.get("user");
 &nbsp;
-    <span class="missing-if-branch" title="if path not taken" >I</span>if (user.subscription_tier !== "free") {
-<span class="cstat-no" title="statement not covered" >      return c.json({ message: "Trials are only for free users." }, 400);</span>
+    if (user.subscription_tier !== "free") {
+      return c.json({ message: "Trials are only for free users." }, 400);
     }
 &nbsp;
     // Note the change from `hasUsedGoldTrial` (boolean) to `subscription_hasUsedGoldTrial` (integer 0 or 1)
@@ -292,7 +292,7 @@ export const startGoldTrial = async (c) =&gt; {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-07-11T07:45:18.770Z
+                at 2025-07-11T07:57:21.492Z
             </div>
         <script src="../prettify.js"></script>
         <script>
