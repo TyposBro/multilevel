@@ -138,6 +138,32 @@ describe("Admin Routes (Controllers and Middleware)", () => {
       );
       expect(res.status).toBe(401);
     });
+    it("POST /login - should fail if email is missing", async () => {
+      const res = await app.request(
+        "/api/admin/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password: "pw" }),
+        },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("POST /login - should handle server error", async () => {
+      db.findAdminByEmail.mockRejectedValue(new Error("DB Connection Failed"));
+      const res = await app.request(
+        "/api/admin/auth/login",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: "admin@test.com", password: "pw" }),
+        },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(500);
+    });
   });
 
   // ===================================================================
@@ -226,6 +252,124 @@ describe("Admin Routes (Controllers and Middleware)", () => {
         MOCK_ADMIN_ENV
       );
       expect(res.status).toBe(201);
+    });
+
+    // --- New Tests for uploadPart1_1 ---
+    it("POST /part1.1 - should handle server error on upload", async () => {
+      uploadToCDN.mockRejectedValue(new Error("R2 is down"));
+      const formData = new FormData();
+      formData.append("questionText", "A question");
+      formData.append("audio", new File(["audio"], "a.mp3"));
+      const res = await app.request(
+        "/api/admin/content/part1.1",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    // --- New Tests for uploadPart1_2 ---
+    it("POST /part1.2 - should succeed with all data", async () => {
+      const formData = new FormData();
+      formData.append("question1", "q1");
+      formData.append("question2", "q2");
+      formData.append("question3", "q3");
+      formData.append("imageDescription", "desc");
+      formData.append("image1", new File([], "f1.jpg"));
+      formData.append("image2", new File([], "f2.jpg"));
+      formData.append("audio1", new File([], "a1.mp3"));
+      formData.append("audio2", new File([], "a2.mp3"));
+      formData.append("audio3", new File([], "a3.mp3"));
+      const res = await app.request(
+        "/api/admin/content/part1.2",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(201);
+      expect(uploadToCDN).toHaveBeenCalledTimes(5);
+    });
+
+    it("POST /part1.2 - should handle server error on upload", async () => {
+      uploadToCDN.mockRejectedValue(new Error("R2 is down"));
+      const formData = new FormData();
+      formData.append("question1", "q1");
+      formData.append("question2", "q2");
+      formData.append("question3", "q3");
+      formData.append("imageDescription", "desc");
+      formData.append("image1", new File([], "f1.jpg"));
+      formData.append("image2", new File([], "f2.jpg"));
+      formData.append("audio1", new File([], "a1.mp3"));
+      formData.append("audio2", new File([], "a2.mp3"));
+      formData.append("audio3", new File([], "a3.mp3"));
+      const res = await app.request(
+        "/api/admin/content/part1.2",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    // --- New Tests for uploadPart2 ---
+    it("POST /part2 - should handle server error on upload", async () => {
+      uploadToCDN.mockRejectedValue(new Error("R2 is down"));
+      const formData = new FormData();
+      formData.append("question1", "q1");
+      formData.append("question2", "q2");
+      formData.append("question3", "q3");
+      formData.append("audio", new File([], "audio.mp3"));
+      const res = await app.request(
+        "/api/admin/content/part2",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    // --- New Tests for uploadPart3 ---
+    it("POST /part3 - should handle server error on upload", async () => {
+      uploadToCDN.mockRejectedValue(new Error("R2 is down"));
+      const formData = new FormData();
+      formData.append("topic", "A topic");
+      formData.append("forPoints", "Point 1");
+      formData.append("againstPoints", "Point A");
+      formData.append("image", new File([], "img.jpg"));
+      const res = await app.request(
+        "/api/admin/content/part3",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    // --- New Tests for uploadWordBankWord ---
+    it("POST /wordbank/add - should return 409 for a duplicate word", async () => {
+      db.createContent.mockRejectedValue(new Error("UNIQUE constraint failed"));
+      const formData = new FormData();
+      formData.append("word", "duplicate");
+      formData.append("translation", "dup");
+      formData.append("cefrLevel", "A1");
+      formData.append("topic", "Test");
+      const res = await app.request(
+        "/api/admin/wordbank/add",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(409);
+    });
+
+    it("POST /wordbank/add - should handle generic server error", async () => {
+      db.createContent.mockRejectedValue(new Error("Some other DB error"));
+      const formData = new FormData();
+      formData.append("word", "new-word");
+      formData.append("translation", "new-trans");
+      formData.append("cefrLevel", "B1");
+      formData.append("topic", "Generic");
+      const res = await app.request(
+        "/api/admin/wordbank/add",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(500);
     });
   });
 });

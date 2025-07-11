@@ -99,4 +99,109 @@ describe("IELTS Exam Routes", () => {
     );
     expect(res.status).toBe(500);
   });
+
+  // --- REPLACE THE "Edge Cases" BLOCK IN ieltsExamRoutes.test.js WITH THIS ---
+
+  describe("Controller: ieltsExamController Edge Cases", () => {
+    it("startExam should handle Gemini API errors", async () => {
+      gemini.generateText.mockRejectedValue(new Error("API Down"));
+      const res = await app.request(
+        "/api/exam/ielts/start",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    it("startExam should handle invalid JSON from Gemini", async () => {
+      gemini.generateText.mockResolvedValue("this is not json");
+      gemini.safeJsonParse.mockReturnValue(null);
+      const res = await app.request(
+        "/api/exam/ielts/start",
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({
+        message: "AI failed to generate a valid starting question.",
+      });
+    });
+
+    it("handleExamStep should handle Gemini API errors", async () => {
+      gemini.generateText.mockRejectedValue(new Error("API Down"));
+      const res = await app.request(
+        "/api/exam/ielts/step",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    it("analyzeExam should add 'General' type for unknown criteria", async () => {
+      const mockAnalysis = {
+        overallBand: 6.5,
+        criteria: [{ criterionName: "Overall Impression", examples: [{ userQuote: "..." }] }],
+      };
+      // --- THIS IS THE FIX ---
+      // The controller calls generateText FIRST. We must mock it.
+      gemini.generateText.mockResolvedValue(JSON.stringify(mockAnalysis));
+      // We also mock safeJsonParse to ensure the exact object is returned.
+      gemini.safeJsonParse.mockReturnValue(mockAnalysis);
+      // --- END OF FIX ---
+
+      db.createIeltsExamResult.mockResolvedValue({ id: "res-123" });
+
+      await app.request(
+        "/api/exam/ielts/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [] }),
+        },
+        MOCK_ENV
+      );
+
+      const savedData = db.createIeltsExamResult.mock.calls[0][1];
+      expect(savedData.criteria[0].examples[0].type).toBe("General");
+    });
+
+    it("analyzeExam should handle database errors", async () => {
+      gemini.safeJsonParse.mockReturnValue({ overallBand: 7.0, criteria: [] });
+      db.createIeltsExamResult.mockRejectedValue(new Error("DB Write Failed"));
+      const res = await app.request(
+        "/api/exam/ielts/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [] }),
+        },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    it("getExamHistory should handle database errors", async () => {
+      db.getIeltsExamHistory.mockRejectedValue(new Error("DB Read Failed"));
+      const res = await app.request(
+        "/api/exam/ielts/history",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    it("getExamResultDetails should handle database errors", async () => {
+      db.getIeltsExamResultDetails.mockRejectedValue(new Error("DB Read Failed"));
+      const res = await app.request(
+        "/api/exam/ielts/result/some-id",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+  });
 });

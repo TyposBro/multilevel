@@ -240,4 +240,116 @@ describe("Multilevel Exam Routes", () => {
       expect(res.status).toBe(404);
     });
   });
+
+  // --- New tests to add for 100% coverage ---
+
+  describe("Controller: multilevelExamController Edge Cases", () => {
+    it("should succeed for a free user with no prior usage history", async () => {
+      // This test covers the `!lastReset` branch in the `resetDailyUsageIfNeeded` helper.
+      const freshFreeUser = {
+        id: "fresh-user",
+        subscription_tier: "free",
+        dailyUsage_fullExams_lastReset: null, // No reset date yet
+      };
+      db.getUserById.mockResolvedValue(freshFreeUser);
+      const token = await generateToken({ env: MOCK_ENV }, freshFreeUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+        },
+        MOCK_ENV
+      );
+
+      expect(res.status).toBe(201);
+      // The helper function should have initialized the count to 1
+      expect(db.updateUserUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        freshFreeUser.id,
+        expect.objectContaining({ fullExams: expect.objectContaining({ count: 1 }) })
+      );
+    });
+
+    it("should return 403 if a free user exceeds the part practice limit", async () => {
+      // This test covers the rate-limiting block for part practices.
+      const limitedUser = {
+        id: "limited-user",
+        subscription_tier: "free",
+        dailyUsage_partPractices_count: 3, // At the limit
+        dailyUsage_partPractices_lastReset: new Date().toISOString(),
+      };
+      db.getUserById.mockResolvedValue(limitedUser);
+      const token = await generateToken({ env: MOCK_ENV }, limitedUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContentIds: {} }),
+        },
+        MOCK_ENV
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.message).toContain("all 3 of your free part practices");
+    });
+
+    it("should return 500 if database fails during exam analysis", async () => {
+      // This covers the main `catch` block in `analyzeExam`.
+      db.createMultilevelExamResult.mockRejectedValue(new Error("DB write failed"));
+      const user = {
+        id: "user-1",
+        subscription_tier: "gold",
+        subscription_expiresAt: new Date().toISOString(),
+      };
+      db.getUserById.mockResolvedValue(user);
+      const token = await generateToken({ env: MOCK_ENV }, user.id);
+
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+        },
+        MOCK_ENV
+      );
+
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({ message: "DB write failed" });
+    });
+
+    it("should return 500 if database fails when fetching history", async () => {
+      // This covers the `catch` block in `getExamHistory`.
+      db.getMultilevelExamHistory.mockRejectedValue(new Error("DB read failed"));
+      const user = { id: "user-1", subscription_tier: "free" };
+      db.getUserById.mockResolvedValue(user);
+      const token = await generateToken({ env: MOCK_ENV }, user.id);
+
+      const res = await app.request(
+        "/api/exam/multilevel/history",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+
+    it("should return 500 if database fails when fetching result details", async () => {
+      // This covers the `catch` block in `getExamResultDetails`.
+      db.getMultilevelExamResultDetails.mockRejectedValue(new Error("DB read failed"));
+      const user = { id: "user-1", subscription_tier: "free" };
+      db.getUserById.mockResolvedValue(user);
+      const token = await generateToken({ env: MOCK_ENV }, user.id);
+
+      const res = await app.request(
+        "/api/exam/multilevel/result/some-id",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+    });
+  });
 });
