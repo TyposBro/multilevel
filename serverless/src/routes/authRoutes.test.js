@@ -1,3 +1,4 @@
+// serverless/src/routes/authRoutes.test.js
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import app from "../index";
 import { generateToken } from "../utils/generateToken";
@@ -9,6 +10,8 @@ describe("Auth Routes & Middleware", () => {
   const MOCK_ENV = {
     JWT_SECRET: "a-secure-test-secret-for-users",
     DB: db,
+    TELEGRAM_BOT_TOKEN: "fake-token",
+    SERVER_URL: "http://localhost",
   };
 
   beforeEach(() => {
@@ -103,5 +106,56 @@ describe("Auth Routes & Middleware", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.message).toBe("Server configuration error");
+  });
+
+  it("googleSignIn should fail if idToken is missing", async () => {
+    const res = await app.request(
+      "/api/auth/google-signin",
+      { method: "POST", body: JSON.stringify({}), headers: { "Content-Type": "application/json" } },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("googleSignIn should handle token verification failure", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false }); // Mock Google API failure
+    const res = await app.request(
+      "/api/auth/google-signin",
+      {
+        method: "POST",
+        body: JSON.stringify({ idToken: "bad-token" }),
+        headers: { "Content-Type": "application/json" },
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("verifyTelegramToken should fail with missing token", async () => {
+    const res = await app.request(
+      "/api/auth/verify-telegram-token",
+      { method: "POST", body: JSON.stringify({}), headers: { "Content-Type": "application/json" } },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("verifyTelegramToken should fail with invalid one-time token", async () => {
+    db.findOneTimeTokenAndDelete.mockResolvedValue(null);
+    const res = await app.request(
+      "/api/auth/verify-telegram-token",
+      {
+        method: "POST",
+        body: JSON.stringify({ oneTimeToken: "bad-token" }),
+        headers: { "Content-Type": "application/json" },
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("telegramRedirect should return error if token is missing", async () => {
+    const res = await app.request("/api/auth/telegram/redirect", {}, MOCK_ENV);
+    expect(res.status).toBe(400);
   });
 });

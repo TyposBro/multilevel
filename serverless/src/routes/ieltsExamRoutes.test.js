@@ -160,4 +160,49 @@ describe("IELTS Exam Routes", () => {
 
     expect(res.status).toBe(500);
   });
+
+  it("handleExamStep should return 500 if Gemini returns invalid JSON", async () => {
+    gemini.generateText.mockResolvedValue("not json");
+    gemini.safeJsonParse.mockReturnValue(null);
+    const res = await app.request(
+      "/api/exam/ielts/step",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          part: 1,
+          userInput: "hi",
+          transcriptContext: "",
+          questionCountInPart: 0,
+        }),
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("analyzeExam should return 500 if Gemini returns invalid JSON", async () => {
+    gemini.generateText.mockResolvedValue("not json");
+    gemini.safeJsonParse.mockReturnValue(null);
+    const res = await app.request(
+      "/api/exam/ielts/analyze",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: [{ speaker: "User", text: "Hello" }] }),
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("getExamResultDetails should return 404 if result not found", async () => {
+    db.getIeltsExamResultDetails.mockResolvedValue(null);
+    const res = await app.request(
+      `/api/exam/ielts/result/not-found-id`,
+      { headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(404);
+  });
 });

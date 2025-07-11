@@ -81,4 +81,17 @@ describe("Word Bank Routes", () => {
     const body = await res.json();
     expect(body.message).toContain("topic query parameters are required");
   });
+
+  it("GET /api/wordbank/topics should fail if level is missing", async () => {
+    const MOCK_ENV = { DB: db };
+    const res = await app.request(`/api/wordbank/topics`, {}, MOCK_ENV);
+    expect(res.status).toBe(400);
+  });
+
+  it("should return 500 on database error", async () => {
+    db.getWordBankLevels.mockRejectedValue(new Error("DB Error"));
+    const MOCK_ENV = { DB: db };
+    const res = await app.request("/api/wordbank/levels", {}, MOCK_ENV);
+    expect(res.status).toBe(500);
+  });
 });
