@@ -14,6 +14,17 @@ describe("Gemini Utility", () => {
       expect(safeJsonParse('{"key":')).toBeNull();
       expect(safeJsonParse(null)).toBeNull();
     });
+
+    it("should return null for a malformed JSON string that contains brackets", () => {
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const json = safeJsonParse('```json\n{"key": "value\'}\n```'); // Invalid JSON
+      expect(json).toBeNull();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[safeJsonParse] CRITICAL: Failed to parse extracted JSON string."),
+        expect.any(Object)
+      );
+      consoleErrorSpy.mockRestore();
+    });
   });
 
   describe("generateText", () => {

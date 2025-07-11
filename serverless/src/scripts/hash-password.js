@@ -1,6 +1,6 @@
 // This script uses the exact same algorithm as your worker's verifyPassword function.
 
-async function hashPassword(password) {
+export async function hashPassword(password) {
   const passwordBuf = new TextEncoder().encode(password);
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const key = await crypto.subtle.importKey("raw", passwordBuf, { name: "PBKDF2" }, false, [
@@ -21,12 +21,16 @@ async function hashPassword(password) {
   return `${saltHex}:${hashHex}`;
 }
 
-const passwordToHash = process.argv[2];
-if (!passwordToHash) {
-  console.error('Usage: node generate-admin-hash.mjs "Your-Secure-Password-Here"');
-  process.exit(1);
+// This check ensures the CLI logic only runs when the script is executed directly
+if (import.meta.url.startsWith("file:") && process.argv[1] === new URL(import.meta.url).pathname) {
+  (async () => {
+    const passwordToHash = process.argv[2];
+    if (!passwordToHash) {
+      console.error('Usage: node src/scripts/hash-password.mjs "Your-Secure-Password-Here"');
+      process.exit(1);
+    }
+    const hashedPassword = await hashPassword(passwordToHash);
+    console.log("--- Copy the entire line below ---");
+    console.log(hashedPassword);
+  })();
 }
-
-const hashedPassword = await hashPassword(passwordToHash);
-console.log("--- Copy the entire line below ---");
-console.log(hashedPassword);

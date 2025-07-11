@@ -3,10 +3,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import app from "../index"; // Your Hono app
 import { generateToken } from "../utils/generateToken";
 import { db } from "../db/d1-client";
-import * as paymentService from "../services/paymentService";
+import { checkSubscriptionStatus } from "../middleware/subscriptionMiddleware";
+import * as paymentService from "../services/paymentService"; // Import the payment service
 
 // 1. Mock the database client
 vi.mock("../db/d1-client.js");
+vi.mock("../services/paymentService.js");
 
 describe("Subscription Routes", () => {
   const MOCK_ENV = {
@@ -251,5 +253,25 @@ describe("Subscription Routes", () => {
 
     // Assert
     expect(res.status).toBe(500);
+  });
+});
+
+describe("Subscription Middleware (checkSubscriptionStatus)", () => {
+  it("should return 401 if user is not found in context", async () => {
+    // Arrange: Create a mock context where c.get('user') returns null
+    const mockContext = {
+      get: vi.fn((key) => {
+        if (key === "user") return null;
+      }),
+      json: vi.fn(),
+    };
+    const next = vi.fn();
+
+    // Act: Call the middleware directly
+    await checkSubscriptionStatus(mockContext, next);
+
+    // Assert
+    expect(mockContext.json).toHaveBeenCalledWith({ message: "User not found in context" }, 401);
+    expect(next).not.toHaveBeenCalled();
   });
 });
