@@ -153,5 +153,54 @@ describe("Multilevel Exam Routes", () => {
 
     expect(res.status).toBe(500);
   });
-  // --- END OF FIXES ---
+
+  // ... in multilevelExamRoutes.test.js
+
+  it("should reset daily usage if last reset was yesterday", async () => {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const mockFreeUser = {
+      id: "free-user-reset",
+      subscription_tier: "free",
+      dailyUsage_fullExams_count: 5, // Over the limit
+      dailyUsage_fullExams_lastReset: yesterday.toISOString(),
+    };
+    db.getUserById.mockResolvedValue(mockFreeUser);
+    db.createMultilevelExamResult.mockResolvedValue({ id: "result-xyz" });
+    const token = await generateToken({ env: MOCK_ENV }, mockFreeUser.id);
+
+    const res = await app.request(
+      "/api/exam/multilevel/analyze",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: [{ speaker: "User", text: "hello" }],
+          practicedPart: null,
+        }),
+      },
+      MOCK_ENV
+    );
+
+    // The count should be reset, so the request succeeds
+    expect(res.status).toBe(201);
+    expect(db.updateUserUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        fullExams: expect.objectContaining({ count: 1 }),
+      })
+    );
+  });
+
+  it("getExamResultDetails should return 404 if result not found", async () => {
+    const token = await generateToken({ env: MOCK_ENV }, { id: "user" });
+    db.getMultilevelExamResultDetails.mockResolvedValue(null);
+    const res = await app.request(
+      "/api/exam/multilevel/result/not-found-id",
+      { headers: { Authorization: `Bearer ${token}` } },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(404);
+  });
 });

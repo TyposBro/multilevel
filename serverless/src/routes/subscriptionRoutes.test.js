@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import app from "../index"; // Your Hono app
 import { generateToken } from "../utils/generateToken";
 import { db } from "../db/d1-client";
+import * as paymentService from "../services/paymentService";
 
 // 1. Mock the database client
 vi.mock("../db/d1-client.js");
@@ -200,5 +201,55 @@ describe("Subscription Routes", () => {
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ message: "Trials are only for free users." });
+  });
+
+  it("POST /api/subscriptions/verify-purchase should fail on server error", async () => {
+    // Arrange
+    const mockUser = { id: "user-error-1" };
+    db.getUserById.mockResolvedValue(mockUser);
+    const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
+    vi.spyOn(paymentService, "verifyPurchase").mockRejectedValue(
+      new Error("Internal server error.")
+    );
+
+    // Act
+    const res = await app.request(
+      "/api/subscriptions/verify-purchase",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "google", token: "a-token", planId: "a-plan" }),
+      },
+      MOCK_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(500);
+  });
+
+  it("POST /api/subscriptions/start-trial should fail on server error", async () => {
+    // Arrange
+    const mockUser = {
+      id: "user-error-2",
+      subscription_tier: "free",
+      subscription_hasUsedGoldTrial: 0,
+    };
+    db.getUserById.mockResolvedValue(mockUser);
+    const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
+    // Mock the DB update to fail
+    db.updateUserSubscription.mockRejectedValue(new Error("DB connection failed"));
+
+    // Act
+    const res = await app.request(
+      "/api/subscriptions/start-trial",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      MOCK_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(500);
   });
 });

@@ -108,4 +108,60 @@ describe("Payment Routes", () => {
       mockUser
     );
   });
+
+  // ... in paymentRoutes.test.js
+
+  it("POST /api/payment/create should fail if provider is missing", async () => {
+    const res = await app.request(
+      "/api/payment/create",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: "silver_monthly" }),
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/payment/create should handle server errors", async () => {
+    paymentService.initiatePayment.mockRejectedValue(new Error("Service is down"));
+    const res = await app.request(
+      "/api/payment/create",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "payme", planId: "silver_monthly" }),
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(500);
+  });
+
+  it("POST /api/payment/verify should fail if token is missing", async () => {
+    const res = await app.request(
+      "/api/payment/verify",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "payme" }),
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/payment/verify should handle server errors", async () => {
+    paymentService.verifyPurchase.mockRejectedValue(new Error("Service is down"));
+    const res = await app.request(
+      "/api/payment/verify",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: "payme", token: "a-token" }),
+      },
+      MOCK_ENV
+    );
+    expect(res.status).toBe(500);
+  });
 });

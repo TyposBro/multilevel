@@ -74,12 +74,14 @@ export const deleteUserProfile = async (c) => {
 /**
  * @desc    Verify a one-time token from the Telegram login flow
  */
+
 export const verifyTelegramToken = async (c) => {
-  const { oneTimeToken } = await c.req.json();
-  if (!oneTimeToken) {
-    return c.json({ message: "One-time token is required." }, 400);
-  }
   try {
+    const { oneTimeToken } = await c.req.json();
+    if (!oneTimeToken) {
+      return c.json({ message: "One-time token is required." }, 400);
+    }
+
     const foundToken = await db.findOneTimeTokenAndDelete(c.env.DB, oneTimeToken);
     if (!foundToken) {
       return c.json({ message: "Invalid or expired token. Please try again." }, 401);
@@ -87,27 +89,34 @@ export const verifyTelegramToken = async (c) => {
 
     const TELEGRAM_API = `https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}`;
 
-    // Asynchronously delete messages from Telegram (fire-and-forget)
-    c.executionCtx.waitUntil(
-      fetch(`${TELEGRAM_API}/deleteMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: foundToken.telegramId,
-          message_id: foundToken.botMessageId,
-        }),
-      }).catch((e) => console.error("Failed to delete bot message", e))
-    );
-    c.executionCtx.waitUntil(
-      fetch(`${TELEGRAM_API}/deleteMessage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chat_id: foundToken.telegramId,
-          message_id: foundToken.userMessageId,
-        }),
-      }).catch((e) => console.error("Failed to delete user message", e))
-    );
+    // --- START OF FINAL FIX ---
+    // This function will be executed in the background. By placing a try/catch
+    // INSIDE it, we ensure that any error (like a failed fetch) is contained
+    // and cannot possibly affect the main request handler's execution.
+    const deleteMessagesInBackground = async () => {
+      try {
+        await fetch(`${TELEGRAM_API}/deleteMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: foundToken.telegramId,
+            message_id: foundToken.botMessageId,
+          }),
+        });
+        await fetch(`${TELEGRAM_API}/deleteMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: foundToken.telegramId,
+            message_id: foundToken.userMessageId,
+          }),
+        });
+      } catch (e) {
+        console.error("Non-blocking error during background message deletion:", e.message);
+      }
+    };
+    c.executionCtx.waitUntil(deleteMessagesInBackground());
+    // --- END OF FINAL FIX ---
 
     let user = await db.findUserByProviderId(c.env.DB, {
       provider: "telegram",
