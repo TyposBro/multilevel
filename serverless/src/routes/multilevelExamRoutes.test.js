@@ -82,4 +82,36 @@ describe("Multilevel Exam Routes", () => {
     expect(body.resultId).toBe("result-xyz");
     expect(db.createMultilevelExamResult).toHaveBeenCalled();
   });
+
+  it("POST /api/exam/multilevel/analyze should return 403 if free user exceeds daily part practice limit", async () => {
+    // Arrange
+    const mockFreeUser = {
+      id: "free-user-2",
+      subscription_tier: "free",
+      // Mock the part practice counter, not the full exam counter
+      dailyUsage_partPractices_count: 3, // The limit is 3
+      dailyUsage_partPractices_lastReset: new Date().toISOString(),
+    };
+    db.getUserById.mockResolvedValue(mockFreeUser);
+    const token = await generateToken({ env: MOCK_ENV }, mockFreeUser.id);
+
+    // Act
+    const res = await app.request(
+      "/api/exam/multilevel/analyze",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transcript: [{ speaker: "User", text: "hello" }],
+          practicePart: "P1_1", // Specify this is a part practice
+        }),
+      },
+      MOCK_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.message).toContain("all 3 of your free part practices");
+  });
 });

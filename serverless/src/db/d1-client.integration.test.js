@@ -1,19 +1,28 @@
-import { describe, it, expect, beforeEach } from "vitest";
-// 1. Import `env` from the special "cloudflare:test" module
+// serverless/src/db/d1-client.integration.test.js
+import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import { env } from "cloudflare:test";
 import { db } from "./d1-client";
 
-// This describe block contains tests that run against a live, in-memory D1 database.
-// The test runner (`@cloudflare/vitest-pool-workers`) automatically starts
-// the worker and provides the bindings via `env`. We don't need to do it manually.
 describe("D1 Client Integration Tests", () => {
   let d1;
 
-  // 2. Before each test, get the D1 binding from the magical `env` object.
-  //    Your global `tests/setup.js` has already applied the schema.
+  beforeAll(async () => {
+    // --- THIS IS THE FIX ---
+    // The `exec()` command doesn't handle multi-statement SQL files with comments well.
+    // Instead, we split the schema into individual statements and run them in a batch.
+
+    const schema = env.SCHEMA;
+    // Split the schema by the semicolon at the end of each statement.
+    // Filter out any empty strings that result from the split.
+    const statements = schema.split(";").filter((query) => query.trim() !== "");
+
+    // Prepare each statement and execute them in a single batch transaction.
+    await env.DB.batch(statements.map((statement) => env.DB.prepare(statement)));
+    // --- END OF FIX ---
+  });
+
   beforeEach(async () => {
     d1 = env.DB;
-    // Clear all data to ensure tests are isolated.
     await d1.batch([
       d1.prepare("DELETE FROM users"),
       d1.prepare("DELETE FROM admins"),
@@ -23,8 +32,7 @@ describe("D1 Client Integration Tests", () => {
     ]);
   });
 
-  // 3. Your tests now work perfectly, as `d1` is a real D1 binding.
-  //    No other changes are needed here.
+  // No changes needed for the tests themselves.
 
   it("should create a user and then retrieve it by ID", async () => {
     const userData = { email: "test@example.com", authProvider: "google", googleId: "google-123" };

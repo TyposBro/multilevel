@@ -58,4 +58,30 @@ describe("Auth Routes & Middleware", () => {
     );
     expect(res.status).toBe(401);
   });
+
+  it("DELETE /api/auth/profile should delete the user", async () => {
+    // Arrange
+    const mockUser = { id: "user-to-delete-789", email: "delete@me.com" };
+    db.getUserById.mockResolvedValue(mockUser);
+    db.deleteUser.mockResolvedValue(undefined); // deleteUser doesn't return anything
+    const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
+
+    // Act
+    const res = await app.request(
+      "/api/auth/profile",
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      },
+      MOCK_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.message).toContain("deleted successfully");
+
+    expect(db.deleteUser).toHaveBeenCalledOnce();
+    expect(db.deleteUser).toHaveBeenCalledWith(MOCK_ENV.DB, mockUser.id);
+  });
 });

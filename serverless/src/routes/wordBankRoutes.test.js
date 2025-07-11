@@ -29,4 +29,56 @@ describe("Word Bank Routes", () => {
     expect(body).toEqual(["A1", "B2", "C1"]);
     expect(db.getWordBankLevels).toHaveBeenCalledOnce();
   });
+
+  it("GET /api/wordbank/topics should return topics for a given level", async () => {
+    // Arrange
+    const MOCK_ENV = { DB: db };
+    db.getWordBankTopics.mockResolvedValue(["Technology", "Health"]);
+    const level = "B2";
+
+    // Act
+    const res = await app.request(`/api/wordbank/topics?level=${level}`, {}, MOCK_ENV);
+
+    // Assert
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual(["Technology", "Health"]);
+    expect(db.getWordBankTopics).toHaveBeenCalledWith(MOCK_ENV.DB, level);
+  });
+
+  it("GET /api/wordbank/words should return words for a given level and topic", async () => {
+    // Arrange
+    const MOCK_ENV = { DB: db };
+    const mockWords = [{ id: "word-1", word: "algorithm", topic: "Technology" }];
+    db.getWordBankWords.mockResolvedValue(mockWords);
+    const level = "B2";
+    const topic = "Technology";
+
+    // Act
+    const res = await app.request(
+      `/api/wordbank/words?level=${level}&topic=${topic}`,
+      {},
+      MOCK_ENV
+    );
+
+    // Assert
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual(mockWords);
+    expect(db.getWordBankWords).toHaveBeenCalledWith(MOCK_ENV.DB, level, topic);
+  });
+
+  it("GET /api/wordbank/words should return 400 if topic is missing", async () => {
+    // Arrange
+    const MOCK_ENV = { DB: db };
+    const level = "B2";
+
+    // Act
+    const res = await app.request(`/api/wordbank/words?level=${level}`, {}, MOCK_ENV);
+
+    // Assert
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.message).toContain("topic query parameters are required");
+  });
 });

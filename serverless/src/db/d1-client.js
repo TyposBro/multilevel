@@ -289,11 +289,16 @@ export const db = {
         .first();
 
       if (foundToken) {
-        // Check for expiration manually
+        // The D1 `createdAt` is a UTC string. To compare it reliably,
+        // we need to parse it as such. Appending 'Z' tells the Date constructor
+        // to parse it as a UTC time, avoiding timezone issues.
+        const createdAtDate = new Date(foundToken.createdAt + "Z");
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-        if (new Date(foundToken.createdAt) < fiveMinutesAgo) {
+
+        if (createdAtDate < fiveMinutesAgo) {
           // Token expired, delete it and return null
           await d1.prepare("DELETE FROM one_time_tokens WHERE token = ?").bind(token).run();
+          console.log(`[DB] Expired token found and deleted: ${token}`);
           return null;
         }
 
