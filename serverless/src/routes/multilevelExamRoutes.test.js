@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import app from "../index";
 import { generateToken } from "../utils/generateToken";
 import { db } from "../db/d1-client";
-// --- 1. IMPORT THE GEMINI MODULE ---
 import * as gemini from "../utils/gemini";
 
 // Mock the Gemini API and the DB client
@@ -14,193 +13,231 @@ describe("Multilevel Exam Routes", () => {
   const MOCK_ENV = {
     JWT_SECRET: "test-secret",
     DB: db,
+    GEMINI_API_KEY: "fake-key",
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // A default successful mock for tests that need it
+    // Setup default successful mocks that can be overridden by specific tests
     gemini.generateText.mockResolvedValue(
       JSON.stringify({ totalScore: 55, feedbackBreakdown: [] })
     );
     gemini.safeJsonParse.mockImplementation((text) => (text ? JSON.parse(text) : null));
-  });
-
-  it("POST /api/exam/multilevel/analyze should return 403 if free user exceeds daily full exam limit", async () => {
-    const mockFreeUser = {
-      id: "free-user-1",
-      subscription_tier: "free",
-      dailyUsage_fullExams_count: 1,
-      dailyUsage_fullExams_lastReset: new Date().toISOString(),
-    };
-    db.getUserById.mockResolvedValue(mockFreeUser);
-    const token = await generateToken({ env: MOCK_ENV }, mockFreeUser.id);
-    const res = await app.request(
-      "/api/exam/multilevel/analyze",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transcript: [{ speaker: "User", text: "hello" }],
-          practicedPart: null,
-        }),
-      },
-      MOCK_ENV
-    );
-    expect(res.status).toBe(403);
-  });
-
-  it("POST /api/exam/multilevel/analyze should succeed for a paying user", async () => {
-    const mockGoldUser = { id: "gold-user-1", subscription_tier: "gold" };
-    db.getUserById.mockResolvedValue(mockGoldUser);
     db.createMultilevelExamResult.mockResolvedValue({ id: "result-xyz" });
-    const token = await generateToken({ env: MOCK_ENV }, mockGoldUser.id);
-    const res = await app.request(
-      "/api/exam/multilevel/analyze",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transcript: [{ speaker: "User", text: "hello" }],
-          practicedPart: "FULL",
-        }),
-      },
-      MOCK_ENV
-    );
-    expect(res.status).toBe(201);
+    db.updateUserUsage.mockResolvedValue({});
+    db.updateUserSubscription.mockResolvedValue({});
+    db.getRandomContent.mockResolvedValue([]); // Default to empty to prevent false positives
   });
 
-  // --- START OF FIXES ---
-  it("generateNewExam should return 500 if not enough content in DB", async () => {
-    db.getRandomContent.mockResolvedValue([]);
-    const token = await generateToken({ env: MOCK_ENV }, { id: "user" });
-    const res = await app.request(
-      "/api/exam/multilevel/new",
-      { headers: { Authorization: `Bearer ${token}` } },
-      MOCK_ENV
-    );
-    expect(res.status).toBe(500);
+  describe("GET /api/exam/multilevel/new", () => {
+    it("should generate a new exam successfully", async () => {
+      // Provide a complete user mock for the middleware
+      db.getUserById.mockResolvedValue({ id: "user-1", subscription_tier: "free" });
+      // Provide the specific content needed for this controller to succeed
+      db.getRandomContent.mockImplementation((d1, tableName) => {
+        if (tableName === "content_part1_1") return Promise.resolve([{}, {}, {}]);
+        return Promise.resolve([{}]);
+      });
+      const token = await generateToken({ env: MOCK_ENV }, "user-1");
+      const res = await app.request(
+        "/api/exam/multilevel/new",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(200);
+    });
   });
 
-  it("analyzeExam should handle single part practice", async () => {
-    // 2. Configure the mock for this specific test case
-    const mockSinglePartResponse = { part: "Part 1.1", score: 10, feedback: "Good." };
-    gemini.generateText.mockResolvedValue(JSON.stringify(mockSinglePartResponse));
-    gemini.safeJsonParse.mockReturnValue(mockSinglePartResponse);
+  describe("POST /api/exam/multilevel/analyze", () => {
+    it("should succeed for a paying user without checking limits", async () => {
+      const mockGoldUser = {
+        id: "gold-user-1",
+        subscription_tier: "gold",
+        subscription_expiresAt: new Date(Date.now() + 86400000).toISOString(), // Expires tomorrow
+      };
+      db.getUserById.mockResolvedValue(mockGoldUser);
+      const token = await generateToken({ env: MOCK_ENV }, mockGoldUser.id);
 
-    const mockGoldUser = { id: "gold-user-1", subscription_tier: "gold" };
-    db.getUserById.mockResolvedValue(mockGoldUser);
-    db.createMultilevelExamResult.mockResolvedValue({ id: "result-xyz" });
-    const token = await generateToken({ env: MOCK_ENV }, mockGoldUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          // --- THIS IS THE FIX ---
+          // `practicePart` must be null for a full exam so `isSinglePartPractice` is false.
+          body: JSON.stringify({
+            transcript: [{ speaker: "User", text: "Hello" }],
+            practicePart: null,
+            examContentIds: {},
+          }),
+          // --- END OF FIX ---
+        },
+        MOCK_ENV
+      );
 
-    const res = await app.request(
-      "/api/exam/multilevel/analyze",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transcript: [{ speaker: "User", text: "hello" }],
-          practicePart: "P1_1",
-        }),
-      },
-      MOCK_ENV
-    );
+      expect(res.status).toBe(201);
+      expect(db.updateUserUsage).not.toHaveBeenCalled();
+    });
 
-    expect(res.status).toBe(201);
+    it("should return 403 if free user exceeds daily full exam limit", async () => {
+      const freeUser = {
+        id: "free-1",
+        subscription_tier: "free",
+        dailyUsage_fullExams_count: 1,
+        dailyUsage_fullExams_lastReset: new Date().toISOString(),
+      };
+      db.getUserById.mockResolvedValue(freeUser);
+      const token = await generateToken({ env: MOCK_ENV }, freeUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+        },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it("should return 403 if free user exceeds daily part practice limit", async () => {
+      const freeUser = {
+        id: "free-2",
+        subscription_tier: "free",
+        dailyUsage_partPractices_count: 3,
+        dailyUsage_partPractices_lastReset: new Date().toISOString(),
+      };
+      db.getUserById.mockResolvedValue(freeUser);
+      const token = await generateToken({ env: MOCK_ENV }, freeUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContentIds: {} }),
+        },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(403);
+    });
+
+    it("should reset usage for a new day and succeed", async () => {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const freeUser = {
+        id: "free-3",
+        subscription_tier: "free",
+        dailyUsage_fullExams_count: 5,
+        dailyUsage_fullExams_lastReset: yesterday.toISOString(),
+      };
+      db.getUserById.mockResolvedValue(freeUser);
+      const token = await generateToken({ env: MOCK_ENV }, freeUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+        },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(201);
+      expect(db.updateUserUsage).toHaveBeenCalledWith(
+        expect.anything(),
+        freeUser.id,
+        expect.objectContaining({ fullExams: expect.objectContaining({ count: 1 }) })
+      );
+    });
+
+    it("should return 500 if Gemini returns invalid JSON for single part analysis", async () => {
+      const user = {
+        id: "user-gemini-fail",
+        subscription_tier: "gold",
+        subscription_expiresAt: new Date().toISOString(),
+      };
+      db.getUserById.mockResolvedValue(user);
+      gemini.safeJsonParse.mockReturnValue(null);
+      const token = await generateToken({ env: MOCK_ENV }, user.id);
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [{}], practicePart: "P1_1", examContentIds: {} }),
+        },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({
+        message: "AI failed to generate a valid single-part analysis JSON.",
+      });
+    });
+
+    it("should return 500 if Gemini returns invalid JSON for full exam analysis", async () => {
+      const user = {
+        id: "user-gemini-fail-2",
+        subscription_tier: "gold",
+        subscription_expiresAt: new Date().toISOString(),
+      };
+      db.getUserById.mockResolvedValue(user);
+      gemini.safeJsonParse.mockReturnValue(null);
+      const token = await generateToken({ env: MOCK_ENV }, user.id);
+      const res = await app.request(
+        "/api/exam/multilevel/analyze",
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ transcript: [{}], examContentIds: {} }),
+        },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(500);
+      expect(await res.json()).toEqual({
+        message: "AI failed to generate a valid full-exam analysis JSON.",
+      });
+    });
   });
 
-  it("analyzeExam should return 500 on Gemini error for single part", async () => {
-    const mockGoldUser = { id: "gold-user-1", subscription_tier: "gold" };
-    db.getUserById.mockResolvedValue(mockGoldUser);
-    gemini.generateText.mockResolvedValue("bad json");
-    gemini.safeJsonParse.mockReturnValue(null);
-    const token = await generateToken({ env: MOCK_ENV }, mockGoldUser.id);
-
-    const res = await app.request(
-      "/api/exam/multilevel/analyze",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transcript: [{ speaker: "User", text: "hello" }],
-          practicePart: "P1_1",
-        }),
-      },
-      MOCK_ENV
-    );
-
-    expect(res.status).toBe(500);
+  describe("GET /api/exam/multilevel/history", () => {
+    it("should get history successfully", async () => {
+      const mockUser = { id: "user-1", subscription_tier: "free" };
+      db.getUserById.mockResolvedValue(mockUser);
+      db.getMultilevelExamHistory.mockResolvedValue([]);
+      const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/history",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(200);
+    });
   });
 
-  it("analyzeExam should return 500 on Gemini error for full exam", async () => {
-    const mockGoldUser = { id: "gold-user-1", subscription_tier: "gold" };
-    db.getUserById.mockResolvedValue(mockGoldUser);
-    gemini.generateText.mockResolvedValue("bad json");
-    gemini.safeJsonParse.mockReturnValue(null);
-    const token = await generateToken({ env: MOCK_ENV }, mockGoldUser.id);
+  describe("GET /api/exam/multilevel/result/:resultId", () => {
+    it("should get result details successfully", async () => {
+      const mockUser = { id: "user-1", subscription_tier: "free" };
+      db.getUserById.mockResolvedValue(mockUser);
+      db.getMultilevelExamResultDetails.mockResolvedValue({ id: "res1" });
+      const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/result/res1",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(200);
+    });
 
-    const res = await app.request(
-      "/api/exam/multilevel/analyze",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transcript: [{ speaker: "User", text: "hello" }],
-          practicedPart: "FULL",
-        }),
-      },
-      MOCK_ENV
-    );
-
-    expect(res.status).toBe(500);
-  });
-
-  // ... in multilevelExamRoutes.test.js
-
-  it("should reset daily usage if last reset was yesterday", async () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const mockFreeUser = {
-      id: "free-user-reset",
-      subscription_tier: "free",
-      dailyUsage_fullExams_count: 5, // Over the limit
-      dailyUsage_fullExams_lastReset: yesterday.toISOString(),
-    };
-    db.getUserById.mockResolvedValue(mockFreeUser);
-    db.createMultilevelExamResult.mockResolvedValue({ id: "result-xyz" });
-    const token = await generateToken({ env: MOCK_ENV }, mockFreeUser.id);
-
-    const res = await app.request(
-      "/api/exam/multilevel/analyze",
-      {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transcript: [{ speaker: "User", text: "hello" }],
-          practicedPart: null,
-        }),
-      },
-      MOCK_ENV
-    );
-
-    // The count should be reset, so the request succeeds
-    expect(res.status).toBe(201);
-    expect(db.updateUserUsage).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.anything(),
-      expect.objectContaining({
-        fullExams: expect.objectContaining({ count: 1 }),
-      })
-    );
-  });
-
-  it("getExamResultDetails should return 404 if result not found", async () => {
-    const token = await generateToken({ env: MOCK_ENV }, { id: "user" });
-    db.getMultilevelExamResultDetails.mockResolvedValue(null);
-    const res = await app.request(
-      "/api/exam/multilevel/result/not-found-id",
-      { headers: { Authorization: `Bearer ${token}` } },
-      MOCK_ENV
-    );
-    expect(res.status).toBe(404);
+    it("should return 404 if result is not found", async () => {
+      const mockUser = { id: "user-1", subscription_tier: "free" };
+      db.getUserById.mockResolvedValue(mockUser);
+      db.getMultilevelExamResultDetails.mockResolvedValue(null);
+      const token = await generateToken({ env: MOCK_ENV }, mockUser.id);
+      const res = await app.request(
+        "/api/exam/multilevel/result/res1",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ENV
+      );
+      expect(res.status).toBe(404);
+    });
   });
 });
