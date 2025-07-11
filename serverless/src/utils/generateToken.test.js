@@ -18,22 +18,23 @@ describe("Generate Token Utility", () => {
     const mockContext = { env: { JWT_SECRET_ADMIN: "test-admin-secret" } };
     const token = await generateToken(mockContext, adminPayload, true);
     const payload = await verify(token, mockContext.env.JWT_SECRET_ADMIN, "HS256");
+    expect(payload.id).toEqual(adminPayload.id);
+    expect(payload.email).toEqual(adminPayload.email);
+    expect(payload.exp).toBeDefined();
+  });
 
-    // --- START OF FINAL FIX ---
-    // Let's log the values to be certain
-    console.log("Decoded payload.id:", payload.id, `(Type: ${typeof payload.id})`);
-    console.log("Original adminPayload.id:", adminPayload.id, `(Type: ${typeof adminPayload.id})`);
+  it("should throw an error for an invalid payload type", async () => {
+    const mockContext = { env: { JWT_SECRET: "test-user-secret" } };
+    // Pass null as payload
+    await expect(generateToken(mockContext, null)).rejects.toThrow(
+      "Invalid payload data provided to generateToken"
+    );
+  });
 
-    // Use toEqual for a robust comparison and add a custom message for clarity if it fails
-    expect(
-      payload.id,
-      "The ID from the decoded token should match the original payload ID"
-    ).toEqual(adminPayload.id);
-    expect(
-      payload.email,
-      "The email from the decoded token should match the original payload email"
-    ).toEqual(adminPayload.email);
-    expect(payload.exp, "The token should have an expiration time").toBeDefined();
-    // --- END OF FINAL FIX ---
+  it("should throw an error if the JWT secret is missing", async () => {
+    const mockContext = { env: {} }; // No JWT_SECRET
+    await expect(generateToken(mockContext, "user-id")).rejects.toThrow(
+      "Server configuration error: Missing JWT secret."
+    );
   });
 });
