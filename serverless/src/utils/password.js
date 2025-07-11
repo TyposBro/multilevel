@@ -70,8 +70,23 @@ export async function verifyPassword(password, storedHash) {
 
     const actualHash = new Uint8Array(hashBuf);
 
-    // Constant-time comparison to prevent timing attacks
-    return crypto.subtle.timingSafeEqual(expectedHash, actualHash);
+    // --- START OF FIX ---
+    // Check if crypto.subtle.timingSafeEqual exists. If not, use a manual fallback.
+    // This makes the function compatible with both the Workers runtime and standard Node.js test environments.
+    if (crypto.subtle.timingSafeEqual) {
+      return crypto.subtle.timingSafeEqual(expectedHash, actualHash);
+    }
+
+    // Manual constant-time comparison fallback
+    if (expectedHash.length !== actualHash.length) {
+      return false;
+    }
+    let diff = 0;
+    for (let i = 0; i < expectedHash.length; i++) {
+      diff |= expectedHash[i] ^ actualHash[i];
+    }
+    return diff === 0;
+    // --- END OF FIX ---
   } catch (error) {
     console.error("Error during password verification:", error);
     return false;
