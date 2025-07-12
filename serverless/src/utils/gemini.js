@@ -50,7 +50,9 @@ export async function generateText(c, prompt) {
   // const model = "@cf/google/gemma-3-12b-it";
   // const model = "@cf/mistralai/mistral-small-3.1-24b-instruct";
   const model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-
+  // *** THE RECOMMENDED MODEL ***
+  // This model is fast, cheap, and excellent at following instructions.
+  // const model = "@cf/meta/llama-3.1-8b-instruct-fast";
   console.log("\n----------- PROMPT TO WORKERS AI -----------");
   console.log(prompt);
   console.log("-------------------------------------------\n");
@@ -60,7 +62,7 @@ export async function generateText(c, prompt) {
       prompt: prompt,
       // Instruct the model to return JSON
       response_format: { type: "json_object" },
-      max_tokens: 8192,
+      // max_tokens: 8192,
     });
 
     // The response from Workers AI is already a parsed JSON object
