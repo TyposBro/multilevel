@@ -142,9 +142,6 @@ fun MainScreen(
                 ProgressScreen(
                     onNavigateToIeltsResult = onNavigateToIeltsResult,
                     onNavigateToMultilevelResult = onNavigateToMultilevelResult,
-                    onNavigateToSubscription = {
-                        mainNavController.navigate(MainDestinations.SUBSCRIPTION_ROUTE)
-                    }
                 )
             }
             composable(MainDestinations.PROFILE_ROUTE) {
