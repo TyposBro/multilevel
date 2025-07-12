@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
 import javax.inject.Inject
 
 // An enum to identify the exam type in a type-safe way
@@ -104,7 +105,7 @@ private fun List<MultilevelExamResultEntity>.toMultilevelGenericSummary(): List<
             multilevelMaxScores[summary.practicedPart] ?: summary.totalScore
         GenericExamResultSummary(
             id = summary.id,
-            examDate = summary.createdAt.toLong(),
+            examDate = Instant.parse(summary.createdAt).toEpochMilli(),
             score = summary.totalScore.toDouble(),
             scoreLabel = "Score: ${summary.totalScore} / ${maxScore.toInt()}",
             type = ExamType.MULTILEVEL,

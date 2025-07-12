@@ -7,7 +7,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.R
-import com.typosbro.multilevel.data.remote.models.ExamContentIds
 import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
 import com.typosbro.multilevel.data.remote.models.RepositoryResult
@@ -307,11 +306,11 @@ class MultilevelExamViewModel @Inject constructor(
         _uiState.update { it.copy(stage = MultilevelExamStage.ANALYZING) }
         viewModelScope.launch {
             val examContent = uiState.value.examContent ?: return@launch
-            val contentIds = ExamContentIds(
-                part1_1 = examContent.part1_1.map { it.id },
-                part1_2 = examContent.part1_2.id,
-                part2 = examContent.part2.id,
-                part3 = examContent.part3.id
+            val contentIds = MultilevelExamResponse(
+                part1_1 = examContent.part1_1,
+                part1_2 = examContent.part1_2,
+                part2 = examContent.part2,
+                part3 = examContent.part3
             )
             // Add the specific practice part to the request, or null for a full exam
             val partString = if (practicePart == PracticePart.FULL) null else practicePart.name
@@ -319,7 +318,7 @@ class MultilevelExamViewModel @Inject constructor(
 
             when (val result = repository.analyzeExam(request)) {
                 is RepositoryResult.Success -> {
-                    _uiState.update { it.copy(finalResultId = result.data.resultId) }
+                    _uiState.update { it.copy(finalResultId = result.data) }
                 }
 
                 is RepositoryResult.Error -> {
