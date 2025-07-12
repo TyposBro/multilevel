@@ -27,6 +27,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -43,6 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.viewmodels.ExamType
 import com.typosbro.multilevel.ui.viewmodels.GenericExamResultSummary
+import com.typosbro.multilevel.ui.viewmodels.HistoryPeriod
 import com.typosbro.multilevel.ui.viewmodels.ProgressViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -56,18 +58,25 @@ private val multilevelPartOrder = listOf("FULL", "P1_1", "P1_2", "P2", "P3")
 fun ProgressScreen(
     onNavigateToIeltsResult: (resultId: String) -> Unit,
     onNavigateToMultilevelResult: (resultId: String) -> Unit,
+    onNavigateToSubscription: () -> Unit, // NEW: Callback to navigate to subscription page
     viewModel: ProgressViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // UPDATED: Logic to get the correct list based on main tab and sub-tab
+    // NEW: A side-effect to handle navigation when the user needs to subscribe
+    LaunchedEffect(uiState.navigateToSubscription) {
+        if (uiState.navigateToSubscription) {
+            onNavigateToSubscription()
+            viewModel.onSubscriptionNavigationHandled() // Reset the trigger
+        }
+    }
+
     val currentHistory = when (uiState.selectedTab) {
         ExamType.IELTS -> uiState.ieltsHistory
         ExamType.MULTILEVEL -> uiState.multilevelHistory[uiState.selectedMultilevelPart]
             ?: emptyList()
     }
 
-    // A helper map to define max scores for the chart
     val multilevelMaxScores = mapOf(
         "FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0
     )
@@ -84,7 +93,6 @@ fun ProgressScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // NEW: Conditionally show the Multilevel part switcher
             if (uiState.selectedTab == ExamType.MULTILEVEL && uiState.multilevelHistory.isNotEmpty()) {
                 MultilevelPartSwitcher(
                     availableParts = uiState.multilevelHistory.keys,
@@ -92,6 +100,13 @@ fun ProgressScreen(
                     onPartSelected = { viewModel.selectMultilevelPart(it) }
                 )
             }
+
+            // NEW: History period switcher
+            HistoryPeriodSwitcher(
+                selectedPeriod = uiState.selectedPeriod,
+                onPeriodSelected = { viewModel.selectPeriod(it) }
+            )
+
 
             if (uiState.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -155,13 +170,42 @@ fun ProgressScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun HistoryPeriodSwitcher(
+    selectedPeriod: HistoryPeriod,
+    onPeriodSelected: (HistoryPeriod) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val periods = HistoryPeriod.entries.toTypedArray()
+    SingleChoiceSegmentedButtonRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        periods.forEachIndexed { index, period ->
+            SegmentedButton(
+                selected = period == selectedPeriod,
+                onClick = { onPeriodSelected(period) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = periods.size)
+            ) {
+                val label = when (period) {
+                    HistoryPeriod.SEVEN_DAYS -> "7 days"
+                    HistoryPeriod.ONE_MONTH -> "1 month"
+                    HistoryPeriod.SIX_MONTHS -> "6 months"
+                }
+                Text(label)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun MultilevelPartSwitcher(
     availableParts: Set<String>,
     selectedPart: String,
     onPartSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Filter and order the parts that actually have history data
     val partsToShow = multilevelPartOrder.filter { it in availableParts }
 
     if (partsToShow.size > 1) {
@@ -179,7 +223,6 @@ fun MultilevelPartSwitcher(
                         count = partsToShow.size
                     ),
                 ) {
-                    // Make labels more user-friendly
                     val label = when (part) {
                         "FULL" -> "Full"
                         "P1_1" -> "1.1"
