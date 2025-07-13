@@ -38,7 +38,7 @@ export const safeJsonParse = (text) => {
  * @param {Array<object>} messages - The messages to send to the model (in OpenAI chat format).
  * @returns {Promise<string>} The text content of the response.
  */
-export async function generateGroqText(c, messages) {
+export async function generateText(c, messages) {
   const apiKey = c.env.GROQ_API_KEY;
   if (!apiKey) {
     throw new Error("FATAL ERROR: GROQ_API_KEY is not set in wrangler.toml secrets.");
