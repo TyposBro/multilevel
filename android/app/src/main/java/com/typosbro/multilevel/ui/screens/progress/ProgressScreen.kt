@@ -13,21 +13,24 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -36,7 +39,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -96,21 +101,16 @@ fun ProgressScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Duration Filter
-            DurationFilterRow(
+            // Filters Row
+            FiltersRow(
                 selectedDuration = uiState.selectedDuration,
                 onDurationSelected = { viewModel.selectDuration(it) },
+                selectedTab = uiState.selectedTab,
+                availableMultilevelParts = availableMultilevelParts,
+                selectedMultilevelPart = uiState.selectedMultilevelPart,
+                onMultilevelPartSelected = { viewModel.selectMultilevelPart(it) },
                 modifier = Modifier.fillMaxWidth()
             )
-
-            // Multilevel Part Filter (only show for multilevel tab)
-            if (uiState.selectedTab == ExamType.MULTILEVEL && availableMultilevelParts.isNotEmpty()) {
-                MultilevelPartSwitcher(
-                    availableParts = availableMultilevelParts,
-                    selectedPart = uiState.selectedMultilevelPart,
-                    onPartSelected = { viewModel.selectMultilevelPart(it) }
-                )
-            }
 
             if (uiState.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -203,6 +203,160 @@ fun ProgressScreen(
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun FiltersRow(
+    selectedDuration: DurationFilter,
+    onDurationSelected: (DurationFilter) -> Unit,
+    selectedTab: ExamType,
+    availableMultilevelParts: Set<String>,
+    selectedMultilevelPart: String,
+    onMultilevelPartSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Duration Filter Dropdown
+        DurationFilterDropdown(
+            selectedDuration = selectedDuration,
+            onDurationSelected = onDurationSelected,
+            modifier = Modifier.weight(1f)
+        )
+
+        // Multilevel Part Filter Dropdown (only show for multilevel tab)
+        if (selectedTab == ExamType.MULTILEVEL && availableMultilevelParts.isNotEmpty()) {
+            val partsToShow = multilevelPartOrder.filter { it in availableMultilevelParts }
+            if (partsToShow.size > 1) {
+                MultilevelPartDropdown(
+                    availableParts = partsToShow,
+                    selectedPart = selectedMultilevelPart,
+                    onPartSelected = onMultilevelPartSelected,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DurationFilterDropdown(
+    selectedDuration: DurationFilter,
+    onDurationSelected: (DurationFilter) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box(modifier = modifier) {
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.FilterList,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = selectedDuration.displayName,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DurationFilter.values().forEach { duration ->
+                DropdownMenuItem(
+                    text = { Text(duration.displayName) },
+                    onClick = {
+                        onDurationSelected(duration)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MultilevelPartDropdown(
+    availableParts: List<String>,
+    selectedPart: String,
+    onPartSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val getPartLabel = { part: String ->
+        when (part) {
+            "FULL" -> "Full Mock"
+            "P1_1" -> "Part 1.1"
+            "P1_2" -> "Part 1.2"
+            "P2" -> "Part 2"
+            "P3" -> "Part 3"
+            else -> part
+        }
+    }
+
+    Box(modifier = modifier) {
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = getPartLabel(selectedPart),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            availableParts.forEach { part ->
+                DropdownMenuItem(
+                    text = { Text(getPartLabel(part)) },
+                    onClick = {
+                        onPartSelected(part)
+                        expanded = false
+                    }
+                )
             }
         }
     }
@@ -317,30 +471,6 @@ fun StatItem(
 }
 
 @Composable
-fun DurationFilterRow(
-    selectedDuration: DurationFilter,
-    onDurationSelected: (DurationFilter) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    LazyRow(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 0.dp)
-    ) {
-        items(DurationFilter.values()) { duration ->
-            FilterChip(
-                selected = duration == selectedDuration,
-                onClick = { onDurationSelected(duration) },
-                label = { Text(duration.displayName) },
-                leadingIcon = if (duration == selectedDuration) {
-                    { Icon(Icons.Default.FilterList, contentDescription = null) }
-                } else null
-            )
-        }
-    }
-}
-
-@Composable
 fun EmptyStateCard(
     selectedTab: ExamType,
     selectedDuration: DurationFilter,
@@ -385,46 +515,6 @@ fun EmptyStateCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MultilevelPartSwitcher(
-    availableParts: Set<String>,
-    selectedPart: String,
-    onPartSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val partsToShow = multilevelPartOrder.filter { it in availableParts }
-
-    if (partsToShow.size > 1) {
-        SingleChoiceSegmentedButtonRow(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp)
-        ) {
-            partsToShow.forEachIndexed { index, part ->
-                SegmentedButton(
-                    selected = part == selectedPart,
-                    onClick = { onPartSelected(part) },
-                    shape = SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = partsToShow.size
-                    ),
-                ) {
-                    val label = when (part) {
-                        "FULL" -> "Full Mock"
-                        "P1_1" -> "Part 1.1"
-                        "P1_2" -> "Part 1.2"
-                        "P2" -> "Part 2"
-                        "P3" -> "Part 3"
-                        else -> part
-                    }
-                    Text(label)
-                }
-            }
         }
     }
 }
