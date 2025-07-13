@@ -44,7 +44,7 @@ export async function generateGroqText(c, messages) {
     throw new Error("FATAL ERROR: GROQ_API_KEY is not set in wrangler.toml secrets.");
   }
 
-  const model = "meta-llama/llama-4-scout-17b-16e-instruct"; // The Groq model you want to use
+  const model = "meta-llama/llama-4-maverick-17b-128e-instruct"; // The Groq model you want to use
   const url = `${GROQ_API_BASE_URL}/chat/completions`;
 
   console.log("\n----------- PROMPT TO GROQ -----------");
