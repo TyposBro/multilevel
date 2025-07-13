@@ -1,6 +1,6 @@
-// {PATH_TO_PROJECT}/src/utils/gemini.js
+// {PATH_TO_PROJECT}/src/utils/groq.js
 
-const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+const GROQ_API_BASE_URL = "https://api.groq.com/openai/v1";
 
 /**
  * A robust JSON parser that extracts JSON from a string,
@@ -33,42 +33,54 @@ export const safeJsonParse = (text) => {
 };
 
 /**
- * Generates a single, non-streamed response from the Gemini model using its REST API.
+ * Generates a single, non-streamed response from the Groq model using its REST API.
  * @param {object} c - The Hono context, for accessing environment variables.
- * @param {string} prompt - The prompt to send to the model.
+ * @param {Array<object>} messages - The messages to send to the model (in OpenAI chat format).
  * @returns {Promise<string>} The text content of the response.
  */
-export async function generateText(c, prompt) {
-  const apiKey = c.env.GEMINI_API_KEY;
+export async function generateGroqText(c, messages) {
+  const apiKey = c.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("FATAL ERROR: GEMINI_API_KEY is not set in wrangler.toml secrets.");
+    throw new Error("FATAL ERROR: GROQ_API_KEY is not set in wrangler.toml secrets.");
   }
 
-  const model = "gemini-2.5-flash"; // Or another Gemini model you prefer
-  const url = `${GEMINI_API_BASE_URL}/${model}:generateContent?key=${apiKey}`;
+  const model = "meta-llama/llama-4-scout-17b-16e-instruct"; // The Groq model you want to use
+  const url = `${GROQ_API_BASE_URL}/chat/completions`;
 
-  console.log("\n----------- PROMPT TO GEMINI -----------");
-  console.log(prompt);
+  console.log("\n----------- PROMPT TO GROQ -----------");
+  console.log(JSON.stringify(messages, null, 2));
   console.log("----------------------------------------\n");
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      messages: messages,
+      model: model,
+      temperature: 1,
+      max_tokens: 8192, // Max tokens for the Groq model
+      top_p: 1,
+      stream: false,
+      response_format: {
+        type: "json_object",
+      },
+      stop: null,
     }),
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    console.error("Gemini API Error:", errorBody);
-    throw new Error(`Gemini API request failed with status ${response.status}`);
+    console.error("Groq API Error:", errorBody);
+    throw new Error(`Groq API request failed with status ${response.status}`);
   }
 
   const data = await response.json();
-  const text = data.candidates[0]?.content?.parts[0]?.text || "";
+  const text = data.choices[0]?.message?.content || "";
 
-  console.log("\n---------- RAW RESPONSE FROM GEMINI ----------");
+  console.log("\n---------- RAW RESPONSE FROM GROQ ----------");
   console.log(text);
   console.log("------------------------------------------\n");
 
