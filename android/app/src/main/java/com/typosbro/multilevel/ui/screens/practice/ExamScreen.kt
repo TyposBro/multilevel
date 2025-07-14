@@ -46,8 +46,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.ParagraphStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextIndent
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -395,15 +399,17 @@ fun Part1_1_View(uiState: MultilevelUiState) {
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Text(
                 text = uiState.currentQuestionText ?: "Loading question...",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineLarge, // Made bigger
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(20.dp)
+                fontWeight = FontWeight.Bold, // Made bolder
+                lineHeight = 32.sp, // Added line height for better readability
+                modifier = Modifier.padding(28.dp) // Increased padding
             )
         }
     }
@@ -421,11 +427,11 @@ fun Part1_2_View(uiState: MultilevelUiState) {
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(160.dp),
+                        .height(180.dp), // Increased height for better image display
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     ImageLoader(
@@ -443,12 +449,14 @@ fun Part1_2_View(uiState: MultilevelUiState) {
                             .clip(RoundedCornerShape(12.dp))
                     )
                 }
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = uiState.currentQuestionText ?: "Loading question...",
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.headlineMedium, // Made bigger
                     textAlign = TextAlign.Center,
-                    lineHeight = 24.sp
+                    fontWeight = FontWeight.Bold, // Made bolder
+                    lineHeight = 28.sp, // Better line height
+                    color = MaterialTheme.colorScheme.primary // Made more prominent
                 )
             }
         }
@@ -458,6 +466,7 @@ fun Part1_2_View(uiState: MultilevelUiState) {
 @Composable
 fun Part2_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part2
+    val questionText = uiState.currentQuestionText ?: "Loading question..."
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -471,21 +480,43 @@ fun Part2_View(uiState: MultilevelUiState) {
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                ImageLoader(
-                    imageUrl = content?.imageUrl,
-                    contentDescription = "Part 2 Image",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                )
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = uiState.currentQuestionText ?: "Loading question...",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Start,
-                    lineHeight = 26.sp
-                )
+                // MODIFIED: Conditionally display image
+                if (!content?.imageUrl.isNullOrBlank()) {
+                    ImageLoader(
+                        imageUrl = content?.imageUrl,
+                        contentDescription = "Part 2 Image",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+
+                // Format as bullet points
+                val bulletPoints = questionText.split("\n").filter { it.isNotBlank() }
+                val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 16.sp))
+
+                bulletPoints.forEach { point ->
+                    if (point.trim().isNotEmpty()) {
+                        // MODIFIED: Use buildAnnotatedString for hanging indent
+                        Text(
+                            buildAnnotatedString {
+                                withStyle(style = paragraphStyle) {
+                                    append("•\u00A0\u00A0") // Bullet with non-breaking spaces
+                                    append(point.trim())
+                                }
+                            },
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 30.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -514,50 +545,68 @@ fun Part3CueCard(topic: Part3Topic) {
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(24.dp)) {
             Text(
                 text = topic.topic,
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.headlineLarge,
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
+                lineHeight = 32.sp,
+                color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "FOR",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    topic.forPoints.forEach { point ->
-                        Text(
-                            text = "• $point",
-                            style = MaterialTheme.typography.bodyMedium,
-                            lineHeight = 22.sp,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "AGAINST",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    topic.againstPoints.forEach { point ->
-                        Text(
-                            text = "• $point",
-                            style = MaterialTheme.typography.bodyMedium,
-                            lineHeight = 22.sp,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                    }
-                }
+            Spacer(modifier = Modifier.height(28.dp))
+
+            val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 12.sp))
+
+            // --- FOR Section ---
+            Text(
+                text = "FOR",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            topic.forPoints.forEach { point ->
+                // MODIFIED: Use buildAnnotatedString for hanging indent
+                Text(
+                    buildAnnotatedString {
+                        withStyle(style = paragraphStyle) {
+                            append("•\u00A0\u00A0")
+                            append(point)
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 24.sp,
+                    modifier = Modifier.padding(bottom = 14.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp)) // Spacer between sections
+
+            // --- AGAINST Section ---
+            Text(
+                text = "AGAINST",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            topic.againstPoints.forEach { point ->
+                // MODIFIED: Use buildAnnotatedString for hanging indent
+                Text(
+                    buildAnnotatedString {
+                        withStyle(style = paragraphStyle) {
+                            append("•\u00A0\u00A0")
+                            append(point)
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 24.sp,
+                    modifier = Modifier.padding(bottom = 14.dp)
+                )
             }
         }
     }

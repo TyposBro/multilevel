@@ -45,18 +45,6 @@ object NetworkModule {
             .build()
     }
 
-    @Provides
-    @Singleton
-    @Named("SseOkHttpClient")
-    fun provideSseOkHttpClient(authInterceptor: AuthInterceptor): OkHttpClient {
-        return OkHttpClient.Builder()
-            .addInterceptor(authInterceptor)
-            .addInterceptor(HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.BODY
-            })
-            .readTimeout(0, TimeUnit.SECONDS) // No read timeout for SSE
-            .build()
-    }
 
     // This is correct: It depends on the named OkHttpClient.
     @Provides
