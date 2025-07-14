@@ -18,11 +18,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +72,7 @@ fun MultilevelExamScreen(
     val snackbarHostState = remember { SnackbarHostState() }
 
     HandleAppLifecycle(onStop = viewModel::stopExam)
+
     // --- PERMISSION HANDLING ---
     var hasAudioPermission by remember {
         mutableStateOf(
@@ -94,65 +98,154 @@ fun MultilevelExamScreen(
 
     // --- UI ---
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Multilevel Speaking Test") }) },
+        topBar = { TopAppBar(title = { Text(getDynamicHeader(uiState.stage)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .padding(padding)
-                .fillMaxSize(),
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
         ) {
-            AnimatedContent(
-                targetState = uiState.stage,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "ExamStageAnimation"
-            ) { targetStage ->
-                when (targetStage) {
-                    MultilevelExamStage.NOT_STARTED -> ExamStartView(onStart = {
-                        if (hasAudioPermission) viewModel.startExam()
-                        else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    })
+            // Timer at the top - fixed position to prevent layout shift
+            TimerSection(uiState)
 
-                    MultilevelExamStage.LOADING -> LoadingView("Downloading exam content...")
-                    MultilevelExamStage.INTRO -> InstructionView(
-                        instruction = stringResource(R.string.PART1_1_INTRO),
-                        header = stringResource(R.string.PART1_HEADER)
-                    )
+            // Main content area
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                AnimatedContent(
+                    targetState = uiState.stage,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "ExamStageAnimation"
+                ) { targetStage ->
+                    when (targetStage) {
+                        MultilevelExamStage.NOT_STARTED -> ExamStartView(onStart = {
+                            if (hasAudioPermission) viewModel.startExam()
+                            else permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        })
 
-                    MultilevelExamStage.PART1_2_INTRO -> InstructionView(
-                        instruction = stringResource(
-                            R.string.PART1_2_INTRO
+                        MultilevelExamStage.LOADING -> LoadingView("Downloading exam content...")
+                        MultilevelExamStage.INTRO -> InstructionView(
+                            instruction = stringResource(R.string.PART1_1_INTRO),
                         )
-                    )
 
-                    MultilevelExamStage.PART2_INTRO -> InstructionView(
-                        instruction = stringResource(R.string.PART2_INTRO),
-                        header = stringResource(R.string.PART2_HEADER)
-                    )
+                        MultilevelExamStage.PART1_2_INTRO -> InstructionView(
+                            instruction = stringResource(R.string.PART1_2_INTRO)
+                        )
 
-                    MultilevelExamStage.PART3_INTRO -> InstructionView(
-                        instruction = stringResource(R.string.PART3_INTRO),
-                        header = stringResource(R.string.PART3_HEADER)
-                    )
+                        MultilevelExamStage.PART2_INTRO -> InstructionView(
+                            instruction = stringResource(R.string.PART2_INTRO),
+                        )
 
-                    MultilevelExamStage.PART1_1_QUESTION -> Part1_1_View(uiState)
-                    MultilevelExamStage.PART1_2_COMPARE,
-                    MultilevelExamStage.PART1_2_FOLLOWUP -> Part1_2_View(uiState)
+                        MultilevelExamStage.PART3_INTRO -> InstructionView(
+                            instruction = stringResource(R.string.PART3_INTRO),
+                        )
 
-                    MultilevelExamStage.PART2_PREP,
-                    MultilevelExamStage.PART2_SPEAKING -> Part2_View(uiState)
+                        MultilevelExamStage.PART1_1_QUESTION -> Part1_1_View(uiState)
+                        MultilevelExamStage.PART1_2_COMPARE,
+                        MultilevelExamStage.PART1_2_FOLLOWUP -> Part1_2_View(uiState)
 
-                    MultilevelExamStage.PART3_PREP,
-                    MultilevelExamStage.PART3_SPEAKING -> Part3_View(uiState)
+                        MultilevelExamStage.PART2_PREP,
+                        MultilevelExamStage.PART2_SPEAKING -> Part2_View(uiState)
 
-                    MultilevelExamStage.ANALYZING -> LoadingView("Analyzing your performance...")
-                    MultilevelExamStage.FINISHED_ERROR -> ErrorView(
-                        uiState.error ?: "An unknown error occurred."
-                    )
+                        MultilevelExamStage.PART3_PREP,
+                        MultilevelExamStage.PART3_SPEAKING -> Part3_View(uiState)
+
+                        MultilevelExamStage.ANALYZING -> LoadingView("Analyzing your performance...")
+                        MultilevelExamStage.FINISHED_ERROR -> ErrorView(
+                            uiState.error ?: "An unknown error occurred."
+                        )
+                    }
                 }
             }
         }
+    }
+}
+
+// --- Timer Section (Always present, hidden by transparency) ---
+@Composable
+fun TimerSection(uiState: MultilevelUiState) {
+    val stage = uiState.stage
+    val isPrep = stage == MultilevelExamStage.PART2_PREP || stage == MultilevelExamStage.PART3_PREP
+    val showTimer = uiState.timerValue > 0 && stage != MultilevelExamStage.NOT_STARTED &&
+            stage != MultilevelExamStage.LOADING && stage != MultilevelExamStage.ANALYZING &&
+            stage != MultilevelExamStage.FINISHED_ERROR && !stage.name.contains("INTRO")
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp), // Always maintain height
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = if (showTimer) 1f else 0f
+            )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (showTimer) 4.dp else 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            if (showTimer) {
+                Text(
+                    text = if (isPrep) "Preparation Time" else "Time Remaining",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = formatTime(uiState.timerValue),
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (uiState.timerValue <= 10) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
+                    if (uiState.isRecording) {
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Text(
+                            text = "● REC",
+                            color = Color.Red,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// --- Dynamic Header Function ---
+@Composable
+fun getDynamicHeader(stage: MultilevelExamStage): String {
+    return when (stage) {
+        MultilevelExamStage.NOT_STARTED -> "Multilevel Speaking Test"
+        MultilevelExamStage.LOADING -> "Loading..."
+        MultilevelExamStage.INTRO -> "Part 1: Introduction"
+        MultilevelExamStage.PART1_1_QUESTION -> "Part 1: Personal Questions"
+        MultilevelExamStage.PART1_2_INTRO -> "Part 1: Picture Comparison"
+        MultilevelExamStage.PART1_2_COMPARE,
+        MultilevelExamStage.PART1_2_FOLLOWUP -> "Part 1: Picture Comparison"
+
+        MultilevelExamStage.PART2_INTRO -> "Part 2: Monologue"
+        MultilevelExamStage.PART2_PREP,
+        MultilevelExamStage.PART2_SPEAKING -> "Part 2: Monologue"
+
+        MultilevelExamStage.PART3_INTRO -> "Part 3: Argument"
+        MultilevelExamStage.PART3_PREP,
+        MultilevelExamStage.PART3_SPEAKING -> "Part 3: Argument"
+
+        MultilevelExamStage.ANALYZING -> "Analyzing Results"
+        MultilevelExamStage.FINISHED_ERROR -> "Error"
     }
 }
 
@@ -160,87 +253,159 @@ fun MultilevelExamScreen(
 
 @Composable
 fun ExamStartView(onStart: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(24.dp)
+    ) {
         Text(
-            "Multilevel Speaking Practice",
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "This test has 3 parts and will take approximately 15 minutes to complete. Please ensure you are in a quiet environment.",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(id = R.string.notice_english_only),
-            style = MaterialTheme.typography.bodyMedium,
+            text = "Multilevel Speaking Practice",
+            style = MaterialTheme.typography.headlineLarge,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.primary
+            fontWeight = FontWeight.Bold
         )
-        Spacer(Modifier.height(32.dp))
-        Button(onClick = onStart) {
-            Text("Start Exam")
+        Spacer(modifier = Modifier.height(24.dp))
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
+            )
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    text = "This test has 3 parts and will take approximately 15 minutes to complete.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    lineHeight = 24.sp
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Please ensure you are in a quiet environment with a good microphone.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Text(
+                text = stringResource(id = R.string.notice_english_only),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(32.dp))
+        Button(
+            onClick = onStart,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
+            Text(
+                text = "Start Exam",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
 
-
 @Composable
 fun LoadingView(text: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        CircularProgressIndicator()
-        Spacer(Modifier.height(16.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(24.dp)
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(48.dp),
+            strokeWidth = 4.dp
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
 @Composable
 fun ErrorView(error: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(24.dp)
+    ) {
         Text(
-            "An Error Occurred",
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.error
+            text = "An Error Occurred",
+            style = MaterialTheme.typography.headlineMedium,
+            color = MaterialTheme.colorScheme.error,
+            fontWeight = FontWeight.Bold
         )
-        Spacer(Modifier.height(8.dp))
-        Text(error, textAlign = TextAlign.Center)
+        Spacer(modifier = Modifier.height(16.dp))
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer
+            )
+        ) {
+            Text(
+                text = error,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onErrorContainer,
+                modifier = Modifier.padding(16.dp)
+            )
+        }
     }
 }
 
-
 @Composable
-fun InstructionView(instruction: String, header: String? = null) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-        if (header != null) {
-            Text(
-                header,
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center
+fun InstructionView(instruction: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(24.dp)
+    ) {
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant
             )
-            Spacer(Modifier.height(16.dp))
+        ) {
+            Text(
+                text = instruction,
+                style = MaterialTheme.typography.bodyLarge,
+                lineHeight = 24.sp,
+                modifier = Modifier.padding(20.dp)
+            )
         }
-        Text(
-            text = instruction,
-            style = MaterialTheme.typography.titleMedium,
-            textAlign = TextAlign.Center
-        )
     }
 }
 
 @Composable
 fun Part1_1_View(uiState: MultilevelUiState) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-        Text("Part 1: Personal Questions", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(32.dp))
-        Text(
-            uiState.currentQuestionText ?: "...",
-            style = MaterialTheme.typography.headlineMedium,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(32.dp))
-        TimerAndRecordingIndicator(uiState)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(24.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            )
+        ) {
+            Text(
+                text = uiState.currentQuestionText ?: "Loading question...",
+                style = MaterialTheme.typography.headlineSmall,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(20.dp)
+            )
+        }
     }
 }
 
@@ -248,38 +413,45 @@ fun Part1_1_View(uiState: MultilevelUiState) {
 fun Part1_2_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part1_2
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-        Text("Part 1: Picture Comparison", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(16.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(100.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(24.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
-            ImageLoader(
-                content?.image1Url,
-                contentDescription = "Image 1",
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp)),
-            )
-            ImageLoader(
-                content?.image2Url,
-                contentDescription = "Image 2",
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(8.dp)),
-            )
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(160.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    ImageLoader(
+                        imageUrl = content?.image1Url,
+                        contentDescription = "Image 1",
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                    ImageLoader(
+                        imageUrl = content?.image2Url,
+                        contentDescription = "Image 2",
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                    )
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                Text(
+                    text = uiState.currentQuestionText ?: "Loading question...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 24.sp
+                )
+            }
         }
-        Spacer(Modifier.height(24.dp))
-        Text(
-            uiState.currentQuestionText ?: "...",
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(24.dp))
-        TimerAndRecordingIndicator(uiState)
     }
 }
 
@@ -287,127 +459,106 @@ fun Part1_2_View(uiState: MultilevelUiState) {
 fun Part2_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part2
 
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .padding(16.dp)
+            .padding(24.dp)
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
     ) {
-        Text("Part 2: Monologue", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(16.dp))
-        ImageLoader(
-            content?.imageUrl,
-            contentDescription = "Part 2 Image",
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(200.dp)
-                .clip(RoundedCornerShape(8.dp)),
-        )
-        Spacer(Modifier.height(24.dp))
-        Text(
-            uiState.currentQuestionText ?: "...",
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Start,
-            lineHeight = 24.sp,
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(Modifier.height(24.dp))
-        TimerAndRecordingIndicator(uiState)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                ImageLoader(
+                    imageUrl = content?.imageUrl,
+                    contentDescription = "Part 2 Image",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = uiState.currentQuestionText ?: "Loading question...",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Start,
+                    lineHeight = 26.sp
+                )
+            }
+        }
     }
 }
 
 @Composable
 fun Part3_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part3
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .padding(16.dp)
+            .padding(24.dp)
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
     ) {
-        Text("Part 3: Argument", style = MaterialTheme.typography.titleLarge)
-        Spacer(Modifier.height(16.dp))
         if (content != null) {
             Part3CueCard(content)
         }
-        Spacer(Modifier.height(24.dp))
-        TimerAndRecordingIndicator(uiState)
     }
 }
 
 @Composable
 fun Part3CueCard(topic: Part3Topic) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Text(
-                topic.topic,
-                style = MaterialTheme.typography.titleLarge,
+                text = topic.topic,
+                style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column(Modifier.weight(1f)) {
+            Spacer(modifier = Modifier.height(24.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "FOR",
+                        text = "FOR",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    topic.forPoints.forEach {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    topic.forPoints.forEach { point ->
                         Text(
-                            "• $it",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "• $point",
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 22.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
                 }
-                Column(Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "AGAINST",
+                        text = "AGAINST",
+                        style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
                     )
-                    topic.againstPoints.forEach {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    topic.againstPoints.forEach { point ->
                         Text(
-                            "• $it",
-                            style = MaterialTheme.typography.bodyMedium
+                            text = "• $point",
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 22.sp,
+                            modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
                 }
             }
-        }
-    }
-}
-
-
-@Composable
-fun TimerAndRecordingIndicator(uiState: MultilevelUiState) {
-    val stage = uiState.stage
-    val isPrep = stage == MultilevelExamStage.PART2_PREP || stage == MultilevelExamStage.PART3_PREP
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        if (uiState.timerValue > 0) {
-            Text(
-                if (isPrep) "Preparation Time" else "Time Remaining",
-                style = MaterialTheme.typography.titleMedium
-            )
-            Text(
-                formatTime(uiState.timerValue),
-                style = MaterialTheme.typography.displayMedium,
-                fontWeight = FontWeight.Bold,
-                color = if (uiState.timerValue <= 10) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
-            )
-        }
-        Spacer(Modifier.height(16.dp))
-        if (uiState.isRecording) {
-            Text(
-                "RECORDING",
-                color = Color.Red,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 2.sp
-            )
         }
     }
 }
