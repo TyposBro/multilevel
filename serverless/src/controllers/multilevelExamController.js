@@ -1,7 +1,7 @@
 // {PATH_TO_PROJECT}/src/controllers/multilevelExamController.js
 
 import { db } from "../db/d1-client.js";
-import { generateText, safeJsonParse } from "../utils/groq.js";
+import { generateText, safeJsonParse } from "../utils/gemini";
 import OFFERINGS from "../config/offerings";
 import { partAnalysisConfig } from "../config/partAnalysis";
 
