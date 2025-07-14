@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
@@ -43,8 +44,9 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.R
+import com.typosbro.multilevel.data.remote.models.ExamResultResponse
 import com.typosbro.multilevel.data.remote.models.FeedbackBreakdown
-import com.typosbro.multilevel.data.remote.models.MultilevelExamResultResponse
+import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import com.typosbro.multilevel.ui.viewmodels.MultilevelResultViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,7 +87,7 @@ fun MultilevelResultScreen(
 }
 
 @Composable
-fun MultilevelResultContent(result: MultilevelExamResultResponse) {
+fun MultilevelResultContent(result: ExamResultResponse) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     val feedbackString = stringResource(id = R.string.exam_result_feedback)
     val transcriptString = stringResource(id = R.string.exam_result_transcript)
@@ -205,6 +207,60 @@ fun FeedbackPartCard(feedback: FeedbackBreakdown) {
                 style = MaterialTheme.typography.bodyMedium,
                 lineHeight = 22.sp
             )
+        }
+    }
+}
+
+
+@Composable
+fun TranscriptTab(transcript: List<TranscriptEntry>) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        reverseLayout = true
+    ) {
+        items(transcript.reversed()) { entry ->
+            TranscriptItem(entry = entry)
+        }
+    }
+}
+
+@Composable
+fun TranscriptItem(entry: TranscriptEntry) {
+    val isUser = entry.speaker.equals("User", ignoreCase = true)
+    val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
+    val bubbleColor =
+        if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+    val shape =
+        if (isUser) MaterialTheme.shapes.medium.copy(bottomEnd = CornerSize(0.dp)) else MaterialTheme.shapes.medium.copy(
+            bottomStart = CornerSize(0.dp)
+        )
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = alignment
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(0.85f),
+            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
+        ) {
+            Text(
+                text = entry.speaker,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+            )
+            Card(
+                shape = shape,
+                colors = CardDefaults.cardColors(containerColor = bubbleColor)
+            ) {
+                Text(
+                    text = entry.text.trim(),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
         }
     }
 }

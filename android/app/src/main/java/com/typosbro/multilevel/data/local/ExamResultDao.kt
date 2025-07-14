@@ -7,13 +7,13 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 @Dao
-interface MultilevelExamResultDao {
+interface ExamResultDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(result: MultilevelExamResultEntity)
+    suspend fun insert(result: ExamResultEntity)
 
     @Query("SELECT * FROM multilevel_exam_results ORDER BY createdAt DESC")
-    fun getHistorySummary(): Flow<List<MultilevelExamResultEntity>>
+    fun getHistorySummary(): Flow<List<ExamResultEntity>>
 
     @Query("SELECT * FROM multilevel_exam_results WHERE id = :id")
-    fun getResultById(id: String): Flow<MultilevelExamResultEntity?>
+    fun getResultById(id: String): Flow<ExamResultEntity?>
 }

@@ -10,8 +10,7 @@ import androidx.room.TypeConverters
 @Database(
     entities = [
         WordEntity::class,
-        IeltsExamResultEntity::class,
-        MultilevelExamResultEntity::class
+        ExamResultEntity::class
     ],
     version = 2, // Incremented version number
     exportSchema = false
@@ -20,8 +19,7 @@ import androidx.room.TypeConverters
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun wordDao(): WordDao
-    abstract fun ieltsExamResultDao(): IeltsExamResultDao
-    abstract fun multilevelExamResultDao(): MultilevelExamResultDao
+    abstract fun multilevelExamResultDao(): ExamResultDao
 
     companion object {
         @Volatile

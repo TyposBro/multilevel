@@ -1,10 +1,10 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/repositories/MultilevelExamRepository.kt
 package com.typosbro.multilevel.data.repositories
 
-import com.typosbro.multilevel.data.local.MultilevelExamResultDao
-import com.typosbro.multilevel.data.local.MultilevelExamResultEntity
+import com.typosbro.multilevel.data.local.ExamResultDao
+import com.typosbro.multilevel.data.local.ExamResultEntity
 import com.typosbro.multilevel.data.remote.ApiService
-import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
+import com.typosbro.multilevel.data.remote.models.AnalyzeRequest
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
 import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.data.remote.models.safeApiCall
@@ -13,19 +13,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MultilevelExamRepository @Inject constructor(
+class ExamRepository @Inject constructor(
     private val apiService: ApiService,
-    private val multilevelExamResultDao: MultilevelExamResultDao
+    private val examResultDao: ExamResultDao
 ) {
     suspend fun getNewExam(): RepositoryResult<MultilevelExamResponse> =
         safeApiCall { apiService.getNewMultilevelExam() }
 
-    suspend fun analyzeExam(request: MultilevelAnalyzeRequest): RepositoryResult<String> {
+    suspend fun analyzeExam(request: AnalyzeRequest): RepositoryResult<String> {
         return when (val apiResult = safeApiCall { apiService.analyzeMultilevelExam(request) }) {
             is RepositoryResult.Success -> {
                 val resultResponse = apiResult.data
-                multilevelExamResultDao.insert(
-                    MultilevelExamResultEntity.fromResponse(
+                examResultDao.insert(
+                    ExamResultEntity.fromResponse(
                         resultResponse
                     )
                 )
@@ -37,9 +37,9 @@ class MultilevelExamRepository @Inject constructor(
     }
 
 
-    fun getLocalHistorySummary(): Flow<List<MultilevelExamResultEntity>> =
-        multilevelExamResultDao.getHistorySummary()
+    fun getLocalHistorySummary(): Flow<List<ExamResultEntity>> =
+        examResultDao.getHistorySummary()
 
-    fun getLocalResultDetails(examId: String): Flow<MultilevelExamResultEntity?> =
-        multilevelExamResultDao.getResultById(examId)
+    fun getLocalResultDetails(examId: String): Flow<ExamResultEntity?> =
+        examResultDao.getResultById(examId)
 }

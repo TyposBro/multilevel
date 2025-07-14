@@ -32,9 +32,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -57,7 +54,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.R
 import com.typosbro.multilevel.ui.viewmodels.DurationFilter
 import com.typosbro.multilevel.ui.viewmodels.ExamStatistics
-import com.typosbro.multilevel.ui.viewmodels.ExamType
 import com.typosbro.multilevel.ui.viewmodels.GenericExamResultSummary
 import com.typosbro.multilevel.ui.viewmodels.ProgressViewModel
 import java.text.SimpleDateFormat
@@ -70,7 +66,6 @@ private val multilevelPartOrder = listOf("FULL", "P1_1", "P1_2", "P2", "P3")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressScreen(
-    onNavigateToIeltsResult: (resultId: String) -> Unit,
     onNavigateToMultilevelResult: (resultId: String) -> Unit,
     viewModel: ProgressViewModel = hiltViewModel()
 ) {
@@ -81,10 +76,7 @@ fun ProgressScreen(
 
     val multilevelMaxScores =
         mapOf("FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0)
-    val yMaxForChart = when (uiState.selectedTab) {
-        ExamType.IELTS -> 9.0
-        ExamType.MULTILEVEL -> multilevelMaxScores[uiState.selectedMultilevelPart] ?: 72.0
-    }
+    val yMaxForChart = multilevelMaxScores[uiState.selectedMultilevelPart] ?: 75.0
 
     Scaffold(
         topBar = {
@@ -94,18 +86,10 @@ fun ProgressScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            // Exam Type Switcher
-            ExamTypeSwitcher(
-                selectedType = uiState.selectedTab,
-                onTypeSelected = { viewModel.selectTab(it) },
-                modifier = Modifier.fillMaxWidth()
-            )
-
             // Filters Row
             FiltersRow(
                 selectedDuration = uiState.selectedDuration,
                 onDurationSelected = { viewModel.selectDuration(it) },
-                selectedTab = uiState.selectedTab,
                 availableMultilevelParts = availableMultilevelParts,
                 selectedMultilevelPart = uiState.selectedMultilevelPart,
                 onMultilevelPartSelected = { viewModel.selectMultilevelPart(it) },
@@ -118,7 +102,6 @@ fun ProgressScreen(
                 }
             } else if (currentHistory.isEmpty()) {
                 EmptyStateCard(
-                    selectedTab = uiState.selectedTab,
                     selectedDuration = uiState.selectedDuration,
                     selectedPart = uiState.selectedMultilevelPart
                 )
@@ -131,7 +114,6 @@ fun ProgressScreen(
                     item {
                         StatisticsCard(
                             statistics = statistics,
-                            examType = uiState.selectedTab,
                             selectedPart = uiState.selectedMultilevelPart,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
@@ -194,10 +176,7 @@ fun ProgressScreen(
                         ExamHistoryItem(
                             result = result,
                             onClick = {
-                                when (result.type) {
-                                    ExamType.IELTS -> onNavigateToIeltsResult(result.id)
-                                    ExamType.MULTILEVEL -> onNavigateToMultilevelResult(result.id)
-                                }
+                                onNavigateToMultilevelResult(result.id)
                             }
                         )
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
@@ -212,7 +191,6 @@ fun ProgressScreen(
 fun FiltersRow(
     selectedDuration: DurationFilter,
     onDurationSelected: (DurationFilter) -> Unit,
-    selectedTab: ExamType,
     availableMultilevelParts: Set<String>,
     selectedMultilevelPart: String,
     onMultilevelPartSelected: (String) -> Unit,
@@ -230,7 +208,7 @@ fun FiltersRow(
         )
 
         // Multilevel Part Filter Dropdown (only show for multilevel tab)
-        if (selectedTab == ExamType.MULTILEVEL && availableMultilevelParts.isNotEmpty()) {
+        if (availableMultilevelParts.isNotEmpty()) {
             val partsToShow = multilevelPartOrder.filter { it in availableMultilevelParts }
             if (partsToShow.size > 1) {
                 MultilevelPartDropdown(
@@ -365,7 +343,6 @@ fun MultilevelPartDropdown(
 @Composable
 fun StatisticsCard(
     statistics: ExamStatistics,
-    examType: ExamType,
     selectedPart: String,
     modifier: Modifier = Modifier
 ) {
@@ -380,7 +357,7 @@ fun StatisticsCard(
                 fontWeight = FontWeight.SemiBold
             )
 
-            if (examType == ExamType.MULTILEVEL && selectedPart != "FULL") {
+            if (selectedPart != "FULL") {
                 Text(
                     text = "Part ${selectedPart.replace("P", "").replace("_", ".")}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -396,45 +373,25 @@ fun StatisticsCard(
             ) {
                 StatItem(
                     label = "Avg Score",
-                    value = if (examType == ExamType.IELTS) {
-                        String.format("%.1f", statistics.averageScore)
-                    } else {
-                        statistics.averageScore.roundToInt().toString()
-                    }
+                    value = statistics.averageScore.roundToInt().toString()
                 )
 
                 StatItem(
                     label = "Best Score",
-                    value = if (examType == ExamType.IELTS) {
-                        String.format("%.1f", statistics.bestScore)
-                    } else {
-                        statistics.bestScore.roundToInt().toString()
-                    }
+                    value = statistics.bestScore.roundToInt().toString()
                 )
 
                 StatItem(
                     label = "Latest",
-                    value = if (examType == ExamType.IELTS) {
-                        String.format("%.1f", statistics.latestScore)
-                    } else {
-                        statistics.latestScore.roundToInt().toString()
-                    }
+                    value = statistics.latestScore.roundToInt().toString()
                 )
 
                 StatItem(
                     label = "Change",
                     value = if (statistics.improvement > 0) {
-                        "+${
-                            if (examType == ExamType.IELTS) String.format(
-                                "%.1f",
-                                statistics.improvement
-                            ) else statistics.improvement.roundToInt()
-                        }"
+                        "+${statistics.improvement.roundToInt()}"
                     } else if (statistics.improvement < 0) {
-                        if (examType == ExamType.IELTS) String.format(
-                            "%.1f",
-                            statistics.improvement
-                        ) else statistics.improvement.roundToInt().toString()
+                        statistics.improvement.roundToInt().toString()
                     } else {
                         "0"
                     },
@@ -472,7 +429,6 @@ fun StatItem(
 
 @Composable
 fun EmptyStateCard(
-    selectedTab: ExamType,
     selectedDuration: DurationFilter,
     selectedPart: String
 ) {
@@ -494,18 +450,18 @@ fun EmptyStateCard(
             Spacer(Modifier.height(8.dp))
 
             val message = when {
-                selectedTab == ExamType.MULTILEVEL && selectedPart != "FULL" -> {
+                selectedPart != "FULL" -> {
                     "No results for Part ${
                         selectedPart.replace("P", "").replace("_", ".")
                     } in the ${selectedDuration.displayName.lowercase()}"
                 }
 
                 selectedDuration != DurationFilter.ALL -> {
-                    "No ${selectedTab.name.lowercase()} results in the ${selectedDuration.displayName.lowercase()}"
+                    "No results in the ${selectedDuration.displayName.lowercase()}"
                 }
 
                 else -> {
-                    "No ${selectedTab.name.lowercase()} results available"
+                    "No results available"
                 }
             }
 
@@ -519,32 +475,6 @@ fun EmptyStateCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun ExamTypeSwitcher(
-    selectedType: ExamType,
-    onTypeSelected: (ExamType) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    SingleChoiceSegmentedButtonRow(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-        SegmentedButton(
-            selected = selectedType == ExamType.MULTILEVEL,
-            onClick = { onTypeSelected(ExamType.MULTILEVEL) },
-            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-        ) {
-            Text("Multilevel")
-        }
-        SegmentedButton(
-            selected = selectedType == ExamType.IELTS,
-            onClick = { onTypeSelected(ExamType.IELTS) },
-            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-        ) {
-            Text("IELTS")
-        }
-    }
-}
 
 @Composable
 fun ExamHistoryItem(result: GenericExamResultSummary, onClick: () -> Unit) {

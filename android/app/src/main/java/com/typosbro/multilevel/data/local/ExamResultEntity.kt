@@ -2,12 +2,12 @@ package com.typosbro.multilevel.data.local
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.typosbro.multilevel.data.remote.models.ExamResultResponse
 import com.typosbro.multilevel.data.remote.models.FeedbackBreakdown
-import com.typosbro.multilevel.data.remote.models.MultilevelExamResultResponse
 import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 
 @Entity(tableName = "multilevel_exam_results")
-data class MultilevelExamResultEntity(
+data class ExamResultEntity(
     @PrimaryKey val id: String,
     val userId: String,
     val totalScore: Int,
@@ -16,8 +16,8 @@ data class MultilevelExamResultEntity(
     val practicedPart: String,
     val createdAt: String
 ) {
-    fun toResponse(): MultilevelExamResultResponse {
-        return MultilevelExamResultResponse(
+    fun toResponse(): ExamResultResponse {
+        return ExamResultResponse(
             id = this.id,
             userId = this.userId,
             totalScore = this.totalScore,
@@ -29,10 +29,10 @@ data class MultilevelExamResultEntity(
 
     companion object {
         fun fromResponse(
-            response: MultilevelExamResultResponse,
+            response: ExamResultResponse,
             practicedPart: String = "FULL"
-        ): MultilevelExamResultEntity {
-            return MultilevelExamResultEntity(
+        ): ExamResultEntity {
+            return ExamResultEntity(
                 id = response.id,
                 userId = response.userId,
                 totalScore = response.totalScore,

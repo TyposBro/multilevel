@@ -1,19 +1,15 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/ApiService.kt
 package com.typosbro.multilevel.data.remote
 
-import com.typosbro.multilevel.data.remote.models.AnalyzeExamRequest
+import com.typosbro.multilevel.data.remote.models.AnalyzeRequest
 import com.typosbro.multilevel.data.remote.models.ApiWord
 import com.typosbro.multilevel.data.remote.models.AuthResponse
 import com.typosbro.multilevel.data.remote.models.CreatePaymentRequest
 import com.typosbro.multilevel.data.remote.models.CreatePaymentResponse
 import com.typosbro.multilevel.data.remote.models.ExamResultResponse
-import com.typosbro.multilevel.data.remote.models.ExamStepRequest
-import com.typosbro.multilevel.data.remote.models.ExamStepResponse
 import com.typosbro.multilevel.data.remote.models.GenericSuccessResponse
 import com.typosbro.multilevel.data.remote.models.GoogleSignInRequest
-import com.typosbro.multilevel.data.remote.models.MultilevelAnalyzeRequest
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
-import com.typosbro.multilevel.data.remote.models.MultilevelExamResultResponse
 import com.typosbro.multilevel.data.remote.models.OneTimeTokenRequest
 import com.typosbro.multilevel.data.remote.models.SubscriptionResponse
 import com.typosbro.multilevel.data.remote.models.UserProfileResponse
@@ -47,22 +43,11 @@ interface ApiService {
     @DELETE("auth/profile")
     suspend fun deleteProfile(): Response<GenericSuccessResponse>
 
-    // --- Structured Exam Endpoints ---
-    @POST("exam/ielts/start")
-    suspend fun startExam(): Response<ExamStepResponse>
-
-    @POST("exam/ielts/step")
-    suspend fun getNextExamStep(@Body request: ExamStepRequest): Response<ExamStepResponse>
-
-    @POST("exam/ielts/analyze")
-    suspend fun analyzeExam(@Body request: AnalyzeExamRequest): Response<ExamResultResponse>
-
-    // --- NEW: Multilevel Exam Endpoints ---
     @GET("exam/multilevel/new")
     suspend fun getNewMultilevelExam(): Response<MultilevelExamResponse>
 
     @POST("exam/multilevel/analyze")
-    suspend fun analyzeMultilevelExam(@Body request: MultilevelAnalyzeRequest): Response<MultilevelExamResultResponse>
+    suspend fun analyzeMultilevelExam(@Body request: AnalyzeRequest): Response<ExamResultResponse>
 
     // History and specific results are now fetched from local DB
     // @GET("exam/multilevel/history")

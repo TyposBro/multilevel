@@ -9,7 +9,6 @@ data class ExamHistorySummaryResponse(
 )
 
 
-
 /**
  * A summary of a single past exam result, used in the ProgressScreen list.
  */
@@ -19,18 +18,6 @@ data class ExamResultSummary(
     @SerializedName("overallBand") val overallBand: Double
 )
 
-/**
- * The full, detailed response for a single exam result.
- * This is the primary model for the Exam Result Details screen.
- */
-data class ExamResultResponse(
-    @SerializedName("_id") val id: String,
-    @SerializedName("userId") val userId: String,
-    @SerializedName("overallBand") val overallBand: Double,
-    @SerializedName("criteria") val criteria: List<Criterion>,
-    @SerializedName("transcript") val transcript: List<TranscriptEntry>,
-    @SerializedName("createdAt") val createdAt: String
-)
 
 /**
  * Represents the feedback for one of the four IELTS criteria.

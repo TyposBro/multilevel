@@ -7,8 +7,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import com.typosbro.multilevel.data.local.AppDatabase
-import com.typosbro.multilevel.data.local.IeltsExamResultDao
-import com.typosbro.multilevel.data.local.MultilevelExamResultDao
+import com.typosbro.multilevel.data.local.ExamResultDao
 import com.typosbro.multilevel.data.local.WordDao
 import dagger.Module
 import dagger.Provides
@@ -42,15 +41,10 @@ object AppModule {
         return database.wordDao()
     }
 
-    @Provides
-    @Singleton
-    fun provideIeltsExamResultDao(database: AppDatabase): IeltsExamResultDao {
-        return database.ieltsExamResultDao()
-    }
 
     @Provides
     @Singleton
-    fun provideMultilevelExamResultDao(database: AppDatabase): MultilevelExamResultDao {
+    fun provideExamResultDao(database: AppDatabase): ExamResultDao {
         return database.multilevelExamResultDao()
     }
 }
