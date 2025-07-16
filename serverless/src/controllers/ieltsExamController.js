@@ -1,6 +1,4 @@
 // {PATH_TO_PROJECT}/src/controllers/ieltsExamController.js
-
-import { db } from "../db/d1-client.js";
 import { generateText, safeJsonParse } from "../utils/gemini.js";
 import { getKokoroInputIds } from "../utils/kokoro.js";
 
@@ -118,63 +116,19 @@ export const analyzeExam = async (c) => {
       }
     });
 
-    // Use the D1 client to save the result
-    const savedResult = await db.createIeltsExamResult(c.env.DB, {
+    // Construct the full response object to send back to the client
+    const resultResponse = {
+      _id: crypto.randomUUID(), // Generate a unique ID on the server
       userId: user.id,
-      transcript,
       overallBand: analysisData.overallBand,
       criteria: analysisData.criteria,
-    });
+      transcript,
+      createdAt: new Date().toISOString(),
+    };
 
-    return c.json({ resultId: savedResult.id }, 201);
+    return c.json(resultResponse, 201);
   } catch (error) {
     console.error("Error analyzing IELTS exam:", error);
     return c.json({ message: "Server error during exam analysis." }, 500);
-  }
-};
-
-/**
- * @desc    Get a summary list of a user's past IELTS exams.
- * @route   GET /api/exam/ielts/history
- * @access  Private
- */
-export const getExamHistory = async (c) => {
-  try {
-    const user = c.get("user");
-    const history = await db.getIeltsExamHistory(c.env.DB, user.id);
-
-    const historySummaries = history.map((item) => ({
-      id: item.id,
-      examDate: new Date(item.createdAt).getTime(), // Convert ISO string to timestamp
-      overallBand: item.overallBand,
-    }));
-
-    return c.json({ history: historySummaries });
-  } catch (error) {
-    console.error("Error fetching IELTS exam history:", error);
-    return c.json({ message: "Server error fetching history." }, 500);
-  }
-};
-
-/**
- * @desc    Get the full details of a specific IELTS exam result.
- * @route   GET /api/exam/ielts/result/:resultId
- * @access  Private
- */
-export const getExamResultDetails = async (c) => {
-  try {
-    const resultId = c.req.param("resultId");
-    const user = c.get("user");
-
-    const result = await db.getIeltsExamResultDetails(c.env.DB, resultId, user.id);
-
-    if (!result) {
-      return c.json({ message: "Exam result not found or permission denied." }, 404);
-    }
-    // The db client already parsed the JSON fields, so it's ready to be sent.
-    return c.json(result);
-  } catch (error) {
-    console.error("Error fetching IELTS exam result details:", error);
-    return c.json({ message: "Server error fetching result details." }, 500);
   }
 };

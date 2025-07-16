@@ -1,53 +1,43 @@
-// {PATH_TO_PROJECT}/src/middleware/adminMiddleware.js
-
-import { verify } from "hono/jwt";
+import { jwt } from "hono/jwt";
 import { db } from "../db/d1-client";
 
+// This middleware combines JWT verification and loading the admin user.
 export const protectAdmin = async (c, next) => {
-  console.log("Entering manual ADMIN protection middleware...");
+  // 1. Use Hono's built-in JWT middleware to verify the token first.
+  const jwtMiddleware = jwt({
+    secret: c.env.JWT_SECRET_ADMIN,
+    alg: "HS256",
+  });
 
-  const authHeader = c.req.header("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    console.log("Admin route: No or malformed Authorization header found.");
-    return c.json({ message: "Authorization header is missing or malformed" }, 401);
+  // Create a dummy next function to capture the result of the JWT middleware
+  let jwtError = null;
+  await jwtMiddleware(c, async () => {}).catch((e) => {
+    jwtError = e;
+  });
+
+  if (jwtError) {
+    // If the JWT middleware failed, it's an auth error (401)
+    return c.json({ message: jwtError.message || "Invalid or expired token" }, 401);
   }
 
-  const token = authHeader.substring(7);
-  // CRITICAL: Use the correct admin secret!
-  const secret = c.env.JWT_SECRET_ADMIN;
-
-  if (!secret) {
-    console.error("FATAL: JWT_SECRET_ADMIN not found in environment for manual verification.");
-    return c.json({ message: "Server configuration error" }, 500);
-  }
-
+  // 2. If the token is valid, load the admin from the database.
   try {
-    console.log(`Attempting to manually verify ADMIN token...`);
-
-    // Manually verify the token with the ADMIN secret and HS256 algorithm
-    const payload = await verify(token, secret, "HS256");
-
-    console.log("Manual ADMIN verification successful. Payload:", JSON.stringify(payload));
-
-    // You were looking for payload.email, so ensure it's there
-    if (!payload || !payload.id || !payload.email) {
-      console.log("Admin payload is missing 'id' or 'email' field.");
-      return c.json({ message: "Invalid admin token payload" }, 401);
+    const payload = c.get("jwtPayload"); // Hono's middleware puts the payload here
+    if (!payload || !payload.id) {
+      return c.json({ message: "Token payload is invalid" }, 401);
     }
 
-    // Find the admin by email, as per your original logic
     const admin = await db.findAdminByEmail(c.env.DB, payload.email);
+
     if (!admin) {
-      console.log(`Admin with email ${payload.email} not found in database.`);
-      return c.json({ message: "Admin user not found" }, 401);
+      return c.json({ message: "Admin not found" }, 401);
     }
 
-    console.log("Admin user successfully loaded from database.");
+    // 3. Attach the admin to the context and proceed.
     c.set("admin", admin);
-
     await next();
   } catch (error) {
-    console.error("ADMIN TOKEN VERIFICATION FAILED:", error.message);
-    return c.json({ message: "Admin token is invalid or expired", error: error.message }, 401);
+    console.error("Error in protectAdmin after JWT verification:", error);
+    return c.json({ message: "Server error during admin authorization" }, 500);
   }
 };

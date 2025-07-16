@@ -2,12 +2,14 @@
 
 import { Hono } from "hono";
 import { protectAndLoadUser } from "../middleware/authMiddleware";
+// --- 1. IMPORT THE MIDDLEWARE ---
+import { checkSubscriptionStatus } from "../middleware/subscriptionMiddleware";
 import { verifyAndGrantAccess, startGoldTrial } from "../controllers/subscriptionController";
 
 const subscriptionRoutes = new Hono();
 
-// All subscription routes should be protected
-subscriptionRoutes.use("/*", protectAndLoadUser);
+// --- 2. APPLY BOTH MIDDLEWARES TO ALL ROUTES ---
+subscriptionRoutes.use("/*", protectAndLoadUser, checkSubscriptionStatus);
 
 subscriptionRoutes.post("/verify-purchase", verifyAndGrantAccess);
 subscriptionRoutes.post("/start-trial", startGoldTrial);

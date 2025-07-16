@@ -2,6 +2,9 @@
 .wrangler
 .mf/
 
+# Vitest coverage output
+coverage/
+
 # Node.js
 node_modules
 npm-debug.log

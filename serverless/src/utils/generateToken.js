@@ -1,23 +1,24 @@
+// serverless/src/utils/generateToken.js
 import { sign } from "hono/jwt";
 
 /**
  * Generates a JWT. This version correctly handles both string and object inputs.
  * @param {object} c - The Hono context.
- * @param {string | object} payloadInput - The data for the payload.
- *                                        Can be a string (userId) or an object ({ id, email, ... }).
+ * @param {string | object} payloadInput - The data for the payload. Can be a string (userId) or an object ({ id, email, ... }).
  * @param {boolean} [isAdmin=false] - Whether to use the admin secret.
  * @returns {Promise<string>} The generated JWT.
  */
 export const generateToken = async (c, payloadInput, isAdmin = false) => {
   let basePayload;
 
-  // Check if the input is a string (the old way, for user IDs) or an object.
   if (typeof payloadInput === "string") {
-    // If it's just a string, create a standard payload with only the id.
+    // This handles the user ID string case correctly
     basePayload = { id: payloadInput };
   } else if (typeof payloadInput === "object" && payloadInput !== null) {
-    // If it's an object, use it directly as the base for our payload.
+    // --- THIS IS THE FIX ---
+    // If we receive an object, we use it directly as the base payload.
     basePayload = payloadInput;
+    // --- END OF FIX ---
   } else {
     throw new Error("Invalid payload data provided to generateToken");
   }
@@ -36,7 +37,6 @@ export const generateToken = async (c, payloadInput, isAdmin = false) => {
     throw new Error(`Server configuration error: Missing JWT secret.`);
   }
 
-  // Explicitly set the algorithm to HS256
   const token = await sign(finalPayload, secret, "HS256");
 
   return token;

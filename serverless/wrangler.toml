@@ -10,6 +10,18 @@ main = "src/index.js"
 compatibility_date = "2024-05-30"
 
 # ==============================================================================
+#  AI Binding (Workers AI)
+# ==============================================================================
+# This enables the c.env.AI object in your code.
+# [ai]
+# binding = "AI"
+
+[observability]
+# Enables observability features like logging and metrics
+enabled = true
+
+
+# ==============================================================================
 #  Bindings to Cloudflare Resources
 # ==============================================================================
 # These connect your code to Cloudflare services like D1 (database) and R2 (storage).

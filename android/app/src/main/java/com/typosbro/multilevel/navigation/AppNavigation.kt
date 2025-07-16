@@ -17,8 +17,6 @@ import androidx.navigation.navArgument
 import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.ui.screens.MainScreen
 import com.typosbro.multilevel.ui.screens.auth.LoginScreen
-import com.typosbro.multilevel.ui.screens.practice.ExamResultScreen
-import com.typosbro.multilevel.ui.screens.practice.ExamScreen
 import com.typosbro.multilevel.ui.screens.practice.MultilevelExamScreen
 import com.typosbro.multilevel.ui.screens.practice.MultilevelResultScreen
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
@@ -28,8 +26,6 @@ object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val REGISTER_ROUTE = "register"
     const val MAIN_HUB_ROUTE = "main_hub"
-    const val EXAM_SCREEN_ROUTE = "exam_screen"
-    const val EXAM_RESULT_ROUTE = "exam_result/{resultId}"
     const val MULTILEVEL_EXAM_ROUTE = "multilevel_exam/{practicePart}"
     const val MULTILEVEL_RESULT_ROUTE = "multilevel_result/{resultId}"
 }
@@ -79,37 +75,16 @@ fun AppNavigation(
 
         composable(AppDestinations.MAIN_HUB_ROUTE) {
             MainScreen(
-                onNavigateToIELTS = {
-                    navController.navigate(AppDestinations.EXAM_SCREEN_ROUTE)
-                },
-                // UPDATED: This lambda now takes the part string
                 onNavigateToMultilevel = { practicePart ->
                     navController.navigate("multilevel_exam/$practicePart")
                 },
-                onNavigateToIeltsResult = { resultId ->
-                    navController.navigate("exam_result/$resultId")
-                },
+
                 onNavigateToMultilevelResult = { resultId ->
                     navController.navigate("multilevel_result/$resultId")
                 }
             )
         }
 
-        composable(AppDestinations.EXAM_SCREEN_ROUTE) {
-            ExamScreen(
-                onNavigateToResults = { resultId ->
-                    navController.navigate("exam_result/$resultId") {
-                        popUpTo(AppDestinations.EXAM_SCREEN_ROUTE) { inclusive = true }
-                    }
-                }
-            )
-        }
-        composable(
-            route = AppDestinations.EXAM_RESULT_ROUTE,
-            arguments = listOf(navArgument("resultId") { type = NavType.StringType })
-        ) {
-            ExamResultScreen(onNavigateBack = { navController.popBackStack() })
-        }
 
         composable(
             route = AppDestinations.MULTILEVEL_EXAM_ROUTE,

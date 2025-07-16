@@ -26,7 +26,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
 import com.typosbro.multilevel.R
-import com.typosbro.multilevel.ui.screens.practice.MultilevelPracticeHubScreen
 import com.typosbro.multilevel.ui.screens.practice.PracticeHubScreen
 import com.typosbro.multilevel.ui.screens.profile.ProfileScreen
 import com.typosbro.multilevel.ui.screens.progress.ProgressScreen
@@ -51,17 +50,9 @@ object WordBankDestinations {
     const val EXPLORE_TOPIC_ROUTE = "wordbank_explore_topic/{level}"
 }
 
-object PracticeDestinations {
-    const val PRACTICE_HUB = "practice_hub"
-    const val MULTILEVEL_HUB = "multilevel_hub"
-    // IELTS hub could be added here later
-}
-
 @Composable
 fun MainScreen(
-    onNavigateToIELTS: () -> Unit,
     onNavigateToMultilevel: (String) -> Unit,
-    onNavigateToIeltsResult: (resultId: String) -> Unit,
     onNavigateToMultilevelResult: (resultId: String) -> Unit,
 ) {
     val mainNavController = rememberNavController()
@@ -75,29 +66,12 @@ fun MainScreen(
             startDestination = MainDestinations.PRACTICE_ROUTE,
             modifier = Modifier.padding(innerPadding)
         ) {
-            // UPDATED: Wrap practice screens in a nested graph
-            navigation(
-                startDestination = PracticeDestinations.PRACTICE_HUB,
-                route = MainDestinations.PRACTICE_ROUTE
-            ) {
-                composable(PracticeDestinations.PRACTICE_HUB) {
-                    PracticeHubScreen(
-                        onNavigateToIELTS = onNavigateToIELTS,
-                        onNavigateToMultilevel = {
-                            // Navigate to the new hub screen
-                            mainNavController.navigate(PracticeDestinations.MULTILEVEL_HUB)
-                        }
-                    )
-                }
-                composable(PracticeDestinations.MULTILEVEL_HUB) {
-                    MultilevelPracticeHubScreen(
-                        onNavigateBack = { mainNavController.popBackStack() },
-                        onPartSelected = { practicePart ->
-                            // Use the enum's name as the navigation argument
-                            onNavigateToMultilevel(practicePart.name)
-                        }
-                    )
-                }
+            composable(MainDestinations.PRACTICE_ROUTE) {
+                PracticeHubScreen(
+                    onPartSelected = { practicePart ->
+                        onNavigateToMultilevel(practicePart.name)
+                    }
+                )
             }
 
             navigation(
@@ -140,8 +114,7 @@ fun MainScreen(
 
             composable(MainDestinations.PROGRESS_ROUTE) {
                 ProgressScreen(
-                    onNavigateToIeltsResult = onNavigateToIeltsResult,
-                    onNavigateToMultilevelResult = onNavigateToMultilevelResult
+                    onNavigateToMultilevelResult = onNavigateToMultilevelResult,
                 )
             }
             composable(MainDestinations.PROFILE_ROUTE) {

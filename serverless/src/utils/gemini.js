@@ -44,7 +44,7 @@ export async function generateText(c, prompt) {
     throw new Error("FATAL ERROR: GEMINI_API_KEY is not set in wrangler.toml secrets.");
   }
 
-  const model = "gemini-2.5-flash-latest";
+  const model = "gemini-2.5-flash"; // Or another Gemini model you prefer
   const url = `${GEMINI_API_BASE_URL}/${model}:generateContent?key=${apiKey}`;
 
   console.log("\n----------- PROMPT TO GEMINI -----------");

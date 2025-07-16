@@ -1,34 +1,44 @@
+// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/ui/screens/progress/ProgressScreen.kt
 package com.typosbro.multilevel.ui.screens.progress
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -37,114 +47,138 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.R
-import com.typosbro.multilevel.ui.viewmodels.ExamType
+import com.typosbro.multilevel.ui.viewmodels.DurationFilter
+import com.typosbro.multilevel.ui.viewmodels.ExamStatistics
 import com.typosbro.multilevel.ui.viewmodels.GenericExamResultSummary
 import com.typosbro.multilevel.ui.viewmodels.ProgressViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
-// A sensible order for displaying the practice part tabs
 private val multilevelPartOrder = listOf("FULL", "P1_1", "P1_2", "P2", "P3")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProgressScreen(
-    onNavigateToIeltsResult: (resultId: String) -> Unit,
     onNavigateToMultilevelResult: (resultId: String) -> Unit,
     viewModel: ProgressViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val currentHistory = viewModel.getCurrentHistory()
+    val availableMultilevelParts = viewModel.getAvailableMultilevelParts()
+    val statistics = viewModel.getStatistics()
 
-    // UPDATED: Logic to get the correct list based on main tab and sub-tab
-    val currentHistory = when (uiState.selectedTab) {
-        ExamType.IELTS -> uiState.ieltsHistory
-        ExamType.MULTILEVEL -> uiState.multilevelHistory[uiState.selectedMultilevelPart]
-            ?: emptyList()
-    }
+    val multilevelMaxScores =
+        mapOf("FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0)
+    val yMaxForChart = multilevelMaxScores[uiState.selectedMultilevelPart] ?: 75.0
 
-    // A helper map to define max scores for the chart
-    val multilevelMaxScores = mapOf(
-        "FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0
-    )
-    val yMaxForChart = when (uiState.selectedTab) {
-        ExamType.IELTS -> 9.0
-        ExamType.MULTILEVEL -> multilevelMaxScores[uiState.selectedMultilevelPart] ?: 72.0
-    }
-
-    Scaffold(topBar = { TopAppBar(title = { Text(text = stringResource(id = R.string.progress_title)) }) }) { padding ->
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(text = stringResource(id = R.string.progress_title)) }
+            )
+        }
+    ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
-            ExamTypeSwitcher(
-                selectedType = uiState.selectedTab,
-                onTypeSelected = { viewModel.selectTab(it) },
+            // Filters Row
+            FiltersRow(
+                selectedDuration = uiState.selectedDuration,
+                onDurationSelected = { viewModel.selectDuration(it) },
+                availableMultilevelParts = availableMultilevelParts,
+                selectedMultilevelPart = uiState.selectedMultilevelPart,
+                onMultilevelPartSelected = { viewModel.selectMultilevelPart(it) },
                 modifier = Modifier.fillMaxWidth()
             )
-
-            // NEW: Conditionally show the Multilevel part switcher
-            if (uiState.selectedTab == ExamType.MULTILEVEL && uiState.multilevelHistory.isNotEmpty()) {
-                MultilevelPartSwitcher(
-                    availableParts = uiState.multilevelHistory.keys,
-                    selectedPart = uiState.selectedMultilevelPart,
-                    onPartSelected = { viewModel.selectMultilevelPart(it) }
-                )
-            }
 
             if (uiState.isLoading) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator()
                 }
             } else if (currentHistory.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = stringResource(id = R.string.progress_empty),
-                        modifier = Modifier.padding(16.dp)
-                    )
-                }
+                EmptyStateCard(
+                    selectedDuration = uiState.selectedDuration,
+                    selectedPart = uiState.selectedMultilevelPart
+                )
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 16.dp)
+                    contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
+                    // Statistics Card
                     item {
-                        Text(
-                            text = stringResource(id = R.string.progress_score),
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        ScoreHistoryChart(
-                            scores = currentHistory.map { it.score },
-                            yMax = yMaxForChart, // Use dynamic max value
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(200.dp)
-                                .padding(16.dp)
+                        StatisticsCard(
+                            statistics = statistics,
+                            selectedPart = uiState.selectedMultilevelPart,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
 
+                    // Score Chart
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = stringResource(id = R.string.progress_score),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = "${currentHistory.size} ${if (currentHistory.size == 1) "exam" else "exams"}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Spacer(Modifier.height(16.dp))
+                                ScoreHistoryChart(
+                                    scores = currentHistory.map { it.score },
+                                    yMax = yMaxForChart,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(200.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    // History Header
                     item {
                         Text(
                             text = stringResource(id = R.string.progress_history),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(
                                 start = 16.dp,
                                 end = 16.dp,
-                                top = 24.dp,
+                                top = 16.dp,
                                 bottom = 8.dp
                             )
                         )
                     }
+
+                    // History Items
                     items(currentHistory) { result ->
-                        ExamHistoryItem(result = result, onClick = {
-                            when (result.type) {
-                                ExamType.IELTS -> onNavigateToIeltsResult(result.id)
-                                ExamType.MULTILEVEL -> onNavigateToMultilevelResult(result.id)
+                        ExamHistoryItem(
+                            result = result,
+                            onClick = {
+                                onNavigateToMultilevelResult(result.id)
                             }
-                        })
+                        )
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))
                     }
                 }
@@ -153,87 +187,309 @@ fun ProgressScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MultilevelPartSwitcher(
-    availableParts: Set<String>,
-    selectedPart: String,
-    onPartSelected: (String) -> Unit,
+fun FiltersRow(
+    selectedDuration: DurationFilter,
+    onDurationSelected: (DurationFilter) -> Unit,
+    availableMultilevelParts: Set<String>,
+    selectedMultilevelPart: String,
+    onMultilevelPartSelected: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Filter and order the parts that actually have history data
-    val partsToShow = multilevelPartOrder.filter { it in availableParts }
+    Row(
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // Duration Filter Dropdown
+        DurationFilterDropdown(
+            selectedDuration = selectedDuration,
+            onDurationSelected = onDurationSelected,
+            modifier = Modifier.weight(1f)
+        )
 
-    if (partsToShow.size > 1) {
-        SingleChoiceSegmentedButtonRow(
-            modifier = modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            partsToShow.forEachIndexed { index, part ->
-                SegmentedButton(
-                    selected = part == selectedPart,
-                    onClick = { onPartSelected(part) },
-                    shape = SegmentedButtonDefaults.itemShape(
-                        index = index,
-                        count = partsToShow.size
-                    ),
-                ) {
-                    // Make labels more user-friendly
-                    val label = when (part) {
-                        "FULL" -> "Full"
-                        "P1_1" -> "1.1"
-                        "P1_2" -> "1.2"
-                        "P2" -> "2"
-                        "P3" -> "3"
-                        else -> part
-                    }
-                    Text(label)
-                }
+        // Multilevel Part Filter Dropdown (only show for multilevel tab)
+        if (availableMultilevelParts.isNotEmpty()) {
+            val partsToShow = multilevelPartOrder.filter { it in availableMultilevelParts }
+            if (partsToShow.size > 1) {
+                MultilevelPartDropdown(
+                    availableParts = partsToShow,
+                    selectedPart = selectedMultilevelPart,
+                    onPartSelected = onMultilevelPartSelected,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
 }
 
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExamTypeSwitcher(
-    selectedType: ExamType,
-    onTypeSelected: (ExamType) -> Unit,
+fun DurationFilterDropdown(
+    selectedDuration: DurationFilter,
+    onDurationSelected: (DurationFilter) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    SingleChoiceSegmentedButtonRow(
-        modifier = modifier.padding(
-            horizontal = 16.dp,
-            vertical = 8.dp
-        )
-    ) {
-        SegmentedButton(
-            selected = selectedType == ExamType.MULTILEVEL,
-            onClick = { onTypeSelected(ExamType.MULTILEVEL) },
-            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-        ) {
-            Text("Multilevel")
-        }
-        SegmentedButton(
-            selected = selectedType == ExamType.IELTS,
-            onClick = { onTypeSelected(ExamType.IELTS) },
-            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+    var expanded by remember { mutableStateOf(false) }
 
+    Box(modifier = modifier) {
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-            Text("IELTS")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.FilterList,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = selectedDuration.displayName,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DurationFilter.values().forEach { duration ->
+                DropdownMenuItem(
+                    text = { Text(duration.displayName) },
+                    onClick = {
+                        onDurationSelected(duration)
+                        expanded = false
+                    }
+                )
+            }
         }
     }
 }
+
+@Composable
+fun MultilevelPartDropdown(
+    availableParts: List<String>,
+    selectedPart: String,
+    onPartSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val getPartLabel = { part: String ->
+        when (part) {
+            "FULL" -> "Full Mock"
+            "P1_1" -> "Part 1.1"
+            "P1_2" -> "Part 1.2"
+            "P2" -> "Part 2"
+            "P3" -> "Part 3"
+            else -> part
+        }
+    }
+
+    Box(modifier = modifier) {
+        OutlinedCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = true }
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = getPartLabel(selectedPart),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Icon(
+                    Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            availableParts.forEach { part ->
+                DropdownMenuItem(
+                    text = { Text(getPartLabel(part)) },
+                    onClick = {
+                        onPartSelected(part)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StatisticsCard(
+    statistics: ExamStatistics,
+    selectedPart: String,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Statistics",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            if (selectedPart != "FULL") {
+                Text(
+                    text = "Part ${selectedPart.replace("P", "").replace("_", ".")}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                StatItem(
+                    label = "Avg Score",
+                    value = statistics.averageScore.roundToInt().toString()
+                )
+
+                StatItem(
+                    label = "Best Score",
+                    value = statistics.bestScore.roundToInt().toString()
+                )
+
+                StatItem(
+                    label = "Latest",
+                    value = statistics.latestScore.roundToInt().toString()
+                )
+
+                StatItem(
+                    label = "Change",
+                    value = if (statistics.improvement > 0) {
+                        "+${statistics.improvement.roundToInt()}"
+                    } else if (statistics.improvement < 0) {
+                        statistics.improvement.roundToInt().toString()
+                    } else {
+                        "0"
+                    },
+                    valueColor = when {
+                        statistics.improvement > 0 -> MaterialTheme.colorScheme.primary
+                        statistics.improvement < 0 -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun StatItem(
+    label: String,
+    value: String,
+    valueColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = valueColor
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun EmptyStateCard(
+    selectedDuration: DurationFilter,
+    selectedPart: String
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "No Results Found",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(Modifier.height(8.dp))
+
+            val message = when {
+                selectedPart != "FULL" -> {
+                    "No results for Part ${
+                        selectedPart.replace("P", "").replace("_", ".")
+                    } in the ${selectedDuration.displayName.lowercase()}"
+                }
+
+                selectedDuration != DurationFilter.ALL -> {
+                    "No results in the ${selectedDuration.displayName.lowercase()}"
+                }
+
+                else -> {
+                    "No results available"
+                }
+            }
+
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
 
 @Composable
 fun ExamHistoryItem(result: GenericExamResultSummary, onClick: () -> Unit) {
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
 
     ListItem(
-        headlineContent = { Text(result.scoreLabel, fontWeight = FontWeight.SemiBold) },
-        supportingContent = { Text(dateFormatter.format(Date(result.examDate))) },
+        headlineContent = {
+            Text(
+                result.scoreLabel,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        supportingContent = {
+            Text(dateFormatter.format(Date(result.examDate)))
+        },
         trailingContent = {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -248,17 +504,37 @@ fun ExamHistoryItem(result: GenericExamResultSummary, onClick: () -> Unit) {
 fun ScoreHistoryChart(scores: List<Double>, yMax: Double, modifier: Modifier = Modifier) {
     if (scores.size < 2) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text(text = stringResource(id = R.string.progress_no_enough_data))
+            Text(
+                text = if (scores.size == 1) "Complete more exams to see progress chart"
+                else stringResource(id = R.string.progress_no_enough_data),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
         return
     }
 
     val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     Canvas(modifier = modifier) {
         val xStep = if (scores.size > 1) size.width / (scores.size - 1) else 0f
         val yMin = 0.0
 
+        // Draw grid lines
+        val gridLines = 5
+        for (i in 0..gridLines) {
+            val y = size.height - (i.toFloat() / gridLines * size.height)
+            drawLine(
+                color = surfaceVariant,
+                start = Offset(0f, y),
+                end = Offset(size.width, y),
+                strokeWidth = 1.dp.toPx()
+            )
+        }
+
+        // Draw the line chart
         val path = Path()
         scores.reversed().forEachIndexed { index, score ->
             val x = index * xStep
@@ -270,13 +546,20 @@ fun ScoreHistoryChart(scores: List<Double>, yMax: Double, modifier: Modifier = M
             } else {
                 path.lineTo(x, clampedY)
             }
-            drawCircle(color = primaryColor, radius = 8f, center = Offset(x, clampedY))
+
+            // Draw points
+            drawCircle(
+                color = primaryColor,
+                radius = 6.dp.toPx(),
+                center = Offset(x, clampedY)
+            )
         }
 
+        // Draw the line
         drawPath(
             path = path,
             color = primaryColor,
-            style = Stroke(width = 5f, cap = StrokeCap.Round)
+            style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round)
         )
     }
 }

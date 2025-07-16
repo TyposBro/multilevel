@@ -3,7 +3,7 @@
 import { db } from "../db/d1-client";
 import PLANS from "../config/plans";
 import * as paymeService from "./providers/paymeService";
-// import * as clickService from './providers/clickService'; // When you implement it
+// import * as clickService from './providers/clickService';
 
 /**
  * Initiates a payment process by dispatching to the correct provider service.
@@ -21,7 +21,6 @@ export const initiatePayment = async (c, provider, planId, userId) => {
 
   switch (provider.toLowerCase()) {
     case "payme":
-      // Pass the context 'c' to the provider service
       return paymeService.createTransaction(c, plan, userId);
     default:
       throw new Error(`Unsupported payment provider for creation: ${provider}`);
@@ -40,17 +39,26 @@ export const verifyPurchase = async (c, provider, verificationToken, user) => {
   let verificationResult;
 
   switch (provider.toLowerCase()) {
-    // case 'google':
-    //   verificationResult = await verifyGooglePurchase(c, verificationToken);
-    //   break;
     case "payme":
-      verificationResult = await paymeService.checkTransaction(c, verificationToken);
-      // Adapt Payme's state to the generic verificationResult format
-      if (verificationResult && verificationResult.state === 4) {
-        verificationResult.success = true;
+      const paymeResult = await paymeService.checkTransaction(c, verificationToken);
+      // If the payme call itself fails or returns nothing, it's a general failure.
+      if (!paymeResult) {
+        verificationResult = {
+          success: false,
+          error: "Purchase verification failed with provider.",
+        };
+        break;
+      }
+
+      // Adapt Payme's state to our generic format
+      if (paymeResult.state === 4) {
+        verificationResult = { ...paymeResult, success: true };
       } else {
-        verificationResult.success = false;
-        verificationResult.error = `Invalid Payme transaction state: ${verificationResult.state}`;
+        verificationResult = {
+          ...paymeResult,
+          success: false,
+          error: `Invalid Payme transaction state: ${paymeResult.state}`,
+        };
       }
       break;
     // case 'click':
@@ -60,16 +68,19 @@ export const verifyPurchase = async (c, provider, verificationToken, user) => {
       return { success: false, message: "Invalid payment provider." };
   }
 
+  // Handle provider-level failures first
   if (!verificationResult.success) {
     return { success: false, message: verificationResult.error || "Purchase verification failed." };
   }
 
+  // Now handle our internal logic failures
   const plan = PLANS[verificationResult.planId];
   if (!plan) {
     console.error(`FATAL: No plan found for verified planId: ${verificationResult.planId}`);
     return { success: false, message: "Internal server error: Plan not configured." };
   }
 
+  // --- Success Path ---
   const now = new Date();
   const startDate =
     user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
@@ -79,11 +90,10 @@ export const verifyPurchase = async (c, provider, verificationToken, user) => {
   const newExpiresAt = new Date(startDate);
   newExpiresAt.setDate(newExpiresAt.getDate() + plan.durationDays);
 
-  // Update user's subscription using the D1 client
   const updatedUser = await db.updateUserSubscription(c.env.DB, user.id, {
     tier: plan.tier,
     expiresAt: newExpiresAt.toISOString(),
-    // providerSubscriptionId: verificationResult.providerSubId, // For recurring subs
+    // providerSubscriptionId: verificationResult.providerSubId,
   });
 
   console.log(
@@ -94,7 +104,6 @@ export const verifyPurchase = async (c, provider, verificationToken, user) => {
     success: true,
     message: `Successfully upgraded to ${plan.tier}!`,
     subscription: {
-      // Construct the response object
       tier: updatedUser.subscription_tier,
       expiresAt: updatedUser.subscription_expiresAt,
     },
