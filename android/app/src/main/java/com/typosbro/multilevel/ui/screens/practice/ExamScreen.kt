@@ -64,6 +64,7 @@ import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -135,9 +136,9 @@ fun ExamScreen(
             // Timer is now compact when the speaking UI is shown
             TimerSection(uiState, isCompact = showSpeakingUi)
 
+
             Box(
-                modifier = Modifier.weight(1f),
-                contentAlignment = Alignment.Center
+                modifier = Modifier.weight(1f)
             ) {
                 AnimatedContent(
                     targetState = uiState.stage,
@@ -171,26 +172,40 @@ fun ExamScreen(
                         )
                     }
                 }
+
+                // Place the transcript overlay specifically for Part 3 speaking stage
+                if (uiState.stage == MultilevelExamStage.PART3_SPEAKING) {
+                    TranscriptOverlay(
+                        currentAnswer = uiState.currentAnswerTranscript,
+                        liveTranscript = uiState.liveTranscript,
+                        isRecording = uiState.isRecording,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(1f) // Lower z-index than cue card
+                    )
+                }
             }
 
 
-            // Animate the appearance of the transcript and controls.
+
             AnimatedVisibility(
                 visible = showSpeakingUi,
                 enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
                 exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    TranscriptDisplay(
-                        currentAnswer = uiState.currentAnswerTranscript,
-                        liveTranscript = uiState.liveTranscript,
-                        isRecording = uiState.isRecording
-                    )
+                    // Only show TranscriptDisplay for non-Part3 stages
+                    if (uiState.stage != MultilevelExamStage.PART3_SPEAKING) {
+                        TranscriptDisplay(
+                            currentAnswer = uiState.currentAnswerTranscript,
+                            liveTranscript = uiState.liveTranscript,
+                            isRecording = uiState.isRecording
+                        )
+                    }
                     RecognitionControls(
                         isRecording = uiState.isRecording,
                         onStartRecording = { /* Disabled */ },
                         onStopRecording = { viewModel.onStopRecordingClicked() },
-                        // Reduced bottom padding to save space
                         modifier = Modifier.padding(bottom = 16.dp),
                         enabled = uiState.isRecording
                     )
@@ -201,11 +216,13 @@ fun ExamScreen(
 }
 
 
+// Create a new TranscriptOverlay composable for Part 3
 @Composable
-fun TranscriptDisplay(
+fun TranscriptOverlay(
     currentAnswer: String,
     liveTranscript: String?,
-    isRecording: Boolean
+    isRecording: Boolean,
+    modifier: Modifier = Modifier
 ) {
     val scrollState = rememberScrollState()
 
@@ -214,42 +231,138 @@ fun TranscriptDisplay(
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            // REDUCED: Height is now smaller to save vertical space
-            .height(90.dp)
-            .padding(horizontal = 24.dp, vertical = 8.dp)
-            .verticalScroll(scrollState)
-            .drawWithContent {
-                // ADJUSTED: Fade height is smaller to match the new box height
-                val fadeHeight = 25.dp.toPx()
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black),
-                        startY = 0f,
-                        endY = fadeHeight
-                    ),
-                    blendMode = BlendMode.DstIn
-                )
-            },
+        modifier = modifier
+            .padding(24.dp),
         contentAlignment = Alignment.BottomEnd
     ) {
-        Column(horizontalAlignment = Alignment.End) {
-            if (currentAnswer.isNotBlank()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .verticalScroll(scrollState)
+                .drawWithContent {
+                    val fadeHeight = 40.dp.toPx()
+                    drawContent()
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color.Black),
+                            startY = 0f,
+                            endY = fadeHeight
+                        ),
+                        blendMode = BlendMode.DstIn
+                    )
+                },
+            contentAlignment = Alignment.BottomEnd
+        ) {
+            Column(horizontalAlignment = Alignment.End) {
+                if (currentAnswer.isNotBlank()) {
+                    Text(
+                        text = currentAnswer,
+                        textAlign = TextAlign.Right,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                    )
+                }
+                if (isRecording && !liveTranscript.isNullOrBlank()) {
+                    Text(
+                        text = liveTranscript,
+                        textAlign = TextAlign.Right,
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                        fontStyle = FontStyle.Italic,
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Update your Part3_View composable to have higher z-index
+@Composable
+fun Part3_View(uiState: MultilevelUiState) {
+    val content = uiState.examContent?.part3
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(24.dp)
+            .zIndex(10f), // Higher z-index than transcript
+        contentAlignment = Alignment.TopCenter
+    ) {
+        if (content != null) {
+            Part3CueCard(content)
+        }
+    }
+}
+
+// Update your Part3CueCard to have a semi-transparent background for better overlay effect
+@Composable
+fun Part3CueCard(topic: Part3Topic) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+            Text(
+                text = topic.topic,
+                style = MaterialTheme.typography.headlineLarge,
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 32.sp,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 12.sp))
+
+            Text(
+                text = "FOR",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            topic.forPoints.forEach { point ->
                 Text(
-                    text = currentAnswer,
-                    textAlign = TextAlign.Right,
-                    style = MaterialTheme.typography.bodyLarge
+                    buildAnnotatedString {
+                        withStyle(style = paragraphStyle) {
+                            append("•\u00A0\u00A0")
+                            append(point)
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 22.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
-            if (isRecording && !liveTranscript.isNullOrBlank()) {
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "AGAINST",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            topic.againstPoints.forEach { point ->
                 Text(
-                    text = liveTranscript,
-                    textAlign = TextAlign.Right,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                    fontStyle = FontStyle.Italic,
-                    style = MaterialTheme.typography.bodyLarge
+                    buildAnnotatedString {
+                        withStyle(style = paragraphStyle) {
+                            append("•\u00A0\u00A0")
+                            append(point)
+                        }
+                    },
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 22.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
         }
@@ -570,86 +683,56 @@ fun Part2_View(uiState: MultilevelUiState) {
     }
 }
 
+
 @Composable
-fun Part3_View(uiState: MultilevelUiState) {
-    val content = uiState.examContent?.part3
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .padding(24.dp)
-            .fillMaxHeight()
-            .verticalScroll(rememberScrollState())
-    ) {
-        if (content != null) {
-            Part3CueCard(content)
-        }
+fun TranscriptDisplay(
+    currentAnswer: String,
+    liveTranscript: String?,
+    isRecording: Boolean
+) {
+    val scrollState = rememberScrollState()
+
+    LaunchedEffect(currentAnswer, liveTranscript) {
+        scrollState.animateScrollTo(scrollState.maxValue)
     }
-}
 
-@Composable
-fun Part3CueCard(topic: Part3Topic) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(90.dp)
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .verticalScroll(scrollState)
+            // Add lower z-index to transcript
+            .zIndex(-10f)
+            .drawWithContent {
+                val fadeHeight = 25.dp.toPx()
+                drawContent()
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black),
+                        startY = 0f,
+                        endY = fadeHeight
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+            },
+        contentAlignment = Alignment.BottomEnd
     ) {
-        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
-            Text(
-                text = topic.topic,
-                style = MaterialTheme.typography.headlineLarge,
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Bold,
-                lineHeight = 32.sp,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 12.sp))
-
-            Text(
-                text = "FOR",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            topic.forPoints.forEach { point ->
+        Column(horizontalAlignment = Alignment.End) {
+            if (currentAnswer.isNotBlank()) {
                 Text(
-                    buildAnnotatedString {
-                        withStyle(style = paragraphStyle) {
-                            append("•\u00A0\u00A0")
-                            append(point)
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 22.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    text = currentAnswer,
+                    textAlign = TextAlign.Right,
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = "AGAINST",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.error
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            topic.againstPoints.forEach { point ->
+            if (isRecording && !liveTranscript.isNullOrBlank()) {
                 Text(
-                    buildAnnotatedString {
-                        withStyle(style = paragraphStyle) {
-                            append("•\u00A0\u00A0")
-                            append(point)
-                        }
-                    },
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 22.sp,
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    text = liveTranscript,
+                    textAlign = TextAlign.Right,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    fontStyle = FontStyle.Italic,
+                    style = MaterialTheme.typography.bodyLarge
                 )
             }
         }
