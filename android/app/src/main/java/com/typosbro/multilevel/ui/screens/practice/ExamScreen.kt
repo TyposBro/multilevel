@@ -68,16 +68,16 @@ import com.typosbro.multilevel.data.remote.models.Part3Topic
 import com.typosbro.multilevel.ui.component.HandleAppLifecycle
 import com.typosbro.multilevel.ui.component.ImageLoader
 import com.typosbro.multilevel.ui.component.RecognitionControls
+import com.typosbro.multilevel.ui.viewmodels.ExamViewModel
 import com.typosbro.multilevel.ui.viewmodels.MultilevelExamStage
-import com.typosbro.multilevel.ui.viewmodels.MultilevelExamViewModel
 import com.typosbro.multilevel.ui.viewmodels.MultilevelUiState
 
 @RequiresApi(Build.VERSION_CODES.S)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MultilevelExamScreen(
+fun ExamScreen(
     onNavigateToResults: (resultId: String) -> Unit,
-    viewModel: MultilevelExamViewModel = hiltViewModel()
+    viewModel: ExamViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -350,9 +350,11 @@ fun ExamStartView(onStart: () -> Unit) {
             )
         }
         Spacer(modifier = Modifier.height(32.dp))
-        Button(onClick = onStart, modifier = Modifier
-            .fillMaxWidth()
-            .height(56.dp)) {
+        Button(
+            onClick = onStart, modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+        ) {
             Text(
                 text = "Start Exam",
                 style = MaterialTheme.typography.titleMedium,
