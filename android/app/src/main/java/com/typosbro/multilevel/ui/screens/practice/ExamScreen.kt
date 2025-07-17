@@ -8,6 +8,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -110,6 +111,17 @@ fun ExamScreen(
         uiState.finalResultId?.let { onNavigateToResults(it) }
     }
 
+    // This boolean determines when to show the speaking-related UI elements.
+    val showSpeakingUi = when (uiState.stage) {
+        MultilevelExamStage.PART1_1_QUESTION,
+        MultilevelExamStage.PART1_2_COMPARE,
+        MultilevelExamStage.PART1_2_FOLLOWUP,
+        MultilevelExamStage.PART2_SPEAKING,
+        MultilevelExamStage.PART3_SPEAKING -> true
+
+        else -> false
+    }
+
     Scaffold(
         topBar = { TopAppBar(title = { Text(getDynamicHeader(uiState.stage)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -120,7 +132,8 @@ fun ExamScreen(
                 .fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            TimerSection(uiState)
+            // Timer is now compact when the speaking UI is shown
+            TimerSection(uiState, isCompact = showSpeakingUi)
 
             Box(
                 modifier = Modifier.weight(1f),
@@ -160,16 +173,6 @@ fun ExamScreen(
                 }
             }
 
-            // This boolean determines when to show the speaking-related UI elements.
-            val showSpeakingUi = when (uiState.stage) {
-                MultilevelExamStage.PART1_1_QUESTION,
-                MultilevelExamStage.PART1_2_COMPARE,
-                MultilevelExamStage.PART1_2_FOLLOWUP,
-                MultilevelExamStage.PART2_SPEAKING,
-                MultilevelExamStage.PART3_SPEAKING -> true
-
-                else -> false
-            }
 
             // Animate the appearance of the transcript and controls.
             AnimatedVisibility(
@@ -187,7 +190,8 @@ fun ExamScreen(
                         isRecording = uiState.isRecording,
                         onStartRecording = { /* Disabled */ },
                         onStopRecording = { viewModel.onStopRecordingClicked() },
-                        modifier = Modifier.padding(bottom = 24.dp),
+                        // Reduced bottom padding to save space
+                        modifier = Modifier.padding(bottom = 16.dp),
                         enabled = uiState.isRecording
                     )
                 }
@@ -196,12 +200,7 @@ fun ExamScreen(
     }
 }
 
-/**
- * REDESIGNED: This Composable now shows only the user's current answer.
- * It's no longer a LazyColumn of chat bubbles, providing a much cleaner look.
- * ADDED: Auto-scrolls to the bottom to show the latest transcript and adds a
- * fade-out effect at the top, so text disappears smoothly.
- */
+
 @Composable
 fun TranscriptDisplay(
     currentAnswer: String,
@@ -210,7 +209,6 @@ fun TranscriptDisplay(
 ) {
     val scrollState = rememberScrollState()
 
-    // Automatically scroll to the bottom when new text appears
     LaunchedEffect(currentAnswer, liveTranscript) {
         scrollState.animateScrollTo(scrollState.maxValue)
     }
@@ -218,15 +216,14 @@ fun TranscriptDisplay(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp) // Fixed height to prevent layout shifts
+            // REDUCED: Height is now smaller to save vertical space
+            .height(90.dp)
             .padding(horizontal = 24.dp, vertical = 8.dp)
             .verticalScroll(scrollState)
-            // Add a fade-out effect to the top of the box
             .drawWithContent {
-                val fadeHeight = 40.dp.toPx()
-                // Draw the content first
+                // ADJUSTED: Fade height is smaller to match the new box height
+                val fadeHeight = 25.dp.toPx()
                 drawContent()
-                // Then draw a gradient on top to create the fade effect using a mask
                 drawRect(
                     brush = Brush.verticalGradient(
                         colors = listOf(Color.Transparent, Color.Black),
@@ -239,7 +236,6 @@ fun TranscriptDisplay(
         contentAlignment = Alignment.BottomEnd
     ) {
         Column(horizontalAlignment = Alignment.End) {
-            // Display the confirmed, cumulative answer for the current question
             if (currentAnswer.isNotBlank()) {
                 Text(
                     text = currentAnswer,
@@ -247,7 +243,6 @@ fun TranscriptDisplay(
                     style = MaterialTheme.typography.bodyLarge
                 )
             }
-            // Display the live, partial transcript below it
             if (isRecording && !liveTranscript.isNullOrBlank()) {
                 Text(
                     text = liveTranscript,
@@ -261,21 +256,33 @@ fun TranscriptDisplay(
     }
 }
 
-// NOTE: TranscriptItem is no longer needed in this file.
 
-// All other composables for this screen (TimerSection, Part views, etc.) remain unchanged.
+/**
+ * REWORKED: This Composable is now dynamic.
+ * It animates to a compact state to save screen space when the user is speaking.
+ */
 @Composable
-fun TimerSection(uiState: MultilevelUiState) {
+fun TimerSection(uiState: MultilevelUiState, isCompact: Boolean) {
     val stage = uiState.stage
     val isPrep = stage == MultilevelExamStage.PART2_PREP || stage == MultilevelExamStage.PART3_PREP
     val showTimer = uiState.timerValue > 0 && stage != MultilevelExamStage.NOT_STARTED &&
             stage != MultilevelExamStage.LOADING && stage != MultilevelExamStage.ANALYZING &&
             stage != MultilevelExamStage.FINISHED_ERROR && !stage.name.contains("INTRO")
 
+    // Animate height and padding based on the compact state
+    val animatedHeight by animateDpAsState(
+        targetValue = if (isCompact) 60.dp else 100.dp,
+        label = "TimerHeightAnimation"
+    )
+    val animatedPadding by animateDpAsState(
+        targetValue = if (isCompact) 8.dp else 16.dp,
+        label = "TimerPaddingAnimation"
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.dp),
+            .height(animatedHeight),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (showTimer) 1f else 0f)
         ),
@@ -284,17 +291,23 @@ fun TimerSection(uiState: MultilevelUiState) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(animatedPadding),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             if (showTimer) {
-                Text(
-                    text = if (isPrep) "Preparation Time" else "Time Remaining",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
+                // The label is only shown in the non-compact state
+                AnimatedVisibility(visible = !isCompact) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = if (isPrep) "Preparation Time" else "Time Remaining",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
@@ -579,7 +592,6 @@ fun Part3CueCard(topic: Part3Topic) {
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        // Reduced vertical padding and spacers to make the card more compact
         Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
             Text(
                 text = topic.topic,
@@ -595,10 +607,9 @@ fun Part3CueCard(topic: Part3Topic) {
 
             val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 12.sp))
 
-            // "FOR" section
             Text(
                 text = "FOR",
-                style = MaterialTheme.typography.titleLarge, // Using TitleLarge for section headers
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
@@ -607,23 +618,22 @@ fun Part3CueCard(topic: Part3Topic) {
                 Text(
                     buildAnnotatedString {
                         withStyle(style = paragraphStyle) {
-                            append("•\u00A0\u00A0") // Bullet and non-breaking spaces
+                            append("•\u00A0\u00A0")
                             append(point)
                         }
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    lineHeight = 22.sp, // Reduced line height for compactness
-                    modifier = Modifier.padding(bottom = 8.dp) // Reduced padding between points
+                    lineHeight = 22.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp)) // Spacer between FOR and AGAINST
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // "AGAINST" section
             Text(
                 text = "AGAINST",
-                style = MaterialTheme.typography.titleLarge, // Using TitleLarge for section headers
+                style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.error
             )
@@ -632,14 +642,14 @@ fun Part3CueCard(topic: Part3Topic) {
                 Text(
                     buildAnnotatedString {
                         withStyle(style = paragraphStyle) {
-                            append("•\u00A0\u00A0") // Bullet and non-breaking spaces
+                            append("•\u00A0\u00A0")
                             append(point)
                         }
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    lineHeight = 22.sp, // Reduced line height
-                    modifier = Modifier.padding(bottom = 8.dp) // Reduced padding
+                    lineHeight = 22.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
         }
