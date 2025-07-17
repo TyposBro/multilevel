@@ -48,6 +48,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -196,6 +199,8 @@ fun ExamScreen(
 /**
  * REDESIGNED: This Composable now shows only the user's current answer.
  * It's no longer a LazyColumn of chat bubbles, providing a much cleaner look.
+ * ADDED: Auto-scrolls to the bottom to show the latest transcript and adds a
+ * fade-out effect at the top, so text disappears smoothly.
  */
 @Composable
 fun TranscriptDisplay(
@@ -203,12 +208,34 @@ fun TranscriptDisplay(
     liveTranscript: String?,
     isRecording: Boolean
 ) {
+    val scrollState = rememberScrollState()
+
+    // Automatically scroll to the bottom when new text appears
+    LaunchedEffect(currentAnswer, liveTranscript) {
+        scrollState.animateScrollTo(scrollState.maxValue)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp) // Fixed height to prevent layout shifts during animation
+            .height(120.dp) // Fixed height to prevent layout shifts
             .padding(horizontal = 24.dp, vertical = 8.dp)
-            .verticalScroll(rememberScrollState()),
+            .verticalScroll(scrollState)
+            // Add a fade-out effect to the top of the box
+            .drawWithContent {
+                val fadeHeight = 40.dp.toPx()
+                // Draw the content first
+                drawContent()
+                // Then draw a gradient on top to create the fade effect using a mask
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black),
+                        startY = 0f,
+                        endY = fadeHeight
+                    ),
+                    blendMode = BlendMode.DstIn
+                )
+            },
         contentAlignment = Alignment.BottomEnd
     ) {
         Column(horizontalAlignment = Alignment.End) {
