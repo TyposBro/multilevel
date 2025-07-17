@@ -65,13 +65,27 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
             }
         }
 
-        override fun onPartialResult(hypothesis: String?) { /* We can show this on UI if needed */
+        // --- THIS IS THE KEY CHANGE ---
+        override fun onPartialResult(hypothesis: String?) {
+            // The partial result is in a JSON object with the key "partial".
+            if (hypothesis.isNullOrBlank()) return
+            try {
+                val partialText = JSONObject(hypothesis).getString("partial")
+                partialResultListener?.invoke(partialText)
+            } catch (e: Exception) {
+                // Don't log as an error, as this can happen with malformed partial JSON
+            }
         }
+        // --- END OF CHANGE ---
 
         override fun onTimeout() {}
     }
 
+    // Listener for final, committed segments
     var resultListener: ((String) -> Unit)? = null
+
+    // Listener for live, partial results
+    var partialResultListener: ((String) -> Unit)? = null
 
     suspend fun initialize() = suspendCoroutine { continuation ->
         if (model != null) {
@@ -89,11 +103,6 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
             })
     }
 
-    /**
-     * Starts a new recognition session.
-     * This creates a fresh SpeechService to ensure no audio is carried over from previous states.
-     * @return Boolean indicating if the service was started successfully.
-     */
     fun startRecognition(): Boolean {
         if (model == null) {
             Log.e(TAG, "Model is not initialized.")
@@ -105,6 +114,7 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
         }
 
         try {
+            // For partial results, we need a Recognizer that supports it
             val recognizer = Recognizer(model, 16000.0f)
             speechService = SpeechService(recognizer, 16000.0f)
             speechService?.startListening(listener) // Starts un-paused
@@ -117,9 +127,6 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
         }
     }
 
-    /**
-     * Stops the current recognition session and shuts down the service.
-     */
     fun stopRecognition() {
         speechService?.stop()
         speechService?.shutdown()
@@ -127,14 +134,12 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
         Log.d(TAG, "Vosk recognition stopped.")
     }
 
-    /**
-     * Releases all resources, including the Vosk model. Called when the ViewModel is destroyed.
-     */
     fun release() {
-        stopRecognition() // Ensure any active service is stopped.
+        stopRecognition()
         model?.close()
         model = null
-        resultListener = null // Avoid potential context leaks
+        resultListener = null
+        partialResultListener = null // Clean up the new listener
         Log.d(TAG, "Vosk service fully released.")
     }
 }

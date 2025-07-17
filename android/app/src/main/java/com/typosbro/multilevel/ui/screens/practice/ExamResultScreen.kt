@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
@@ -79,7 +78,7 @@ fun MultilevelResultScreen(
         ) {
             when {
                 uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                uiState.error != null -> ErrorView(uiState.error!!) // Reusing ErrorView from ExamScreen
+                uiState.error != null -> ErrorView(uiState.error!!) // Reusing ErrorView
                 uiState.result != null -> MultilevelResultContent(result = uiState.result!!)
             }
         }
@@ -93,7 +92,6 @@ fun MultilevelResultContent(result: ExamResultResponse) {
     val transcriptString = stringResource(id = R.string.exam_result_transcript)
     val tabs = listOf(feedbackString, transcriptString)
 
-    // Check if this is a result for a single part or a full exam
     val isSinglePartResult = result.feedbackBreakdown.size == 1
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -149,7 +147,6 @@ fun OverallScoreCardMultilevel(score: Int, maxScore: Int?, isSinglePart: Boolean
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
-                // Only show the max score if it's provided (for the full exam)
                 if (maxScore != null) {
                     Text(
                         text = " / $maxScore",
@@ -211,7 +208,6 @@ fun FeedbackPartCard(feedback: FeedbackBreakdown) {
     }
 }
 
-
 @Composable
 fun TranscriptTab(transcript: List<TranscriptEntry>) {
     LazyColumn(
@@ -226,41 +222,24 @@ fun TranscriptTab(transcript: List<TranscriptEntry>) {
     }
 }
 
+/**
+ * This is the shared component for displaying a single transcript entry.
+ * It's used here in the results screen to show the full conversation.
+ */
 @Composable
 fun TranscriptItem(entry: TranscriptEntry) {
     val isUser = entry.speaker.equals("User", ignoreCase = true)
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
     val bubbleColor =
         if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    val shape =
-        if (isUser) MaterialTheme.shapes.medium.copy(bottomEnd = CornerSize(0.dp)) else MaterialTheme.shapes.medium.copy(
-            bottomStart = CornerSize(0.dp)
-        )
 
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = alignment
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(0.85f),
-            horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
-        ) {
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = alignment) {
+        Card(colors = CardDefaults.cardColors(containerColor = bubbleColor)) {
             Text(
-                text = entry.speaker,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                text = entry.text.trim(),
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                style = MaterialTheme.typography.bodyLarge
             )
-            Card(
-                shape = shape,
-                colors = CardDefaults.cardColors(containerColor = bubbleColor)
-            ) {
-                Text(
-                    text = entry.text.trim(),
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            }
         }
     }
 }

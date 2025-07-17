@@ -20,6 +20,7 @@ import com.typosbro.multilevel.features.vosk.VoskService
 import com.typosbro.multilevel.utils.AudioPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -36,7 +37,6 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
-// Enums and UiState remain the same...
 enum class PracticePart {
     FULL, P1_1, P1_2, P2, P3
 }
@@ -46,7 +46,6 @@ enum class MultilevelExamStage {
     PART1_2_FOLLOWUP, PART2_INTRO, PART2_PREP, PART2_SPEAKING, PART3_INTRO,
     PART3_PREP, PART3_SPEAKING, ANALYZING, FINISHED_ERROR
 }
-
 
 object MULTILEVEL_TIMEOUTS {
     const val PART1_1_PREP = 5
@@ -61,6 +60,11 @@ object MULTILEVEL_TIMEOUTS {
     const val PART3_SPEAKING = 120
 }
 
+/**
+ * UPDATED: The UI state no longer holds the entire conversation history.
+ * `transcript` has been replaced with `currentAnswerTranscript` to only show the user's
+ * response for the active question, simplifying the UI.
+ */
 data class MultilevelUiState(
     val stage: MultilevelExamStage = MultilevelExamStage.NOT_STARTED,
     val examContent: MultilevelExamResponse? = null,
@@ -69,11 +73,11 @@ data class MultilevelUiState(
     val part1_2_QuestionIndex: Int = 0,
     val timerValue: Int = 0,
     val isRecording: Boolean = false,
-    val transcript: List<TranscriptEntry> = emptyList(),
+    val currentAnswerTranscript: String = "", // CHANGED: Was `transcript: List<...>`
+    val liveTranscript: String? = null,
     val error: String? = null,
     val finalResultId: String? = null
 )
-
 
 @HiltViewModel
 class MultilevelExamViewModel @Inject constructor(
@@ -86,6 +90,10 @@ class MultilevelExamViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(MultilevelUiState())
     val uiState = _uiState.asStateFlow()
 
+    // This internal list stores the full conversation for the final analysis,
+    // hidden from the real-time UI.
+    private val fullTranscriptHistory = mutableListOf<TranscriptEntry>()
+
     private val practicePart: PracticePart =
         savedStateHandle.get<String>("practicePart")?.let {
             try {
@@ -97,6 +105,7 @@ class MultilevelExamViewModel @Inject constructor(
         } ?: PracticePart.FULL
 
     private var examJob: Job? = null
+    private var timerJob: Job? = null
 
     private fun updateState(caller: String, transform: (MultilevelUiState) -> MultilevelUiState) {
         Log.i("STATE_UPDATE", "Request from [$caller]")
@@ -113,8 +122,25 @@ class MultilevelExamViewModel @Inject constructor(
         }
 
         voskService.resultListener = { text ->
-            addTranscript(TranscriptEntry("User", text))
+            // Add the final text to our internal history for analysis
+            addEntryToFullTranscript(TranscriptEntry("User", text))
+            // Append the final text to the visible current answer on the UI
+            _uiState.update {
+                it.copy(
+                    currentAnswerTranscript = (it.currentAnswerTranscript + " " + text).trim(),
+                    liveTranscript = null
+                )
+            }
         }
+
+        voskService.partialResultListener = { partialText ->
+            _uiState.update { it.copy(liveTranscript = partialText) }
+        }
+    }
+
+    fun onStopRecordingClicked() {
+        Log.d("ExamVM", "Stop recording button clicked by user.")
+        timerJob?.cancel()
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
@@ -134,18 +160,12 @@ class MultilevelExamViewModel @Inject constructor(
             }
             updateState("startExam: Success") { it.copy(examContent = result.data) }
 
-            // *** REMOVED VOSK START FROM HERE ***
-
             when (practicePart) {
                 PracticePart.FULL -> {
-                    executePart1_1()
-                    if (!isActive) return@launch
-                    executePart1_2()
-                    if (!isActive) return@launch
-                    executePart2()
-                    if (!isActive) return@launch
-                    executePart3()
-                    if (!isActive) return@launch
+                    executePart1_1(); if (!isActive) return@launch
+                    executePart1_2(); if (!isActive) return@launch
+                    executePart2(); if (!isActive) return@launch
+                    executePart3(); if (!isActive) return@launch
                     concludeAndAnalyze()
                 }
 
@@ -178,10 +198,11 @@ class MultilevelExamViewModel @Inject constructor(
                 it.copy(
                     stage = MultilevelExamStage.PART1_1_QUESTION,
                     currentQuestionText = question.questionText,
-                    part1_1_QuestionIndex = index
+                    part1_1_QuestionIndex = index,
+                    currentAnswerTranscript = "" // CLEAR transcript for new question
                 )
             }
-            addTranscript(TranscriptEntry("Examiner", question.questionText))
+            addEntryToFullTranscript(TranscriptEntry("Examiner", question.questionText))
             AudioPlayer.playFromUrlAndWait(context, question.audioUrl)
             startAnswerTimer(MULTILEVEL_TIMEOUTS.PART1_1_PREP, MULTILEVEL_TIMEOUTS.PART1_1_ANSWER)
         }
@@ -210,10 +231,11 @@ class MultilevelExamViewModel @Inject constructor(
                 it.copy(
                     stage = currentStage,
                     currentQuestionText = question.text,
-                    part1_2_QuestionIndex = index
+                    part1_2_QuestionIndex = index,
+                    currentAnswerTranscript = "" // CLEAR transcript for new question
                 )
             }
-            addTranscript(TranscriptEntry("Examiner", question.text))
+            addEntryToFullTranscript(TranscriptEntry("Examiner", question.text))
             AudioPlayer.playFromUrlAndWait(context, question.audioUrl)
             startAnswerTimer(prepTime, answerTime)
         }
@@ -225,9 +247,13 @@ class MultilevelExamViewModel @Inject constructor(
         val set = _uiState.value.examContent?.part2 ?: return
         val fullQuestionText = set.questions.joinToString("\n") { it.text }
         updateState("executePart2: Prep") {
-            it.copy(stage = MultilevelExamStage.PART2_PREP, currentQuestionText = fullQuestionText)
+            it.copy(
+                stage = MultilevelExamStage.PART2_PREP,
+                currentQuestionText = fullQuestionText,
+                currentAnswerTranscript = "" // CLEAR transcript for new monologue
+            )
         }
-        addTranscript(TranscriptEntry("Examiner", fullQuestionText))
+        addEntryToFullTranscript(TranscriptEntry("Examiner", fullQuestionText))
         AudioPlayer.playFromUrlAndWait(context, set.questions.firstOrNull()?.audioUrl ?: "")
         startMonologueTimer(
             MULTILEVEL_TIMEOUTS.PART2_PREP,
@@ -239,7 +265,12 @@ class MultilevelExamViewModel @Inject constructor(
     private suspend fun executePart3() {
         updateState("executePart3: Intro") { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
         playInstructionAndWait(R.raw.multilevel_part3_intro)
-        updateState("executePart3: Prep") { it.copy(stage = MultilevelExamStage.PART3_PREP) }
+        updateState("executePart3: Prep") {
+            it.copy(
+                stage = MultilevelExamStage.PART3_PREP,
+                currentAnswerTranscript = "" // CLEAR transcript for new monologue
+            )
+        }
         startMonologueTimer(
             MULTILEVEL_TIMEOUTS.PART3_PREP,
             MULTILEVEL_TIMEOUTS.PART3_SPEAKING,
@@ -249,8 +280,7 @@ class MultilevelExamViewModel @Inject constructor(
 
     private suspend fun startAnswerTimer(prepTime: Int, answerTime: Int) {
         updateState("startAnswerTimer: Prep phase") { it.copy(isRecording = false) }
-        // Service is not running, so no need to pause
-        startTimer(prepTime)
+        startTimer(prepTime).join()
         if (!viewModelScope.isActive) return
 
         updateState("startAnswerTimer: Answer phase") { it.copy(isRecording = true) }
@@ -265,11 +295,19 @@ class MultilevelExamViewModel @Inject constructor(
             return
         }
 
-        startTimer(answerTime)
-        if (!viewModelScope.isActive) return
-
-        updateState("startAnswerTimer: Stopping recording") { it.copy(isRecording = false) }
-        voskService.stopRecognition()
+        try {
+            startTimer(answerTime).join()
+        } catch (e: CancellationException) {
+            Log.d("ExamVM", "Answer timer was manually stopped by user.")
+        } finally {
+            updateState("startAnswerTimer: Stopping recording") {
+                it.copy(
+                    isRecording = false,
+                    liveTranscript = null
+                )
+            }
+            voskService.stopRecognition()
+        }
     }
 
     private suspend fun startMonologueTimer(
@@ -278,8 +316,7 @@ class MultilevelExamViewModel @Inject constructor(
         speakingStage: MultilevelExamStage
     ) {
         updateState("startMonologueTimer: Prep") { it.copy(isRecording = false) }
-        // Service is not running, so no need to pause
-        startTimer(prepTime)
+        startTimer(prepTime).join()
         if (!viewModelScope.isActive) return
 
         updateState("startMonologueTimer: Speaking") {
@@ -299,32 +336,48 @@ class MultilevelExamViewModel @Inject constructor(
             return
         }
 
-        startTimer(speakTime)
-        if (!viewModelScope.isActive) return
+        try {
+            startTimer(speakTime).join()
+        } catch (e: CancellationException) {
+            Log.d("ExamVM", "Monologue timer was manually stopped by user.")
+        } finally {
+            updateState("startMonologueTimer: Stopping") {
+                it.copy(
+                    isRecording = false,
+                    liveTranscript = null
+                )
+            }
+            voskService.stopRecognition()
+        }
+    }
 
-        updateState("startMonologueTimer: Stopping") { it.copy(isRecording = false) }
-        voskService.stopRecognition()
+    private fun startTimer(duration: Int): Job {
+        timerJob = viewModelScope.launch {
+            for (i in duration downTo 1) {
+                if (!isActive) return@launch
+                updateState("startTimer: countdown") { it.copy(timerValue = i) }
+                delay(1000)
+            }
+            updateState("startTimer: finished") { it.copy(timerValue = 0) }
+        }
+        return timerJob!!
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
     private fun concludeAndAnalyze() {
-        // Service is already stopped after the last speaking segment.
         updateState("concludeAndAnalyze: Analyzing") { it.copy(stage = MultilevelExamStage.ANALYZING) }
-
-        // We add a small delay to ensure the final result from Vosk has time to be processed.
         viewModelScope.launch {
             delay(500)
-
             val logDir = context.getExternalFilesDir(Environment.DIRECTORY_RECORDINGS)
             if (logDir != null) {
                 val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                 val finalLogFile = File(logDir, "full_exam_transcript_$timestamp.wav")
-                DebugLogRepository.saveTranscript(context, finalLogFile, uiState.value.transcript)
+                DebugLogRepository.saveTranscript(context, finalLogFile, fullTranscriptHistory)
             }
 
             val examContent = uiState.value.examContent ?: return@launch
             val partString = if (practicePart == PracticePart.FULL) "FULL" else practicePart.name
-            val request = AnalyzeRequest(uiState.value.transcript, examContent, partString)
+            val request = AnalyzeRequest(fullTranscriptHistory, examContent, partString)
 
             when (val result = repository.analyzeExam(request)) {
                 is RepositoryResult.Success -> {
@@ -333,24 +386,14 @@ class MultilevelExamViewModel @Inject constructor(
 
                 is RepositoryResult.Error -> {
                     updateState("concludeAndAnalyze: Error") {
-                        it.copy(stage = MultilevelExamStage.FINISHED_ERROR, error = result.message)
+                        it.copy(
+                            stage = MultilevelExamStage.FINISHED_ERROR,
+                            error = result.message
+                        )
                     }
                 }
             }
         }
-    }
-
-    // startTimer, playInstructionAndWait, etc. remain the same...
-    private suspend fun startTimer(duration: Int) {
-        val job = viewModelScope.launch {
-            for (i in duration downTo 1) {
-                if (!isActive) return@launch
-                updateState("startTimer: countdown") { it.copy(timerValue = i) }
-                delay(1000)
-            }
-            updateState("startTimer: finished") { it.copy(timerValue = 0) }
-        }
-        job.join()
     }
 
     private suspend fun playInstructionAndWait(@RawRes resId: Int) {
@@ -370,28 +413,15 @@ class MultilevelExamViewModel @Inject constructor(
         }
     }
 
-    private fun addTranscript(newEntry: TranscriptEntry) {
-        _uiState.update { currentState ->
-            val currentTranscript = currentState.transcript
-            val lastEntry = currentTranscript.lastOrNull()
-
-            val updatedTranscript =
-                if (newEntry.speaker == "User" && lastEntry?.speaker == "User") {
-                    val updatedText = "${lastEntry.text} ${newEntry.text}".trim()
-                    currentTranscript.dropLast(1) + lastEntry.copy(text = updatedText)
-                } else {
-                    currentTranscript + newEntry
-                }
-            currentState.copy(transcript = updatedTranscript)
+    private fun addEntryToFullTranscript(newEntry: TranscriptEntry) {
+        val lastEntry = fullTranscriptHistory.lastOrNull()
+        if (newEntry.speaker == "User" && lastEntry?.speaker == "User") {
+            val updatedText = "${lastEntry.text} ${newEntry.text}".trim()
+            fullTranscriptHistory[fullTranscriptHistory.size - 1] =
+                lastEntry.copy(text = updatedText)
+        } else {
+            fullTranscriptHistory.add(newEntry)
         }
-    }
-
-    private fun getAssetFile(assetName: String): File {
-        val file = File(context.cacheDir, assetName)
-        if (!file.exists()) {
-            context.assets.open(assetName).use { it.copyTo(file.outputStream()) }
-        }
-        return file
     }
 
     fun stopExam() {

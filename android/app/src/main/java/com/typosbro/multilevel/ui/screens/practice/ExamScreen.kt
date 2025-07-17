@@ -2,11 +2,16 @@ package com.typosbro.multilevel.ui.screens.practice
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +53,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextIndent
@@ -61,10 +67,12 @@ import com.typosbro.multilevel.R
 import com.typosbro.multilevel.data.remote.models.Part3Topic
 import com.typosbro.multilevel.ui.component.HandleAppLifecycle
 import com.typosbro.multilevel.ui.component.ImageLoader
+import com.typosbro.multilevel.ui.component.RecognitionControls
 import com.typosbro.multilevel.ui.viewmodels.MultilevelExamStage
 import com.typosbro.multilevel.ui.viewmodels.MultilevelExamViewModel
 import com.typosbro.multilevel.ui.viewmodels.MultilevelUiState
 
+@RequiresApi(Build.VERSION_CODES.S)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MultilevelExamScreen(
@@ -77,11 +85,11 @@ fun MultilevelExamScreen(
 
     HandleAppLifecycle(onStop = viewModel::stopExam)
 
-    // --- PERMISSION HANDLING ---
     var hasAudioPermission by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
-                context, Manifest.permission.RECORD_AUDIO
+                context,
+                Manifest.permission.RECORD_AUDIO
             ) == PackageManager.PERMISSION_GRANTED
         )
     }
@@ -95,12 +103,10 @@ fun MultilevelExamScreen(
         }
     }
 
-    // --- NAVIGATION LOGIC ---
     LaunchedEffect(uiState.finalResultId) {
         uiState.finalResultId?.let { onNavigateToResults(it) }
     }
 
-    // --- UI ---
     Scaffold(
         topBar = { TopAppBar(title = { Text(getDynamicHeader(uiState.stage)) }) },
         snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -108,16 +114,13 @@ fun MultilevelExamScreen(
         Column(
             modifier = Modifier
                 .padding(padding)
-                .fillMaxSize()
+                .fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Timer at the top - fixed position to prevent layout shift
             TimerSection(uiState)
 
-            // Main content area
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .weight(1f),
+                modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 AnimatedContent(
@@ -132,22 +135,10 @@ fun MultilevelExamScreen(
                         })
 
                         MultilevelExamStage.LOADING -> LoadingView("Downloading exam content...")
-                        MultilevelExamStage.INTRO -> InstructionView(
-                            instruction = stringResource(R.string.PART1_1_INTRO),
-                        )
-
-                        MultilevelExamStage.PART1_2_INTRO -> InstructionView(
-                            instruction = stringResource(R.string.PART1_2_INTRO)
-                        )
-
-                        MultilevelExamStage.PART2_INTRO -> InstructionView(
-                            instruction = stringResource(R.string.PART2_INTRO),
-                        )
-
-                        MultilevelExamStage.PART3_INTRO -> InstructionView(
-                            instruction = stringResource(R.string.PART3_INTRO),
-                        )
-
+                        MultilevelExamStage.INTRO -> InstructionView(stringResource(R.string.PART1_1_INTRO))
+                        MultilevelExamStage.PART1_2_INTRO -> InstructionView(stringResource(R.string.PART1_2_INTRO))
+                        MultilevelExamStage.PART2_INTRO -> InstructionView(stringResource(R.string.PART2_INTRO))
+                        MultilevelExamStage.PART3_INTRO -> InstructionView(stringResource(R.string.PART3_INTRO))
                         MultilevelExamStage.PART1_1_QUESTION -> Part1_1_View(uiState)
                         MultilevelExamStage.PART1_2_COMPARE,
                         MultilevelExamStage.PART1_2_FOLLOWUP -> Part1_2_View(uiState)
@@ -165,11 +156,87 @@ fun MultilevelExamScreen(
                     }
                 }
             }
+
+            // This boolean determines when to show the speaking-related UI elements.
+            val showSpeakingUi = when (uiState.stage) {
+                MultilevelExamStage.PART1_1_QUESTION,
+                MultilevelExamStage.PART1_2_COMPARE,
+                MultilevelExamStage.PART1_2_FOLLOWUP,
+                MultilevelExamStage.PART2_SPEAKING,
+                MultilevelExamStage.PART3_SPEAKING -> true
+
+                else -> false
+            }
+
+            // Animate the appearance of the transcript and controls.
+            AnimatedVisibility(
+                visible = showSpeakingUi,
+                enter = fadeIn() + slideInVertically(initialOffsetY = { it / 2 }),
+                exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    TranscriptDisplay(
+                        currentAnswer = uiState.currentAnswerTranscript,
+                        liveTranscript = uiState.liveTranscript,
+                        isRecording = uiState.isRecording
+                    )
+                    RecognitionControls(
+                        isRecording = uiState.isRecording,
+                        onStartRecording = { /* Disabled */ },
+                        onStopRecording = { viewModel.onStopRecordingClicked() },
+                        modifier = Modifier.padding(bottom = 24.dp),
+                        enabled = uiState.isRecording
+                    )
+                }
+            }
         }
     }
 }
 
-// --- Timer Section (Always present, hidden by transparency) ---
+/**
+ * REDESIGNED: This Composable now shows only the user's current answer.
+ * It's no longer a LazyColumn of chat bubbles, providing a much cleaner look.
+ */
+@Composable
+fun TranscriptDisplay(
+    currentAnswer: String,
+    liveTranscript: String?,
+    isRecording: Boolean
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp) // Fixed height to prevent layout shifts during animation
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .verticalScroll(rememberScrollState()),
+        contentAlignment = Alignment.BottomEnd
+    ) {
+        Column(horizontalAlignment = Alignment.End) {
+            // Display the confirmed, cumulative answer for the current question
+            if (currentAnswer.isNotBlank()) {
+                Text(
+                    text = currentAnswer,
+                    textAlign = TextAlign.Right,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+            // Display the live, partial transcript below it
+            if (isRecording && !liveTranscript.isNullOrBlank()) {
+                Text(
+                    text = liveTranscript,
+                    textAlign = TextAlign.Right,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    fontStyle = FontStyle.Italic,
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+        }
+    }
+}
+
+// NOTE: TranscriptItem is no longer needed in this file.
+
+// All other composables for this screen (TimerSection, Part views, etc.) remain unchanged.
 @Composable
 fun TimerSection(uiState: MultilevelUiState) {
     val stage = uiState.stage
@@ -181,11 +248,9 @@ fun TimerSection(uiState: MultilevelUiState) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(100.dp), // Always maintain height
+            .height(100.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
-                alpha = if (showTimer) 1f else 0f
-            )
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (showTimer) 1f else 0f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = if (showTimer) 4.dp else 0.dp)
     ) {
@@ -228,7 +293,6 @@ fun TimerSection(uiState: MultilevelUiState) {
     }
 }
 
-// --- Dynamic Header Function ---
 @Composable
 fun getDynamicHeader(stage: MultilevelExamStage): String {
     return when (stage) {
@@ -237,30 +301,19 @@ fun getDynamicHeader(stage: MultilevelExamStage): String {
         MultilevelExamStage.INTRO -> "Part 1: Introduction"
         MultilevelExamStage.PART1_1_QUESTION -> "Part 1: Personal Questions"
         MultilevelExamStage.PART1_2_INTRO -> "Part 1: Picture Comparison"
-        MultilevelExamStage.PART1_2_COMPARE,
-        MultilevelExamStage.PART1_2_FOLLOWUP -> "Part 1: Picture Comparison"
-
+        MultilevelExamStage.PART1_2_COMPARE, MultilevelExamStage.PART1_2_FOLLOWUP -> "Part 1: Picture Comparison"
         MultilevelExamStage.PART2_INTRO -> "Part 2: Monologue"
-        MultilevelExamStage.PART2_PREP,
-        MultilevelExamStage.PART2_SPEAKING -> "Part 2: Monologue"
-
+        MultilevelExamStage.PART2_PREP, MultilevelExamStage.PART2_SPEAKING -> "Part 2: Monologue"
         MultilevelExamStage.PART3_INTRO -> "Part 3: Argument"
-        MultilevelExamStage.PART3_PREP,
-        MultilevelExamStage.PART3_SPEAKING -> "Part 3: Argument"
-
+        MultilevelExamStage.PART3_PREP, MultilevelExamStage.PART3_SPEAKING -> "Part 3: Argument"
         MultilevelExamStage.ANALYZING -> "Analyzing Results"
         MultilevelExamStage.FINISHED_ERROR -> "Error"
     }
 }
 
-// --- Specific Views for each Exam Stage ---
-
 @Composable
 fun ExamStartView(onStart: () -> Unit) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(24.dp)
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
         Text(
             text = "Multilevel Speaking Practice",
             style = MaterialTheme.typography.headlineLarge,
@@ -270,9 +323,7 @@ fun ExamStartView(onStart: () -> Unit) {
         Spacer(modifier = Modifier.height(24.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
@@ -289,11 +340,7 @@ fun ExamStartView(onStart: () -> Unit) {
             }
         }
         Spacer(modifier = Modifier.height(20.dp))
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
-        ) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
             Text(
                 text = stringResource(id = R.string.notice_english_only),
                 style = MaterialTheme.typography.bodyMedium,
@@ -303,12 +350,9 @@ fun ExamStartView(onStart: () -> Unit) {
             )
         }
         Spacer(modifier = Modifier.height(32.dp))
-        Button(
-            onClick = onStart,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-        ) {
+        Button(onClick = onStart, modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)) {
             Text(
                 text = "Start Exam",
                 style = MaterialTheme.typography.titleMedium,
@@ -320,29 +364,16 @@ fun ExamStartView(onStart: () -> Unit) {
 
 @Composable
 fun LoadingView(text: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(24.dp)
-    ) {
-        CircularProgressIndicator(
-            modifier = Modifier.size(48.dp),
-            strokeWidth = 4.dp
-        )
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+        CircularProgressIndicator(modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
         Spacer(modifier = Modifier.height(24.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center
-        )
+        Text(text = text, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
     }
 }
 
 @Composable
 fun ErrorView(error: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(24.dp)
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
         Text(
             text = "An Error Occurred",
             style = MaterialTheme.typography.headlineMedium,
@@ -350,11 +381,7 @@ fun ErrorView(error: String) {
             fontWeight = FontWeight.Bold
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.errorContainer
-            )
-        ) {
+        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
             Text(
                 text = error,
                 textAlign = TextAlign.Center,
@@ -368,16 +395,10 @@ fun ErrorView(error: String) {
 
 @Composable
 fun InstructionView(instruction: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(24.dp)
-    ) {
-
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant
-            )
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Text(
                 text = instruction,
@@ -391,25 +412,20 @@ fun InstructionView(instruction: String) {
 
 @Composable
 fun Part1_1_View(uiState: MultilevelUiState) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(24.dp)
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer
-            ),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Text(
                 text = uiState.currentQuestionText ?: "Loading question...",
-                style = MaterialTheme.typography.headlineLarge, // Made bigger
+                style = MaterialTheme.typography.headlineLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
-                fontWeight = FontWeight.Bold, // Made bolder
-                lineHeight = 32.sp, // Added line height for better readability
-                modifier = Modifier.padding(28.dp) // Increased padding
+                fontWeight = FontWeight.Bold,
+                lineHeight = 32.sp,
+                modifier = Modifier.padding(28.dp)
             )
         }
     }
@@ -418,11 +434,7 @@ fun Part1_1_View(uiState: MultilevelUiState) {
 @Composable
 fun Part1_2_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part1_2
-
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(24.dp)
-    ) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
         Card(
             modifier = Modifier.fillMaxWidth(),
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -431,7 +443,7 @@ fun Part1_2_View(uiState: MultilevelUiState) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp), // Increased height for better image display
+                        .height(180.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     ImageLoader(
@@ -452,11 +464,11 @@ fun Part1_2_View(uiState: MultilevelUiState) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
                     text = uiState.currentQuestionText ?: "Loading question...",
-                    style = MaterialTheme.typography.headlineMedium, // Made bigger
+                    style = MaterialTheme.typography.headlineMedium,
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold, // Made bolder
-                    lineHeight = 28.sp, // Better line height
-                    color = MaterialTheme.colorScheme.primary // Made more prominent
+                    fontWeight = FontWeight.Bold,
+                    lineHeight = 28.sp,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         }
@@ -467,7 +479,6 @@ fun Part1_2_View(uiState: MultilevelUiState) {
 fun Part2_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part2
     val questionText = uiState.currentQuestionText ?: "Loading question..."
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -480,7 +491,6 @@ fun Part2_View(uiState: MultilevelUiState) {
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                // MODIFIED: Conditionally display image
                 if (!content?.imageUrl.isNullOrBlank()) {
                     ImageLoader(
                         imageUrl = content?.imageUrl,
@@ -492,19 +502,16 @@ fun Part2_View(uiState: MultilevelUiState) {
                     )
                     Spacer(modifier = Modifier.height(24.dp))
                 }
-
-                // Format as bullet points
                 val bulletPoints = questionText.split("\n").filter { it.isNotBlank() }
                 val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 16.sp))
-
                 bulletPoints.forEach { point ->
                     if (point.trim().isNotEmpty()) {
-                        // MODIFIED: Use buildAnnotatedString for hanging indent
                         Text(
                             buildAnnotatedString {
                                 withStyle(style = paragraphStyle) {
-                                    append("•\u00A0\u00A0") // Bullet with non-breaking spaces
-                                    append(point.trim())
+                                    append("•\u00A0\u00A0"); append(
+                                    point.trim()
+                                )
                                 }
                             },
                             style = MaterialTheme.typography.headlineSmall,
@@ -525,7 +532,6 @@ fun Part2_View(uiState: MultilevelUiState) {
 @Composable
 fun Part3_View(uiState: MultilevelUiState) {
     val content = uiState.examContent?.part3
-
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -556,10 +562,7 @@ fun Part3CueCard(topic: Part3Topic) {
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(28.dp))
-
             val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 12.sp))
-
-            // --- FOR Section ---
             Text(
                 text = "FOR",
                 style = MaterialTheme.typography.headlineSmall,
@@ -568,12 +571,12 @@ fun Part3CueCard(topic: Part3Topic) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             topic.forPoints.forEach { point ->
-                // MODIFIED: Use buildAnnotatedString for hanging indent
                 Text(
                     buildAnnotatedString {
                         withStyle(style = paragraphStyle) {
-                            append("•\u00A0\u00A0")
-                            append(point)
+                            append("•\u00A0\u00A0"); append(
+                            point
+                        )
                         }
                     },
                     style = MaterialTheme.typography.bodyLarge,
@@ -582,10 +585,7 @@ fun Part3CueCard(topic: Part3Topic) {
                     modifier = Modifier.padding(bottom = 14.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.height(28.dp)) // Spacer between sections
-
-            // --- AGAINST Section ---
+            Spacer(modifier = Modifier.height(28.dp))
             Text(
                 text = "AGAINST",
                 style = MaterialTheme.typography.headlineSmall,
@@ -594,12 +594,12 @@ fun Part3CueCard(topic: Part3Topic) {
             )
             Spacer(modifier = Modifier.height(16.dp))
             topic.againstPoints.forEach { point ->
-                // MODIFIED: Use buildAnnotatedString for hanging indent
                 Text(
                     buildAnnotatedString {
                         withStyle(style = paragraphStyle) {
-                            append("•\u00A0\u00A0")
-                            append(point)
+                            append("•\u00A0\u00A0"); append(
+                            point
+                        )
                         }
                     },
                     style = MaterialTheme.typography.bodyLarge,
