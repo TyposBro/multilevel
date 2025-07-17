@@ -538,9 +538,8 @@ fun Part2_View(uiState: MultilevelUiState) {
                         Text(
                             buildAnnotatedString {
                                 withStyle(style = paragraphStyle) {
-                                    append("•\u00A0\u00A0"); append(
-                                    point.trim()
-                                )
+                                    append("•\u00A0\u00A0")
+                                    append(point.trim())
                                 }
                             },
                             style = MaterialTheme.typography.headlineSmall,
@@ -580,7 +579,8 @@ fun Part3CueCard(topic: Part3Topic) {
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Column(modifier = Modifier.padding(24.dp)) {
+        // Reduced vertical padding and spacers to make the card more compact
+        Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
             Text(
                 text = topic.topic,
                 style = MaterialTheme.typography.headlineLarge,
@@ -590,56 +590,62 @@ fun Part3CueCard(topic: Part3Topic) {
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.height(28.dp))
+
+            Spacer(modifier = Modifier.height(24.dp))
+
             val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 12.sp))
+
+            // "FOR" section
             Text(
                 text = "FOR",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge, // Using TitleLarge for section headers
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             topic.forPoints.forEach { point ->
                 Text(
                     buildAnnotatedString {
                         withStyle(style = paragraphStyle) {
-                            append("•\u00A0\u00A0"); append(
-                            point
-                        )
+                            append("•\u00A0\u00A0") // Bullet and non-breaking spaces
+                            append(point)
                         }
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    lineHeight = 24.sp,
-                    modifier = Modifier.padding(bottom = 14.dp)
+                    lineHeight = 22.sp, // Reduced line height for compactness
+                    modifier = Modifier.padding(bottom = 8.dp) // Reduced padding between points
                 )
             }
-            Spacer(modifier = Modifier.height(28.dp))
+
+            Spacer(modifier = Modifier.height(20.dp)) // Spacer between FOR and AGAINST
+
+            // "AGAINST" section
             Text(
                 text = "AGAINST",
-                style = MaterialTheme.typography.headlineSmall,
+                style = MaterialTheme.typography.titleLarge, // Using TitleLarge for section headers
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.error
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             topic.againstPoints.forEach { point ->
                 Text(
                     buildAnnotatedString {
                         withStyle(style = paragraphStyle) {
-                            append("•\u00A0\u00A0"); append(
-                            point
-                        )
+                            append("•\u00A0\u00A0") // Bullet and non-breaking spaces
+                            append(point)
                         }
                     },
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
-                    lineHeight = 24.sp,
-                    modifier = Modifier.padding(bottom = 14.dp)
+                    lineHeight = 22.sp, // Reduced line height
+                    modifier = Modifier.padding(bottom = 8.dp) // Reduced padding
                 )
             }
         }
     }
 }
+
 
 private fun formatTime(seconds: Int): String {
     val minutes = seconds / 60
