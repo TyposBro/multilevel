@@ -17,14 +17,11 @@ import kotlin.coroutines.Continuation
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
-// In typosbro-multilevel/android/app/src/main/java/com/typosbro/multilevel/features/vosk/VoskService.kt
-
 @Singleton
 class VoskService @Inject constructor(@ApplicationContext private val context: Context) {
 
     private var model: Model? = null
     private var speechService: SpeechService? = null
-    private var recognizer: Recognizer? = null
     private var recognitionContinuation: Continuation<String>? = null
 
     companion object {
@@ -34,15 +31,12 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
     }
 
     private val listener = object : RecognitionListener {
-        // This is called when the recognizer detects a period of silence.
         override fun onResult(hypothesis: String?) {
             if (hypothesis.isNullOrBlank()) return
             try {
                 val text = JSONObject(hypothesis).getString("text")
                 if (text.isNotBlank()) {
                     Log.d(TAG, "onResult (segment): $text")
-                    // Instead of resuming, we now pass the result to a callback.
-                    // The ViewModel will handle appending it to the transcript.
                     resultListener?.invoke(text)
                 }
             } catch (e: Exception) {
@@ -50,7 +44,6 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
             }
         }
 
-        // This is called only when speechService.stop() is called.
         override fun onFinalResult(hypothesis: String?) {
             val text = try {
                 if (hypothesis.isNullOrBlank()) "" else JSONObject(hypothesis).getString("text")
@@ -78,7 +71,6 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
         override fun onTimeout() {}
     }
 
-    // New callback to send intermediate results to the ViewModel
     var resultListener: ((String) -> Unit)? = null
 
     suspend fun initialize() = suspendCoroutine { continuation ->
@@ -97,52 +89,52 @@ class VoskService @Inject constructor(@ApplicationContext private val context: C
             })
     }
 
-    // Creates the service but does not start listening
-    fun createAndStartService(): Boolean {
+    /**
+     * Starts a new recognition session.
+     * This creates a fresh SpeechService to ensure no audio is carried over from previous states.
+     * @return Boolean indicating if the service was started successfully.
+     */
+    fun startRecognition(): Boolean {
         if (model == null) {
             Log.e(TAG, "Model is not initialized.")
             return false
         }
         if (speechService != null) {
-            return true // Already created
+            Log.w(TAG, "Recognition already active. Stopping previous instance.")
+            stopRecognition()
         }
+
         try {
-            recognizer = Recognizer(model, 16000.0f)
+            val recognizer = Recognizer(model, 16000.0f)
             speechService = SpeechService(recognizer, 16000.0f)
-            speechService?.startListening(listener)
-            speechService?.setPause(true) // Start in a paused state
+            speechService?.startListening(listener) // Starts un-paused
+            Log.d(TAG, "Vosk recognition started.")
             return true
         } catch (e: IOException) {
-            Log.e(TAG, "Failed to create SpeechService", e)
+            Log.e(TAG, "Failed to create/start SpeechService", e)
+            speechService = null
             return false
         }
     }
 
-    // Unpauses the recognizer to start processing audio
-    fun startListening() {
-        speechService?.setPause(false)
-        Log.d(TAG, "Vosk listening resumed.")
-    }
-
-    // Pauses the recognizer, it will stop processing audio but not shut down.
-    fun pauseListening() {
-        speechService?.setPause(true)
-        Log.d(TAG, "Vosk listening paused.")
-    }
-
-    // Fully stops and cleans up the service.
-    fun stopAndRelease() {
+    /**
+     * Stops the current recognition session and shuts down the service.
+     */
+    fun stopRecognition() {
         speechService?.stop()
         speechService?.shutdown()
-        recognizer = null
         speechService = null
-        resultListener = null
-        Log.d(TAG, "Vosk service stopped and released.")
+        Log.d(TAG, "Vosk recognition stopped.")
     }
 
+    /**
+     * Releases all resources, including the Vosk model. Called when the ViewModel is destroyed.
+     */
     fun release() {
-        stopAndRelease()
+        stopRecognition() // Ensure any active service is stopped.
         model?.close()
         model = null
+        resultListener = null // Avoid potential context leaks
+        Log.d(TAG, "Vosk service fully released.")
     }
 }

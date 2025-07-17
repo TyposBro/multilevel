@@ -36,7 +36,7 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
-// Enum to define the practice parts for type safety
+// Enums and UiState remain the same...
 enum class PracticePart {
     FULL, P1_1, P1_2, P2, P3
 }
@@ -73,6 +73,7 @@ data class MultilevelUiState(
     val error: String? = null,
     val finalResultId: String? = null
 )
+
 
 @HiltViewModel
 class MultilevelExamViewModel @Inject constructor(
@@ -133,18 +134,7 @@ class MultilevelExamViewModel @Inject constructor(
             }
             updateState("startExam: Success") { it.copy(examContent = result.data) }
 
-            val serviceCreated = voskService.createAndStartService()
-            if (!serviceCreated || !isActive) {
-                updateState(
-                    "startExam",
-                    {
-                        it.copy(
-                            stage = MultilevelExamStage.FINISHED_ERROR,
-                            error = "Could not start recognition service."
-                        )
-                    })
-                return@launch
-            }
+            // *** REMOVED VOSK START FROM HERE ***
 
             when (practicePart) {
                 PracticePart.FULL -> {
@@ -259,19 +249,27 @@ class MultilevelExamViewModel @Inject constructor(
 
     private suspend fun startAnswerTimer(prepTime: Int, answerTime: Int) {
         updateState("startAnswerTimer: Prep phase") { it.copy(isRecording = false) }
-        voskService.pauseListening()
+        // Service is not running, so no need to pause
         startTimer(prepTime)
         if (!viewModelScope.isActive) return
 
         updateState("startAnswerTimer: Answer phase") { it.copy(isRecording = true) }
         playStartSpeakingSound()
-        voskService.startListening()
+        if (!voskService.startRecognition()) {
+            updateState("startAnswerTimer: Error") {
+                it.copy(
+                    stage = MultilevelExamStage.FINISHED_ERROR,
+                    error = "Could not start recognition."
+                )
+            }
+            return
+        }
 
         startTimer(answerTime)
         if (!viewModelScope.isActive) return
 
         updateState("startAnswerTimer: Stopping recording") { it.copy(isRecording = false) }
-        voskService.pauseListening()
+        voskService.stopRecognition()
     }
 
     private suspend fun startMonologueTimer(
@@ -280,7 +278,7 @@ class MultilevelExamViewModel @Inject constructor(
         speakingStage: MultilevelExamStage
     ) {
         updateState("startMonologueTimer: Prep") { it.copy(isRecording = false) }
-        voskService.pauseListening()
+        // Service is not running, so no need to pause
         startTimer(prepTime)
         if (!viewModelScope.isActive) return
 
@@ -291,24 +289,31 @@ class MultilevelExamViewModel @Inject constructor(
             )
         }
         playStartSpeakingSound()
-        voskService.startListening()
+        if (!voskService.startRecognition()) {
+            updateState("startMonologueTimer: Error") {
+                it.copy(
+                    stage = MultilevelExamStage.FINISHED_ERROR,
+                    error = "Could not start recognition."
+                )
+            }
+            return
+        }
 
         startTimer(speakTime)
         if (!viewModelScope.isActive) return
 
         updateState("startMonologueTimer: Stopping") { it.copy(isRecording = false) }
-        voskService.pauseListening()
+        voskService.stopRecognition()
     }
 
     @RequiresApi(Build.VERSION_CODES.S)
     private fun concludeAndAnalyze() {
-        voskService.stopAndRelease() // Fully stop and release the service
-
+        // Service is already stopped after the last speaking segment.
         updateState("concludeAndAnalyze: Analyzing") { it.copy(stage = MultilevelExamStage.ANALYZING) }
 
-        // We add a small delay to ensure the final result from Vosk has time to be processed and added to the transcript
+        // We add a small delay to ensure the final result from Vosk has time to be processed.
         viewModelScope.launch {
-            delay(500) // 0.5-second buffer
+            delay(500)
 
             val logDir = context.getExternalFilesDir(Environment.DIRECTORY_RECORDINGS)
             if (logDir != null) {
@@ -335,6 +340,7 @@ class MultilevelExamViewModel @Inject constructor(
         }
     }
 
+    // startTimer, playInstructionAndWait, etc. remain the same...
     private suspend fun startTimer(duration: Int) {
         val job = viewModelScope.launch {
             for (i in duration downTo 1) {
