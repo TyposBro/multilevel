@@ -5,8 +5,7 @@ import { cors } from "hono/cors";
 
 // Import routes
 import authRoutes from "./routes/authRoutes";
-import ieltsExamRoutes from "./routes/ieltsExamRoutes";
-import multilevelExamRoutes from "./routes/multilevelExamRoutes";
+import examRoutes from "./routes/examRoutes";
 import subscriptionRoutes from "./routes/subscriptionRoutes";
 import wordBankRoutes from "./routes/wordBankRoutes";
 import adminRoutes from "./routes/adminRoutes";
@@ -40,8 +39,7 @@ app.use(
 );
 // --- API Routes ---
 app.route("/api/auth", authRoutes);
-app.route("/api/exam/ielts", ieltsExamRoutes);
-app.route("/api/exam/multilevel", multilevelExamRoutes);
+app.route("/api/exam/multilevel", examRoutes);
 app.route("/api/subscriptions", subscriptionRoutes);
 app.route("/api/wordbank", wordBankRoutes);
 app.route("/api/admin", adminRoutes);
