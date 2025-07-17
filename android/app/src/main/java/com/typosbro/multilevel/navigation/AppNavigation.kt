@@ -1,6 +1,8 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/navigation/AppNavigation.kt
 package com.typosbro.multilevel.navigation
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -17,8 +19,8 @@ import androidx.navigation.navArgument
 import com.typosbro.multilevel.data.local.SessionManager
 import com.typosbro.multilevel.ui.screens.MainScreen
 import com.typosbro.multilevel.ui.screens.auth.LoginScreen
-import com.typosbro.multilevel.ui.screens.practice.MultilevelExamScreen
-import com.typosbro.multilevel.ui.screens.practice.MultilevelResultScreen
+import com.typosbro.multilevel.ui.screens.practice.ExamScreen
+import com.typosbro.multilevel.ui.screens.practice.ResultScreen
 import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
 
 // Define navigation routes
@@ -26,10 +28,11 @@ object AppDestinations {
     const val LOGIN_ROUTE = "login"
     const val REGISTER_ROUTE = "register"
     const val MAIN_HUB_ROUTE = "main_hub"
-    const val MULTILEVEL_EXAM_ROUTE = "multilevel_exam/{practicePart}"
-    const val MULTILEVEL_RESULT_ROUTE = "multilevel_result/{resultId}"
+    const val EXAM_ROUTE = "multilevel_exam/{practicePart}"
+    const val RESULT_ROUTE = "multilevel_result/{resultId}"
 }
 
+@RequiresApi(Build.VERSION_CODES.S)
 @Composable
 fun AppNavigation(
     navController: NavHostController = rememberNavController()
@@ -87,27 +90,29 @@ fun AppNavigation(
 
 
         composable(
-            route = AppDestinations.MULTILEVEL_EXAM_ROUTE,
+            route = AppDestinations.EXAM_ROUTE,
             arguments = listOf(navArgument("practicePart") { type = NavType.StringType })
         ) {
-            MultilevelExamScreen(
+            ExamScreen(
                 onNavigateToResults = { resultId ->
                     navController.navigate("multilevel_result/$resultId") {
-                        // Pop back to the multilevel practice hub, not just the exam screen
-                        popUpTo(navController.graph.id) {
-                            inclusive = false // Keep MainScreen in the backstack
+                        // Pop the ExamScreen from the back stack. This ensures that when the user
+                        // presses 'back' on the ResultScreen, they are taken to the MainScreen
+                        // instead of back to the completed exam.
+                        popUpTo(AppDestinations.EXAM_ROUTE) {
+                            inclusive = true
                         }
-                        // A more specific popUp can be used if you know the route
-                        // popUpTo(PracticeDestinations.MULTILEVEL_HUB) { inclusive = true }
+                        // Avoid launching multiple instances of the result screen if triggered quickly.
+                        launchSingleTop = true
                     }
                 }
             )
         }
         composable(
-            route = AppDestinations.MULTILEVEL_RESULT_ROUTE,
+            route = AppDestinations.RESULT_ROUTE,
             arguments = listOf(navArgument("resultId") { type = NavType.StringType })
         ) {
-            MultilevelResultScreen(onNavigateBack = { navController.popBackStack() })
+            ResultScreen(onNavigateBack = { navController.popBackStack() })
         }
     }
 }
