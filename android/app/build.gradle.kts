@@ -21,12 +21,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // FIX: Add the NDK block to specify which native architectures to build.
-        // This is crucial for the C++ code.
-        ndk {
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
-        }
     }
 
     buildTypes {
@@ -36,12 +30,6 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
         }
     }
 
@@ -56,7 +44,7 @@ android {
 
     buildFeatures {
         compose = true
-        buildConfig = true  // ADD THIS LINE to enable BuildConfig generation
+        buildConfig = true
     }
 
     // DEBUG Keystore
@@ -69,13 +57,19 @@ android {
             keyPassword = "android"
         }
     }
-
-    aaptOptions {
-        noCompress += ".onnx"
+    // IMPORTANT: Add this packagingOptions block. This is needed because
+    // the Vosk .aar and other libraries might have conflicting native lib files.
+    // This tells Gradle to pick the first one it finds, which is standard practice.
+    packaging {
+        resources.pickFirsts.add("**/libc++_shared.so")
+        resources.pickFirsts.add("**/libkaldi_jni.so") // This might be needed depending on the Vosk version
     }
 }
 
 dependencies {
+    // Vosk STT Engine
+    implementation(project(":models"))
+
     // Core Android & Compose
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -109,10 +103,6 @@ dependencies {
 
     // ONNX Runtime (for TTS)
     implementation(libs.onnxruntime.android)
-
-    // FIX: Add TensorFlow Lite dependencies (for Whisper STT Java fallback)
-    implementation(libs.tensorflow.lite)
-    implementation(libs.tensorflow.lite.support)
 
     // Room (Local Database)
     implementation(libs.androidx.room.runtime)
@@ -153,4 +143,6 @@ dependencies {
 
     // Swipe
     implementation(libs.swipeablecard)
+
+    implementation(libs.vosk.android)
 }

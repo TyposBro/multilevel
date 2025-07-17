@@ -1,17 +1,14 @@
 package com.typosbro.multilevel.data.repositories
 
 import android.content.Context
-import android.os.Build
 import android.os.Environment
 import android.util.Log
-import androidx.annotation.RequiresApi
 import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import java.io.File
 
 object DebugLogRepository {
     private const val TAG = "DebugLogRepository"
 
-    @RequiresApi(Build.VERSION_CODES.S)
     fun saveTranscript(
         context: Context,
         audioFile: File?,
@@ -28,7 +25,8 @@ object DebugLogRepository {
 
         try {
             val transcriptFileName = audioFile.name.replace(".wav", ".txt")
-            val dir = context.getExternalFilesDir(Environment.DIRECTORY_RECORDINGS)
+            val dir = context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS)
+                ?: throw IllegalStateException("External files directory is not available")
             val transcriptFile = File(dir, transcriptFileName)
 
             val content = transcript.joinToString(separator = "\n") { "[${it.speaker}] ${it.text}" }
