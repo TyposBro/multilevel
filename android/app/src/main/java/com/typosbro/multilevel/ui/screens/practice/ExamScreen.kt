@@ -206,7 +206,7 @@ fun TranscriptDisplay(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(150.dp) // Fixed height to prevent layout shifts during animation
+            .height(120.dp) // Fixed height to prevent layout shifts during animation
             .padding(horizontal = 24.dp, vertical = 8.dp)
             .verticalScroll(rememberScrollState()),
         contentAlignment = Alignment.BottomEnd
@@ -445,7 +445,7 @@ fun Part1_2_View(uiState: MultilevelUiState) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(180.dp),
+                        .weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     ImageLoader(
@@ -463,7 +463,7 @@ fun Part1_2_View(uiState: MultilevelUiState) {
                             .clip(RoundedCornerShape(12.dp))
                     )
                 }
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = uiState.currentQuestionText ?: "Loading question...",
                     style = MaterialTheme.typography.headlineMedium,
