@@ -42,7 +42,6 @@ describe("Admin Routes (Controllers and Middleware)", () => {
 
   // ===================================================================
   // Tests for adminMiddleware.js
-  // We test the middleware by calling a protected route with bad data.
   // ===================================================================
   describe("Middleware: protectAdmin", () => {
     it("should return 401 if token has an invalid signature", async () => {
@@ -167,11 +166,10 @@ describe("Admin Routes (Controllers and Middleware)", () => {
   });
 
   // ===================================================================
-  // Tests for adminContentController.js
-  // All these tests assume the middleware has passed.
+  // Tests for adminContentController.js (Create)
   // ===================================================================
-  describe("Controller: adminContentController", () => {
-    it("POST /part1.1 - should succeed with valid data", async () => {
+  describe("Controller: adminContentController (Create)", () => {
+    it("POST /content/part1.1 - should succeed with valid data", async () => {
       const formData = new FormData();
       formData.append("questionText", "A question");
       formData.append("audio", new File(["audio"], "a.mp3"));
@@ -184,165 +182,21 @@ describe("Admin Routes (Controllers and Middleware)", () => {
       expect(db.createContent).toHaveBeenCalled();
     });
 
-    it("POST /part1.2 - should fail with missing files", async () => {
-      const formData = new FormData();
-      formData.append("question1", "q1");
-      formData.append("image1", new File([], "f1.jpg"));
-      const res = await app.request(
-        "/api/admin/content/part1.2",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(400);
-    });
-
-    it("POST /part2 - should succeed with optional image", async () => {
-      const formData = new FormData();
-      formData.append("question1", "q1");
-      formData.append("question2", "q2");
-      formData.append("question3", "q3");
-      formData.append("image", new File([], "img.jpg"));
-      formData.append("audio", new File([], "audio.mp3"));
-      const res = await app.request(
-        "/api/admin/content/part2",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(201);
-      expect(uploadToCDN).toHaveBeenCalledTimes(2);
-    });
-
-    it("POST /part2 - should fail with missing audio file", async () => {
-      const formData = new FormData();
-      formData.append("question1", "q1");
-      formData.append("question2", "q2");
-      formData.append("question3", "q3");
-      const res = await app.request(
-        "/api/admin/content/part2",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(400);
-    });
-
-    it("POST /part3 - should succeed with optional image", async () => {
-      const formData = new FormData();
-      formData.append("topic", "A topic");
-      formData.append("forPoints", "Point 1\nPoint 2");
-      formData.append("againstPoints", "Point A\nPoint B");
-      formData.append("image", new File([], "img.jpg"));
-      const res = await app.request(
-        "/api/admin/content/part3",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(201);
-      expect(uploadToCDN).toHaveBeenCalledTimes(1);
-    });
-
-    it("POST /wordbank/add - should succeed with valid data", async () => {
+    it("POST /wordbank - should succeed with valid data", async () => {
       const formData = new FormData();
       formData.append("word", "ephemeral");
       formData.append("translation", "efemer");
       formData.append("cefrLevel", "C1");
       formData.append("topic", "Advanced");
       const res = await app.request(
-        "/api/admin/wordbank/add",
+        "/api/admin/wordbank", // Updated route
         { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
         MOCK_ADMIN_ENV
       );
       expect(res.status).toBe(201);
     });
 
-    // --- New Tests for uploadPart1_1 ---
-    it("POST /part1.1 - should handle server error on upload", async () => {
-      uploadToCDN.mockRejectedValue(new Error("R2 is down"));
-      const formData = new FormData();
-      formData.append("questionText", "A question");
-      formData.append("audio", new File(["audio"], "a.mp3"));
-      const res = await app.request(
-        "/api/admin/content/part1.1",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(500);
-    });
-
-    // --- New Tests for uploadPart1_2 ---
-    it("POST /part1.2 - should succeed with all data", async () => {
-      const formData = new FormData();
-      formData.append("question1", "q1");
-      formData.append("question2", "q2");
-      formData.append("question3", "q3");
-      formData.append("imageDescription", "desc");
-      formData.append("image1", new File([], "f1.jpg"));
-      formData.append("image2", new File([], "f2.jpg"));
-      formData.append("audio1", new File([], "a1.mp3"));
-      formData.append("audio2", new File([], "a2.mp3"));
-      formData.append("audio3", new File([], "a3.mp3"));
-      const res = await app.request(
-        "/api/admin/content/part1.2",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(201);
-      expect(uploadToCDN).toHaveBeenCalledTimes(5);
-    });
-
-    it("POST /part1.2 - should handle server error on upload", async () => {
-      uploadToCDN.mockRejectedValue(new Error("R2 is down"));
-      const formData = new FormData();
-      formData.append("question1", "q1");
-      formData.append("question2", "q2");
-      formData.append("question3", "q3");
-      formData.append("imageDescription", "desc");
-      formData.append("image1", new File([], "f1.jpg"));
-      formData.append("image2", new File([], "f2.jpg"));
-      formData.append("audio1", new File([], "a1.mp3"));
-      formData.append("audio2", new File([], "a2.mp3"));
-      formData.append("audio3", new File([], "a3.mp3"));
-      const res = await app.request(
-        "/api/admin/content/part1.2",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(500);
-    });
-
-    // --- New Tests for uploadPart2 ---
-    it("POST /part2 - should handle server error on upload", async () => {
-      uploadToCDN.mockRejectedValue(new Error("R2 is down"));
-      const formData = new FormData();
-      formData.append("question1", "q1");
-      formData.append("question2", "q2");
-      formData.append("question3", "q3");
-      formData.append("audio", new File([], "audio.mp3"));
-      const res = await app.request(
-        "/api/admin/content/part2",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(500);
-    });
-
-    // --- New Tests for uploadPart3 ---
-    it("POST /part3 - should handle server error on upload", async () => {
-      uploadToCDN.mockRejectedValue(new Error("R2 is down"));
-      const formData = new FormData();
-      formData.append("topic", "A topic");
-      formData.append("forPoints", "Point 1");
-      formData.append("againstPoints", "Point A");
-      formData.append("image", new File([], "img.jpg"));
-      const res = await app.request(
-        "/api/admin/content/part3",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
-        MOCK_ADMIN_ENV
-      );
-      expect(res.status).toBe(500);
-    });
-
-    // --- New Tests for uploadWordBankWord ---
-    it("POST /wordbank/add - should return 409 for a duplicate word", async () => {
+    it("POST /wordbank - should return 409 for a duplicate word", async () => {
       db.createContent.mockRejectedValue(new Error("UNIQUE constraint failed"));
       const formData = new FormData();
       formData.append("word", "duplicate");
@@ -350,23 +204,118 @@ describe("Admin Routes (Controllers and Middleware)", () => {
       formData.append("cefrLevel", "A1");
       formData.append("topic", "Test");
       const res = await app.request(
-        "/api/admin/wordbank/add",
+        "/api/admin/wordbank", // Updated route
         { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
         MOCK_ADMIN_ENV
       );
       expect(res.status).toBe(409);
     });
+  });
 
-    it("POST /wordbank/add - should handle generic server error", async () => {
-      db.createContent.mockRejectedValue(new Error("Some other DB error"));
-      const formData = new FormData();
-      formData.append("word", "new-word");
-      formData.append("translation", "new-trans");
-      formData.append("cefrLevel", "B1");
-      formData.append("topic", "Generic");
+  // ===================================================================
+  // Tests for Admin Content CRUD (Read, Update, Delete)
+  // ===================================================================
+  describe("Admin Content CRUD (Read, Update, Delete)", () => {
+    const mockContentItem = { id: "c1", questionText: "test question" };
+    const mockContentList = [mockContentItem];
+
+    it("GET /content/part1.1 - should list all items", async () => {
+      db.listAllContent.mockResolvedValue(mockContentList);
       const res = await app.request(
-        "/api/admin/wordbank/add",
-        { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData },
+        "/api/admin/content/part1.1",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(mockContentList);
+      expect(db.listAllContent).toHaveBeenCalledWith(MOCK_ADMIN_ENV.DB, "content_part1_1");
+    });
+
+    it("GET /content/part1.1/:id - should get a single item", async () => {
+      db.getContentById.mockResolvedValue(mockContentItem);
+      const res = await app.request(
+        `/api/admin/content/part1.1/${mockContentItem.id}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(mockContentItem);
+      expect(db.getContentById).toHaveBeenCalledWith(
+        MOCK_ADMIN_ENV.DB,
+        "content_part1_1",
+        mockContentItem.id
+      );
+    });
+
+    it("GET /content/part1.1/:id - should return 404 if not found", async () => {
+      db.getContentById.mockResolvedValue(null);
+      const res = await app.request(
+        "/api/admin/content/part1.1/not-found-id",
+        { headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it("PUT /content/part1.1/:id - should update an item", async () => {
+      const updateData = { questionText: "updated question" };
+      const updatedItem = { ...mockContentItem, ...updateData };
+      db.updateContent.mockResolvedValue(updatedItem);
+
+      const res = await app.request(
+        `/api/admin/content/part1.1/${mockContentItem.id}`,
+        {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify(updateData),
+        },
+        MOCK_ADMIN_ENV
+      );
+
+      expect(res.status).toBe(200);
+      expect(await res.json()).toEqual(updatedItem);
+      expect(db.updateContent).toHaveBeenCalledWith(
+        MOCK_ADMIN_ENV.DB,
+        "content_part1_1",
+        mockContentItem.id,
+        updateData
+      );
+    });
+
+    it("PUT /wordbank/:id - should return 409 on unique constraint violation", async () => {
+      db.updateContent.mockRejectedValue(new Error("UNIQUE constraint failed"));
+      const res = await app.request(
+        "/api/admin/wordbank/some-id",
+        {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ word: "existing-word" }),
+        },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(409);
+    });
+
+    it("DELETE /content/part1.1/:id - should delete an item and return 204", async () => {
+      db.deleteContent.mockResolvedValue({ success: true });
+      const res = await app.request(
+        `/api/admin/content/part1.1/${mockContentItem.id}`,
+        { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+        MOCK_ADMIN_ENV
+      );
+      expect(res.status).toBe(204);
+      expect(db.deleteContent).toHaveBeenCalledWith(
+        MOCK_ADMIN_ENV.DB,
+        "content_part1_1",
+        mockContentItem.id
+      );
+    });
+
+    it("GET /content/part1.1 - should return 500 on database error", async () => {
+      db.listAllContent.mockRejectedValue(new Error("DB Error"));
+      const res = await app.request(
+        "/api/admin/content/part1.1",
+        { headers: { Authorization: `Bearer ${token}` } },
         MOCK_ADMIN_ENV
       );
       expect(res.status).toBe(500);

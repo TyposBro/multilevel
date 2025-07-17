@@ -67,7 +67,9 @@ CREATE TABLE IF NOT EXISTS content_part1_1 (
   id TEXT PRIMARY KEY,
   questionText TEXT NOT NULL,
   audioUrl TEXT NOT NULL,
-  tags TEXT
+  tags TEXT,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS content_part1_2 (
@@ -76,7 +78,9 @@ CREATE TABLE IF NOT EXISTS content_part1_2 (
   image2Url TEXT NOT NULL,
   imageDescription TEXT NOT NULL,
   questions TEXT NOT NULL,
-  tags TEXT
+  tags TEXT,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS content_part2 (
@@ -84,7 +88,9 @@ CREATE TABLE IF NOT EXISTS content_part2 (
   imageUrl TEXT,
   imageDescription TEXT,
   questions TEXT NOT NULL,
-  tags TEXT
+  tags TEXT,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS content_part3 (
@@ -93,5 +99,7 @@ CREATE TABLE IF NOT EXISTS content_part3 (
   forPoints TEXT NOT NULL,
   againstPoints TEXT NOT NULL,
   imageUrl TEXT,
-  tags TEXT
+  tags TEXT,
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
 );

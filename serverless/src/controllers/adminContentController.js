@@ -5,9 +5,45 @@ import { uploadToCDN } from "../services/storageService";
 
 const DEFAULT_PROVIDER = "cloudflare";
 
-/**
- * @desc    Upload content for a new Part 1.1 Question
- */
+// --- Generic CRUD Controller Factories ---
+
+const listContent = (tableName) => async (c) => {
+  try {
+    const items = await db.listAllContent(c.env.DB, tableName);
+    return c.json(items);
+  } catch (error) {
+    console.error(`[Admin] List ${tableName} Error:`, error);
+    return c.json({ message: `Server error while fetching ${tableName}.` }, 500);
+  }
+};
+
+const getContent = (tableName) => async (c) => {
+  try {
+    const { id } = c.req.param();
+    const item = await db.getContentById(c.env.DB, tableName, id);
+    if (!item) {
+      return c.json({ message: "Content not found." }, 404);
+    }
+    return c.json(item);
+  } catch (error) {
+    console.error(`[Admin] Get ${tableName} Error:`, error);
+    return c.json({ message: `Server error while fetching content.` }, 500);
+  }
+};
+
+const deleteContent = (tableName) => async (c) => {
+  try {
+    const { id } = c.req.param();
+    await db.deleteContent(c.env.DB, tableName, id);
+    return c.body(null, 204); // No Content
+  } catch (error) {
+    console.error(`[Admin] Delete ${tableName} Error:`, error);
+    return c.json({ message: `Server error while deleting content.` }, 500);
+  }
+};
+
+// --- Create (Upload) Controllers ---
+// ... uploadPart1_1, etc. are unchanged ...
 export const uploadPart1_1 = async (c) => {
   try {
     const formData = await c.req.formData();
@@ -33,28 +69,22 @@ export const uploadPart1_1 = async (c) => {
   }
 };
 
-/**
- * @desc    Upload content for a new Part 1.2 Set
- */
 export const uploadPart1_2 = async (c) => {
   try {
     const formData = await c.req.formData();
     const provider = formData.get("provider")?.toString() || DEFAULT_PROVIDER;
 
-    // Extract text fields
     const question1 = formData.get("question1");
     const question2 = formData.get("question2");
     const question3 = formData.get("question3");
     const imageDescription = formData.get("imageDescription");
 
-    // Extract files
     const image1 = formData.get("image1");
     const image2 = formData.get("image2");
     const audio1 = formData.get("audio1");
     const audio2 = formData.get("audio2");
     const audio3 = formData.get("audio3");
 
-    // --- ROBUST VALIDATION ---
     if (!question1 || !question2 || !question3 || !imageDescription) {
       return c.json({ message: "All text fields are required." }, 400);
     }
@@ -67,9 +97,7 @@ export const uploadPart1_2 = async (c) => {
     ) {
       return c.json({ message: "All 5 files (2 images, 3 audio) are required." }, 400);
     }
-    // --- END ROBUST VALIDATION ---
 
-    // Upload all files in parallel
     const [image1Url, image2Url, audio1Url, audio2Url, audio3Url] = await Promise.all([
       uploadToCDN(c, provider, image1, "images"),
       uploadToCDN(c, provider, image2, "images"),
@@ -97,9 +125,6 @@ export const uploadPart1_2 = async (c) => {
   }
 };
 
-/**
- * @desc    Upload content for a new Part 2 Set
- */
 export const uploadPart2 = async (c) => {
   try {
     const formData = await c.req.formData();
@@ -108,18 +133,16 @@ export const uploadPart2 = async (c) => {
     const question1 = formData.get("question1");
     const question2 = formData.get("question2");
     const question3 = formData.get("question3");
-    const imageDescription = formData.get("imageDescription"); // Optional
-    const imageFile = formData.get("image"); // Optional
+    const imageDescription = formData.get("imageDescription");
+    const imageFile = formData.get("image");
     const audioFile = formData.get("audio");
 
-    // --- ROBUST VALIDATION ---
     if (!question1 || !question2 || !question3) {
       return c.json({ message: "All three question text fields are required." }, 400);
     }
     if (!audioFile || !(audioFile instanceof File)) {
       return c.json({ message: "A single combined audio file is required." }, 400);
     }
-    // --- END ROBUST VALIDATION ---
 
     let imageUrl = null;
     if (imageFile instanceof File) {
@@ -145,9 +168,6 @@ export const uploadPart2 = async (c) => {
   }
 };
 
-/**
- * @desc    Upload content for a new Part 3 Topic
- */
 export const uploadPart3 = async (c) => {
   try {
     const formData = await c.req.formData();
@@ -156,20 +176,17 @@ export const uploadPart3 = async (c) => {
     const topic = formData.get("topic");
     const forPoints = formData.get("forPoints");
     const againstPoints = formData.get("againstPoints");
-    const imageFile = formData.get("image"); // Optional
+    const imageFile = formData.get("image");
 
-    // --- ROBUST VALIDATION ---
     if (!topic || !forPoints || !againstPoints) {
       return c.json({ message: "Topic, FOR points, and AGAINST points are required." }, 400);
     }
-    // --- END ROBUST VALIDATION ---
 
     let imageUrl = null;
     if (imageFile instanceof File) {
       imageUrl = await uploadToCDN(c, provider, imageFile, "images");
     }
 
-    // Convert newline-separated points into a JSON array of strings
     const forPointsArray = forPoints.split("\n").filter((p) => p.trim() !== "");
     const againstPointsArray = againstPoints.split("\n").filter((p) => p.trim() !== "");
 
@@ -188,23 +205,18 @@ export const uploadPart3 = async (c) => {
   }
 };
 
-/**
- * @desc    Uploads a new word to the Word Bank
- */
-export const uploadWordBankWord = async (c) => {
+export const createWordBankWord = async (c) => {
   try {
     const formData = await c.req.formData();
     const wordData = Object.fromEntries(formData.entries());
     const { word, translation, cefrLevel, topic } = wordData;
 
-    // --- ROBUST VALIDATION ---
     if (!word || !translation || !cefrLevel || !topic) {
       return c.json(
         { message: "Please fill all required fields: word, translation, cefrLevel, and topic." },
         400
       );
     }
-    // --- END ROBUST VALIDATION ---
 
     const createdWord = await db.createContent(c.env.DB, "words", {
       word,
@@ -226,3 +238,109 @@ export const uploadWordBankWord = async (c) => {
     return c.json({ message: "Server error while adding the word." }, 500);
   }
 };
+
+// --- Update Controllers ---
+
+// A helper for simple updates (text fields only)
+const updateTextContent = (tableName) => async (c) => {
+  try {
+    const { id } = c.req.param();
+    const data = await c.req.json();
+    const updatedItem = await db.updateContent(c.env.DB, tableName, id, data);
+    if (!updatedItem) return c.json({ message: "Content not found" }, 404);
+    return c.json(updatedItem);
+  } catch (error) {
+    console.error(`[Admin] Update ${tableName} Error:`, error);
+    return c.json({ message: `Server error while updating content.` }, 500);
+  }
+};
+
+// Specialized Update for Part 1.1 (simple file update)
+export const updatePart1_1 = async (c) => {
+  try {
+    const { id } = c.req.param();
+    const formData = await c.req.formData();
+    const currentItem = await db.getContentById(c.env.DB, "content_part1_1", id);
+    if (!currentItem) return c.json({ message: "Content not found" }, 404);
+
+    const dataToUpdate = {
+      questionText: formData.get("questionText") || currentItem.questionText,
+      audioUrl: currentItem.audioUrl,
+    };
+
+    const audioFile = formData.get("audio");
+    if (audioFile instanceof File && audioFile.size > 0) {
+      dataToUpdate.audioUrl = await uploadToCDN(c, "cloudflare", audioFile, "audio");
+    }
+
+    const updatedItem = await db.updateContent(c.env.DB, "content_part1_1", id, dataToUpdate);
+    return c.json(updatedItem);
+  } catch (error) {
+    console.error(`[Admin] Update Part 1.1 Error:`, error);
+    return c.json({ message: `Server error while updating content.` }, 500);
+  }
+};
+
+// Specialized Update for Part 2 (nested audio, single image)
+export const updatePart2 = async (c) => {
+  try {
+    const { id } = c.req.param();
+    const formData = await c.req.formData();
+    const currentItem = await db.getContentById(c.env.DB, "content_part2", id);
+    if (!currentItem) return c.json({ message: "Content not found" }, 404);
+
+    let newAudioUrl = currentItem.questions[0].audioUrl;
+    const audioFile = formData.get("audio");
+    if (audioFile instanceof File && audioFile.size > 0) {
+      newAudioUrl = await uploadToCDN(c, "cloudflare", audioFile, "audio");
+    }
+
+    let newImageUrl = currentItem.imageUrl;
+    const imageFile = formData.get("image");
+    if (imageFile instanceof File && imageFile.size > 0) {
+      newImageUrl = await uploadToCDN(c, "cloudflare", imageFile, "images");
+    }
+
+    const dataToUpdate = {
+      imageDescription: formData.get("imageDescription") || currentItem.imageDescription,
+      imageUrl: newImageUrl,
+      questions: JSON.stringify([
+        { text: formData.get("question1"), audioUrl: newAudioUrl },
+        { text: formData.get("question2"), audioUrl: newAudioUrl },
+        { text: formData.get("question3"), audioUrl: newAudioUrl },
+      ]),
+    };
+
+    const updatedItem = await db.updateContent(c.env.DB, "content_part2", id, dataToUpdate);
+    return c.json(updatedItem);
+  } catch (error) {
+    console.error(`[Admin] Update Part 2 Error:`, error);
+    return c.json({ message: `Server error while updating content.` }, 500);
+  }
+};
+
+// --- Export specific instances of the generic CRUD controllers ---
+export const listPart1_1 = listContent("content_part1_1");
+export const getPart1_1 = getContent("content_part1_1");
+export const deletePart1_1 = deleteContent("content_part1_1");
+
+// For Part 1.2, an update is too complex for a generic form. A dedicated page would be better.
+// We provide a text-only update for now.
+export const listPart1_2 = listContent("content_part1_2");
+export const getPart1_2 = getContent("content_part1_2");
+export const updatePart1_2 = updateTextContent("content_part1_2");
+export const deletePart1_2 = deleteContent("content_part1_2");
+
+export const listPart2 = listContent("content_part2");
+export const getPart2 = getContent("content_part2");
+export const deletePart2 = deleteContent("content_part2");
+
+export const listPart3 = listContent("content_part3");
+export const getPart3 = getContent("content_part3");
+export const updatePart3 = updateTextContent("content_part3"); // Assuming text-only for now
+export const deletePart3 = deleteContent("content_part3");
+
+export const listWordBankWords = listContent("words");
+export const getWordBankWord = getContent("words");
+export const updateWordBankWord = updateTextContent("words");
+export const deleteWordBankWord = deleteContent("words");

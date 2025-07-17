@@ -1,5 +1,16 @@
 // serverless/src/db/d1-client.js
 
+// Helper to parse JSON fields from a database record.
+const parseJsonFields = (item) => {
+  if (!item) return item;
+  const newItem = { ...item };
+  if (newItem.questions) newItem.questions = JSON.parse(newItem.questions);
+  if (newItem.forPoints) newItem.forPoints = JSON.parse(newItem.forPoints);
+  if (newItem.againstPoints) newItem.againstPoints = JSON.parse(newItem.againstPoints);
+  if (newItem.tags) newItem.tags = JSON.parse(newItem.tags);
+  return newItem;
+};
+
 export const db = {
   // --- User Functions ---
 
@@ -243,31 +254,42 @@ export const db = {
         .prepare(`SELECT * FROM ${tableName} ORDER BY RANDOM() LIMIT ?`)
         .bind(size)
         .all();
-
-      // Automatically parse JSON fields if they exist
-      if (results.length > 0) {
-        results.forEach((r) => {
-          if (r.questions) r.questions = JSON.parse(r.questions);
-          if (r.forPoints) r.forPoints = JSON.parse(r.forPoints);
-          if (r.againstPoints) r.againstPoints = JSON.parse(r.againstPoints);
-          if (r.tags) r.tags = JSON.parse(r.tags);
-        });
-      }
-
-      return results;
+      return results.map(parseJsonFields);
     } catch (e) {
       console.error(`D1 getRandomContent for ${tableName} Error:`, e.message);
       return [];
     }
   },
 
+  async listAllContent(d1, tableName) {
+    try {
+      // Remove the "ORDER BY" clause to support tables with and without the `createdAt` column
+      const { results } = await d1.prepare(`SELECT * FROM ${tableName}`).all();
+      return results.map(parseJsonFields);
+    } catch (e) {
+      console.error(`D1 listAllContent for ${tableName} Error:`, e.message);
+      return [];
+    }
+  },
+
+  async getContentById(d1, tableName, id) {
+    try {
+      const result = await d1.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).bind(id).first();
+      return parseJsonFields(result);
+    } catch (e) {
+      console.error(`D1 getContentById for ${tableName} Error:`, e.message);
+      return null;
+    }
+  },
+
   async createContent(d1, tableName, data) {
     try {
       const id = crypto.randomUUID();
-      const dataWithId = { ...data, id };
+      const now = new Date().toISOString();
+      const dataWithMeta = { ...data, id, createdAt: now, updatedAt: now };
 
-      const columns = Object.keys(dataWithId);
-      const values = Object.values(dataWithId);
+      const columns = Object.keys(dataWithMeta);
+      const values = Object.values(dataWithMeta);
       const placeholders = columns.map(() => "?").join(", ");
 
       const stmt = d1
@@ -276,10 +298,50 @@ export const db = {
         )
         .bind(...values);
 
-      return await stmt.first();
+      const result = await stmt.first();
+      return parseJsonFields(result);
     } catch (e) {
       console.error(`D1 createContent for ${tableName} Error:`, e.message);
       throw new Error(`Failed to create content in ${tableName}`);
+    }
+  },
+
+  async updateContent(d1, tableName, id, data) {
+    try {
+      delete data.id;
+      delete data.createdAt;
+      data.updatedAt = new Date().toISOString();
+
+      const dataToUpdate = { ...data };
+      Object.keys(dataToUpdate).forEach((key) => {
+        if (typeof dataToUpdate[key] === "object" && dataToUpdate[key] !== null) {
+          dataToUpdate[key] = JSON.stringify(dataToUpdate[key]);
+        }
+      });
+
+      const fields = Object.keys(dataToUpdate);
+      const values = Object.values(dataToUpdate);
+      const setClause = fields.map((field) => `${field} = ?`).join(", ");
+
+      const stmt = d1
+        .prepare(`UPDATE ${tableName} SET ${setClause} WHERE id = ? RETURNING *`)
+        .bind(...values, id);
+
+      const result = await stmt.first();
+      return parseJsonFields(result);
+    } catch (e) {
+      console.error(`D1 updateContent for ${tableName} Error:`, e.message);
+      throw new Error(`Failed to update content in ${tableName}`);
+    }
+  },
+
+  async deleteContent(d1, tableName, id) {
+    try {
+      const result = await d1.prepare(`DELETE FROM ${tableName} WHERE id = ?`).bind(id).run();
+      return result;
+    } catch (e) {
+      console.error(`D1 deleteContent for ${tableName} Error:`, e.message);
+      throw new Error(`Failed to delete content from ${tableName}`);
     }
   },
 };
