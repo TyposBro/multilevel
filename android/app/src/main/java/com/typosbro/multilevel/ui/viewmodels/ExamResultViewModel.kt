@@ -20,7 +20,7 @@ data class MultilevelResultUiState(
 )
 
 @HiltViewModel
-class MultilevelResultViewModel @Inject constructor(
+class ResultViewModel @Inject constructor(
     private val repository: ExamRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {

@@ -56,8 +56,8 @@ object MULTILEVEL_TIMEOUTS {
     const val PART1_2_ANSWER_FOLLOWUP = 30
     const val PART2_PREP = 60
     const val PART2_SPEAKING = 120
-    const val PART3_PREP = 60
-    const val PART3_SPEAKING = 120
+    const val PART3_PREP = 5
+    const val PART3_SPEAKING = 5
 }
 
 /**
@@ -265,9 +265,31 @@ class MultilevelExamViewModel @Inject constructor(
     private suspend fun executePart3() {
         updateState("executePart3: Intro") { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
         playInstructionAndWait(R.raw.multilevel_part3_intro)
+        val set = _uiState.value.examContent?.part3 ?: return
+
+        // Build a single, formatted string containing the topic and all points.
+        val fullPrompt = buildString {
+            appendLine(set.topic)
+            appendLine() // Add a blank line for readability
+            appendLine("For:")
+            set.forPoints.forEach { point ->
+                appendLine("- $point")
+            }
+            appendLine()
+            appendLine("Against:")
+            set.againstPoints.forEach { point ->
+                appendLine("- $point")
+            }
+        }.trim()
+
+        // Add the complete, formatted prompt to the transcript history.
+        addEntryToFullTranscript(TranscriptEntry("Examiner", fullPrompt))
+
         updateState("executePart3: Prep") {
             it.copy(
                 stage = MultilevelExamStage.PART3_PREP,
+                // Display the complete prompt in the UI.
+                currentQuestionText = fullPrompt,
                 currentAnswerTranscript = "" // CLEAR transcript for new monologue
             )
         }

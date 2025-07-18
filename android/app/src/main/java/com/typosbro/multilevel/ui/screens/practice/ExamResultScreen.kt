@@ -46,13 +46,13 @@ import com.typosbro.multilevel.R
 import com.typosbro.multilevel.data.remote.models.ExamResultResponse
 import com.typosbro.multilevel.data.remote.models.FeedbackBreakdown
 import com.typosbro.multilevel.data.remote.models.TranscriptEntry
-import com.typosbro.multilevel.ui.viewmodels.MultilevelResultViewModel
+import com.typosbro.multilevel.ui.viewmodels.ResultViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MultilevelResultScreen(
     onNavigateBack: () -> Unit,
-    viewModel: MultilevelResultViewModel = hiltViewModel()
+    viewModel: ResultViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
