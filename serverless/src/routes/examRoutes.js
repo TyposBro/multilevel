@@ -3,7 +3,7 @@
 import { Hono } from "hono";
 import { protectAndLoadUser } from "../middleware/authMiddleware";
 import { checkSubscriptionStatus } from "../middleware/subscriptionMiddleware";
-import { generateNewExam, analyzeExam } from "../controllers/examController";
+import { generateNewExam, analyzeExam, analyzeExamV2 } from "../controllers/examController";
 
 const examRoutes = new Hono();
 
@@ -12,5 +12,6 @@ examRoutes.use("*", protectAndLoadUser, checkSubscriptionStatus);
 
 examRoutes.get("/new", generateNewExam);
 examRoutes.post("/analyze", analyzeExam);
+examRoutes.post("/v2/analyze/", analyzeExamV2);
 
 export default examRoutes;

@@ -10,7 +10,6 @@ import {
 } from "../prompt/examAnalysisPrompt.js";
 
 // Helper function to check if daily usage counters need to be reset.
-// It returns an object with the current count and last reset date.
 const resetDailyUsageIfNeeded = (count, lastReset) => {
   if (!lastReset) {
     return { count: 0, lastReset: new Date().toISOString() };
@@ -19,7 +18,6 @@ const resetDailyUsageIfNeeded = (count, lastReset) => {
   const now = new Date();
   const lastResetDate = new Date(lastReset);
 
-  // Compare dates in UTC to avoid timezone issues
   if (
     lastResetDate.getUTCFullYear() !== now.getUTCFullYear() ||
     lastResetDate.getUTCMonth() !== now.getUTCMonth() ||
@@ -59,7 +57,6 @@ export const generateNewExam = async (c) => {
       return c.json({ message: "Could not assemble a full exam. Not enough content in DB." }, 500);
     }
 
-    // Return the exam structure with single objects instead of arrays for single-item parts.
     return c.json({
       part1_1,
       part1_2: part1_2_arr[0],
@@ -80,6 +77,8 @@ export const generateNewExam = async (c) => {
 export const analyzeExam = async (c) => {
   try {
     const user = c.get("user");
+    // Note: The original controller had 'examContent' which was unused.
+    // Kept 'practicePart' as it's the key differentiator.
     const { transcript, practicePart } = await c.req.json();
     const isSinglePartPractice = !!practicePart && practicePart !== "FULL";
 
@@ -87,10 +86,8 @@ export const analyzeExam = async (c) => {
       return c.json({ message: "Transcript is required for analysis." }, 400);
     }
 
-    // --- TIER & USAGE CHECK LOGIC ---
     const tier = user.subscription_tier;
     const limits = OFFERINGS[tier];
-
     if (c.env.ENVIRONMENT !== "development" && tier === "free") {
       const fullExamsUsage = resetDailyUsageIfNeeded(
         user.dailyUsage_fullExams_count,
@@ -100,12 +97,11 @@ export const analyzeExam = async (c) => {
         user.dailyUsage_partPractices_count,
         user.dailyUsage_partPractices_lastReset
       );
-
       if (isSinglePartPractice) {
         if (partPracticesUsage.count >= limits.dailyPartPractices) {
           return c.json(
             {
-              message: `You have used all ${limits.dailyPartPractices} of your free part practices for today. Upgrade for unlimited access.`,
+              message: `You have used all ${limits.dailyPartPractices} of your free part practices today.`,
             },
             403
           );
@@ -114,15 +110,12 @@ export const analyzeExam = async (c) => {
       } else {
         if (fullExamsUsage.count >= limits.dailyFullExams) {
           return c.json(
-            {
-              message: `You have used your ${limits.dailyFullExams} free full mock exam for today. Upgrade for more.`,
-            },
+            { message: `You have used your ${limits.dailyFullExams} free full mock exam today.` },
             403
           );
         }
         fullExamsUsage.count += 1;
       }
-
       await db.updateUserUsage(c.env.DB, user.id, {
         fullExams: fullExamsUsage,
         partPractices: partPracticesUsage,
@@ -130,21 +123,16 @@ export const analyzeExam = async (c) => {
     }
 
     const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
-
-    // Call the simple prompt generator from the dedicated prompt file
     const prompt = generateSimpleAnalysisPrompt(
       formattedTranscript,
       partAnalysisConfig,
       isSinglePartPractice,
       practicePart
     );
-
     const responseText = await generateText(c, prompt);
     const analysisData = safeJsonParse(responseText);
 
-    let totalScore;
-    let feedbackBreakdown;
-
+    let totalScore, feedbackBreakdown;
     if (isSinglePartPractice) {
       if (!analysisData || typeof analysisData.score === "undefined" || !analysisData.feedback) {
         throw new Error("AI failed to generate a valid single-part analysis JSON.");
@@ -171,10 +159,9 @@ export const analyzeExam = async (c) => {
       transcript,
       createdAt: new Date().toISOString(),
     };
-
     return c.json(resultResponse, 201);
   } catch (error) {
-    console.error("Error during multilevel exam analysis:", error);
+    console.error("Error during simple multilevel exam analysis:", error);
     return c.json({ message: error.message || "Server error during exam analysis." }, 500);
   }
 };
@@ -184,17 +171,17 @@ export const analyzeExam = async (c) => {
  * @route   POST /api/exam/multilevel/v2/analyze
  * @access  Private
  */
-export const analyzeExamDetailed = async (c) => {
+export const analyzeExamV2 = async (c) => {
   try {
     const user = c.get("user");
-    const { transcript, practicePart } = await c.req.json();
+    // --- MODIFIED: Get language from the request body ---
+    const { transcript, practicePart, language } = await c.req.json();
     const isSinglePartPractice = !!practicePart && practicePart !== "FULL";
 
     if (!transcript || transcript.length === 0) {
       return c.json({ message: "Transcript is required for analysis." }, 400);
     }
 
-    // --- TIER & USAGE CHECK LOGIC ---
     const tier = user.subscription_tier;
     const limits = OFFERINGS[tier];
     if (c.env.ENVIRONMENT !== "development" && tier === "free") {
@@ -233,11 +220,9 @@ export const analyzeExamDetailed = async (c) => {
       });
     }
 
-    // Get user's preferred language, default to English if not set
-    const targetLanguage = user.preferred_language || "en";
+    // --- MODIFIED: Use the language from the request, or default to 'en' ---
+    const targetLanguage = language || "en";
     const formattedTranscript = transcript.map((t) => `${t.speaker}: ${t.text}`).join("\n");
-
-    // --- USE THE NEW DETAILED & LOCALIZED PROMPT GENERATOR ---
     const prompt = generateDetailedAnalysisPrompt(
       formattedTranscript,
       partAnalysisConfig,
@@ -245,11 +230,9 @@ export const analyzeExamDetailed = async (c) => {
       practicePart,
       targetLanguage
     );
-
     const responseText = await generateText(c, prompt);
     const analysisData = safeJsonParse(responseText);
 
-    // --- VALIDATE THE NEW, MORE COMPLEX STRUCTURE ---
     if (!analysisData) {
       throw new Error("AI response was not valid JSON.");
     }
@@ -289,8 +272,10 @@ export const analyzeExamDetailed = async (c) => {
       feedbackBreakdown: finalAnalysisData.feedbackBreakdown,
       transcript,
       createdAt: new Date().toISOString(),
-      language: targetLanguage, // Return the language used for feedback
+      language: targetLanguage,
     };
+
+    // --- REMOVED: No database saving of the analysis result ---
 
     return c.json(resultResponse, 201);
   } catch (error) {
