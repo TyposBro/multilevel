@@ -12,6 +12,6 @@ examRoutes.use("*", protectAndLoadUser, checkSubscriptionStatus);
 
 examRoutes.get("/new", generateNewExam);
 examRoutes.post("/analyze", analyzeExam);
-examRoutes.post("/v2/analyze/", analyzeExamV2);
+examRoutes.post("/v2/analyze", analyzeExamV2);
 
 export default examRoutes;

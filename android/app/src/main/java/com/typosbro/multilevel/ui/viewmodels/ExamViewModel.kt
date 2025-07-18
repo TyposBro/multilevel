@@ -407,10 +407,15 @@ class ExamViewModel @Inject constructor(
                 DebugLogRepository.saveTranscript(context, finalLogFile, fullTranscriptHistory)
             }
 
-            val examContent = uiState.value.examContent ?: return@launch
+            // --- MODIFIED: Create the new request object for the V2 API ---
             val partString = if (practicePart == PracticePart.FULL) "FULL" else practicePart.name
-            val request = AnalyzeRequest(fullTranscriptHistory, examContent, partString)
+            val request = AnalyzeRequest(
+                transcript = fullTranscriptHistory,
+                practicePart = partString,
+                language = "en" // Hardcode language to English for now. Can be dynamic later.
+            )
 
+            // This now calls the v2 endpoint via the repository
             when (val result = repository.analyzeExam(request)) {
                 is RepositoryResult.Success -> {
                     updateState("concludeAndAnalyze: Success") { it.copy(finalResultId = result.data) }
@@ -431,8 +436,6 @@ class ExamViewModel @Inject constructor(
     private suspend fun playInstructionAndWait(@RawRes resId: Int) {
         try {
             audioPlayer.playFromRawAndWait(resId)
-            // THE CODE BELOW IS INTENTIONAL. DO NOT REMOVE IT
-            playStartSpeakingSound()
         } catch (e: Exception) {
             Log.e("ExamVM", "Instruction audio failed to play", e)
             updateState("playInstructionAndWait: Error") { it.copy(error = "Audio playback failed. Please try again.") }

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -44,8 +45,10 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.typosbro.multilevel.R
+import com.typosbro.multilevel.data.remote.models.DetailedBreakdown
 import com.typosbro.multilevel.data.remote.models.ExamResultResponse
 import com.typosbro.multilevel.data.remote.models.FeedbackBreakdown
+import com.typosbro.multilevel.data.remote.models.FeedbackCriterion
 import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import com.typosbro.multilevel.ui.viewmodels.ResultViewModel
 
@@ -201,14 +204,88 @@ fun FeedbackPartCard(feedback: FeedbackBreakdown) {
                 )
             }
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
-            Text(
-                text = feedback.feedback,
-                style = MaterialTheme.typography.bodyMedium,
-                lineHeight = 22.sp
-            )
+
+            // --- MODIFIED: Display detailed V2 feedback or fallback to V1 ---
+            if (feedback.detailedBreakdown != null) {
+                // V2 Detailed Feedback
+                feedback.overallFeedback?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyLarge,
+                        lineHeight = 24.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    )
+                }
+                DetailedFeedbackItems(detailedBreakdown = feedback.detailedBreakdown)
+            } else if (feedback.feedback != null) {
+                // V1 Simple Feedback (Fallback)
+                Text(
+                    text = feedback.feedback,
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 22.sp
+                )
+            }
         }
     }
 }
+
+@Composable
+fun DetailedFeedbackItems(detailedBreakdown: DetailedBreakdown) {
+    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        CriteriaItem(
+            title = "Fluency and Coherence",
+            criterion = detailedBreakdown.fluencyAndCoherence
+        )
+        CriteriaItem(
+            title = "Lexical Resource (Vocabulary)",
+            criterion = detailedBreakdown.lexicalResource
+        )
+        CriteriaItem(
+            title = "Grammatical Range and Accuracy",
+            criterion = detailedBreakdown.grammaticalRangeAndAccuracy
+        )
+        CriteriaItem(title = "Task Achievement", criterion = detailedBreakdown.taskAchievement)
+    }
+}
+
+@Composable
+private fun CriteriaItem(title: String, criterion: FeedbackCriterion) {
+    Column {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        FeedbackDetailRow(label = "✅ Positive", text = criterion.positive)
+        FeedbackDetailRow(label = "💡 Suggestion", text = criterion.suggestion)
+        if (criterion.example.isNotBlank() && criterion.example != "N/A") {
+            FeedbackDetailRow(label = "💬 Example", text = criterion.example)
+        }
+    }
+}
+
+@Composable
+private fun FeedbackDetailRow(label: String, text: String) {
+    Row(Modifier.padding(top = 4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(90.dp)
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(start = 8.dp),
+            lineHeight = 20.sp
+        )
+    }
+}
+
 
 @Composable
 fun TranscriptTab(transcript: List<TranscriptEntry>) {
@@ -224,10 +301,6 @@ fun TranscriptTab(transcript: List<TranscriptEntry>) {
     }
 }
 
-/**
- * This is the shared component for displaying a single transcript entry.
- * It's used here in the results screen to show the full conversation.
- */
 @Composable
 fun TranscriptItem(entry: TranscriptEntry) {
     val isUser = entry.speaker.equals("User", ignoreCase = true)

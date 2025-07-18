@@ -3,14 +3,6 @@ package com.typosbro.multilevel.data.remote.models
 
 import com.google.gson.annotations.SerializedName
 
-/**
- * Represents a single entry in the conversation transcript.
- * Used for sending the full transcript for final analysis.
- */
-data class TranscriptEntry(
-    @SerializedName("speaker") val speaker: String, // "Examiner" or "User"
-    @SerializedName("text") val text: String
-)
 
 /**
  * Represents the Part 2 Cue Card topic and points.
@@ -59,27 +51,68 @@ data class QuestionAudio(
     @SerializedName("audioUrl") val audioUrl: String
 )
 
-// --- Models for sending the final analysis request ---
-
+/**
+ * Defines the request body for the v2 analysis endpoint.
+ * It's simpler than the v1 request, omitting the large 'examContent' object.
+ */
 data class AnalyzeRequest(
-    val transcript: List<TranscriptEntry>, // Can reuse from IELTS models
-    val examContent: MultilevelExamResponse?, // Send the full content for context
-    val practicePart: String? = null // e.g., "FULL", "P1_1"
+    val transcript: List<TranscriptEntry>,
+    val practicePart: String?,
+    val language: String? = "en" // Add language, default to English
 )
 
-// --- Models for displaying the multilevel results ---
-
+/**
+ * Represents the full response from the v2 analysis API.
+ * This structure is saved locally in the Room database.
+ */
 data class ExamResultResponse(
     @SerializedName("_id") val id: String,
-    @SerializedName("userId") val userId: String,
-    @SerializedName("totalScore") val totalScore: Int,
-    @SerializedName("feedbackBreakdown") val feedbackBreakdown: List<FeedbackBreakdown>,
-    @SerializedName("transcript") val transcript: List<TranscriptEntry>,
-    @SerializedName("createdAt") val createdAt: String
+    val userId: String,
+    val totalScore: Int,
+    val feedbackBreakdown: List<FeedbackBreakdown>,
+    val transcript: List<TranscriptEntry>,
+    val createdAt: String,
+    val language: String? = null // Field from v2 response
 )
 
+/**
+ * Represents the feedback for a single part of the exam.
+ * It's designed to be backward-compatible with v1 results.
+ */
 data class FeedbackBreakdown(
-    @SerializedName("part") val part: String,
-    @SerializedName("score") val score: Int,
-    @SerializedName("feedback") val feedback: String
+    val part: String,
+    val score: Int,
+    // v2 fields:
+    val overallFeedback: String?,
+    val detailedBreakdown: DetailedBreakdown?,
+    // v1 field (kept for backward compatibility):
+    val feedback: String?
 )
+
+/**
+ * Contains the detailed, criteria-based feedback from the v2 API.
+ */
+data class DetailedBreakdown(
+    val fluencyAndCoherence: FeedbackCriterion,
+    val lexicalResource: FeedbackCriterion,
+    val grammaticalRangeAndAccuracy: FeedbackCriterion,
+    val taskAchievement: FeedbackCriterion
+)
+
+/**
+ * A single feedback criterion, including positive remarks, suggestions, and an example.
+ */
+data class FeedbackCriterion(
+    val positive: String,
+    val suggestion: String,
+    val example: String
+)
+
+/**
+ * Represents a single entry in the conversation transcript.
+ */
+data class TranscriptEntry(
+    val speaker: String,
+    val text: String
+)
+

@@ -1,4 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/ApiService.kt
 package com.typosbro.multilevel.data.remote
 
 import com.typosbro.multilevel.data.remote.models.AnalyzeRequest
@@ -46,15 +45,9 @@ interface ApiService {
     @GET("exam/multilevel/new")
     suspend fun getNewMultilevelExam(): Response<MultilevelExamResponse>
 
-    @POST("exam/multilevel/analyze")
+    // --- MODIFIED: Point to the new V2 endpoint ---
+    @POST("exam/multilevel/v2/analyze")
     suspend fun analyzeMultilevelExam(@Body request: AnalyzeRequest): Response<ExamResultResponse>
-
-    // History and specific results are now fetched from local DB
-    // @GET("exam/multilevel/history")
-    // suspend fun getMultilevelExamHistory(): Response<MultilevelExamHistorySummaryResponse>
-
-    // @GET("exam/multilevel/result/{resultId}")
-    // suspend fun getMultilevelExamResult(@Path("resultId") resultId: String): Response<MultilevelExamResultResponse>
 
 
     //    NEW: WORDBANK Endpoints
