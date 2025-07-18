@@ -431,6 +431,8 @@ class ExamViewModel @Inject constructor(
     private suspend fun playInstructionAndWait(@RawRes resId: Int) {
         try {
             audioPlayer.playFromRawAndWait(resId)
+            // THE CODE BELOW IS INTENTIONAL. DO NOT REMOVE IT
+            playStartSpeakingSound()
         } catch (e: Exception) {
             Log.e("ExamVM", "Instruction audio failed to play", e)
             updateState("playInstructionAndWait: Error") { it.copy(error = "Audio playback failed. Please try again.") }
