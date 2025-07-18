@@ -20,6 +20,12 @@ npx wrangler secret put PAYME_SECRET_KEY_LIVE
 npx wrangler secret put PAYME_MERCHANT_ID_TEST
 npx wrangler secret put PAYME_SECRET_KEY_TEST
 
+# --- Google Play Billing ---
+npx wrangler secret put GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
+# (Go to Google Cloud Console -> IAM & Admin -> Service Accounts -> Create Key -> JSON)
+# (Paste the entire single-line JSON blob)
+
+
 # --- DEPRECATED/REPLACED Secrets ---
 # The following credentials are for Node.js SDKs that don't work in Workers.
 # The functionality has been replaced by Cloudflare R2 and D1.
