@@ -26,11 +26,11 @@ class SettingsViewModel @Inject constructor(
         )
 
     // Expose the language preference as a StateFlow
-    val currentLanguageCode: StateFlow<String?> = languageRepository.languageCode
+    val currentLanguageCode: StateFlow<String> = languageRepository.languageCode
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null // The initial value is null, representing "not loaded yet"
+            initialValue = "en" // The initial value can now be a sensible default
         )
 
     /**

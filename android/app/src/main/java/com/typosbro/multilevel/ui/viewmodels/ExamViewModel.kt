@@ -10,6 +10,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.typosbro.multilevel.R
+import com.typosbro.multilevel.data.preferences.LanguageRepository
 import com.typosbro.multilevel.data.remote.models.AnalyzeRequest
 import com.typosbro.multilevel.data.remote.models.MultilevelExamResponse
 import com.typosbro.multilevel.data.remote.models.RepositoryResult
@@ -27,6 +28,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -81,7 +83,8 @@ class ExamViewModel @Inject constructor(
     private val repository: ExamRepository,
     private val voskService: VoskService,
     private val audioPlayer: AudioPlayer,
-    val assetPrefetcher: AssetPrefetcher, // Make it public to access from UI
+    val assetPrefetcher: AssetPrefetcher,
+    private val languageRepository: LanguageRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -399,7 +402,7 @@ class ExamViewModel @Inject constructor(
     private fun concludeAndAnalyze() {
         updateState("concludeAndAnalyze: Analyzing") { it.copy(stage = MultilevelExamStage.ANALYZING) }
         viewModelScope.launch {
-            delay(500)
+            delay(500) // Brief delay to allow the UI to update to the "Analyzing" state
             val logDir = context.getExternalFilesDir(Environment.DIRECTORY_RECORDINGS)
             if (logDir != null) {
                 val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
@@ -407,15 +410,18 @@ class ExamViewModel @Inject constructor(
                 DebugLogRepository.saveTranscript(context, finalLogFile, fullTranscriptHistory)
             }
 
-            // --- MODIFIED: Create the new request object for the V2 API ---
+            // Get the current language preference. .first() is a suspending call that gets
+            // the most recent value from the Flow.
+            val languageCode = languageRepository.languageCode.first()
+            Log.d("ExamVM", "Submitting analysis request with language: $languageCode")
+
             val partString = if (practicePart == PracticePart.FULL) "FULL" else practicePart.name
             val request = AnalyzeRequest(
                 transcript = fullTranscriptHistory,
                 practicePart = partString,
-                language = "en" // Hardcode language to English for now. Can be dynamic later.
+                language = languageCode // Include the user's preferred language
             )
 
-            // This now calls the v2 endpoint via the repository
             when (val result = repository.analyzeExam(request)) {
                 is RepositoryResult.Success -> {
                     updateState("concludeAndAnalyze: Success") { it.copy(finalResultId = result.data) }
@@ -452,6 +458,7 @@ class ExamViewModel @Inject constructor(
 
     private fun addEntryToFullTranscript(newEntry: TranscriptEntry) {
         val lastEntry = fullTranscriptHistory.lastOrNull()
+        // If the last entry was also from the user, combine them to avoid many small bubbles.
         if (newEntry.speaker == "User" && lastEntry?.speaker == "User") {
             val updatedText = "${lastEntry.text} ${newEntry.text}".trim()
             fullTranscriptHistory[fullTranscriptHistory.size - 1] =
@@ -462,7 +469,7 @@ class ExamViewModel @Inject constructor(
     }
 
     fun stopExam() {
-        examJob?.cancel()
+        examJob?.cancel(CancellationException("Exam was manually stopped."))
         voskService.release()
         audioPlayer.release()
         updateState("stopExam: Force stop") {
