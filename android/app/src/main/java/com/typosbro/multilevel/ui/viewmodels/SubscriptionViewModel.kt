@@ -1,21 +1,30 @@
+// android/app/src/main/java/com/typosbro/multilevel/ui/viewmodels/SubscriptionViewModel.kt
+
 package com.typosbro.multilevel.ui.viewmodels
 
 import android.app.Activity
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.android.billingclient.api.ProductDetails
+import com.android.billingclient.api.Purchase
 import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.data.repositories.PaymentRepository
 import com.typosbro.multilevel.data.repositories.SubscriptionRepository
+import com.typosbro.multilevel.features.billing.BillingClientWrapper
 import com.typosbro.multilevel.utils.openUrlInCustomTab
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class SubscriptionUiState(
     val isLoading: Boolean = false,
+    val productDetails: List<ProductDetails> = emptyList(),
     val purchaseSuccessMessage: String? = null,
     val error: String? = null
 )
@@ -23,31 +32,70 @@ data class SubscriptionUiState(
 @HiltViewModel
 class SubscriptionViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
-    private val paymentRepository: PaymentRepository // INJECT THE NEW REPOSITORY
+    private val paymentRepository: PaymentRepository,
+    private val billingClient: BillingClientWrapper
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SubscriptionUiState())
     val uiState = _uiState.asStateFlow()
 
+    init {
+        billingClient.startConnection()
+
+        // Observe product details from the BillingClientWrapper
+        billingClient.productDetails.onEach { products ->
+            _uiState.update { it.copy(productDetails = products) }
+        }.launchIn(viewModelScope)
+
+        // Observe new purchases from the BillingClientWrapper
+        billingClient.purchases.onEach { purchases ->
+            purchases.forEach { purchase ->
+                // Process only new, unacknowledged purchases
+                if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
+                    val planId = purchase.products.firstOrNull()
+                    if (planId != null) {
+                        verifyAndAcknowledgePurchase(
+                            provider = "google",
+                            token = purchase.purchaseToken,
+                            planId = planId,
+                            purchase = purchase
+                        )
+                    } else {
+                        Log.e("SubscriptionVM", "Purchase is missing product ID. Cannot verify.")
+                    }
+                }
+            }
+        }.launchIn(viewModelScope)
+    }
+
     /**
-     * Step 1 of the web payment flow: Create the payment on the backend.
-     * This will open a browser/custom tab for the user to pay.
+     * Called by the UI to fetch product details from the Google Play Store.
+     */
+    fun loadProducts() {
+        viewModelScope.launch {
+            // Your actual product IDs from the Google Play Console
+            val productIds = listOf("silver_monthly", "gold_monthly")
+            billingClient.queryProductDetails(productIds)
+        }
+    }
+
+    /**
+     * Initiates the Google Play purchase flow for a specific product.
+     */
+    fun launchGooglePlayPurchase(activity: Activity, productDetails: ProductDetails) {
+        billingClient.launchPurchaseFlow(activity, productDetails)
+    }
+
+    /**
+     * Initiates the web-based payment flow for local providers like Payme.
      */
     fun createWebPayment(activity: Activity, provider: String, planId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
-
             when (val result = paymentRepository.createPayment(provider, planId)) {
                 is RepositoryResult.Success -> {
-                    // Successfully got the payment URL
                     val paymentUrl = result.data.paymentUrl
-                    val receiptId = result.data.receiptId
-
-                    // TODO: Save the `receiptId` and `planId` locally (e.g., in a DataStore or
-                    // a simple preference) so we know what to verify when the user returns to the app.
-                    // Example: paymentPrefManager.savePendingTransaction(receiptId, planId)
-
-                    // Open the URL for the user to pay
+                    // TODO: Persist the receiptId for verification upon app resume
                     openUrlInCustomTab(activity, paymentUrl)
                     _uiState.update { it.copy(isLoading = false) }
                 }
@@ -60,42 +108,49 @@ class SubscriptionViewModel @Inject constructor(
     }
 
     /**
-     * Step 2 of the web payment flow: Verify the transaction after the user returns to the app.
+     * Sends the purchase token to the backend for verification. If successful,
+     * acknowledges the purchase with the Google Play Store.
      */
-    fun verifyPendingPurchase(provider: String) {
+    private fun verifyAndAcknowledgePurchase(
+        provider: String,
+        token: String,
+        planId: String,
+        purchase: Purchase
+    ) {
         viewModelScope.launch {
-            // TODO: Retrieve the saved `receiptId` and `planId` from your local storage.
-            // val pendingTx = paymentPrefManager.getPendingTransaction() ?: return@launch
-            // val receiptId = pendingTx.receiptId
-            // val planId = pendingTx.planId
-
-            // For now, we will hardcode for demonstration
-            val receiptId = "HARDCODED_RECEIPT_ID_FOR_TESTING"
-            val planId = "gold_monthly"
-
             _uiState.update { it.copy(isLoading = true, error = null) }
-
-            when (val result = subscriptionRepository.verifyPurchase(provider, receiptId, planId)) {
+            when (val result = subscriptionRepository.verifyPurchase(provider, token, planId)) {
                 is RepositoryResult.Success -> {
+                    Log.d(
+                        "SubscriptionVM",
+                        "Backend verification successful. Acknowledging purchase."
+                    )
+                    billingClient.acknowledgePurchase(purchase)
                     _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            purchaseSuccessMessage = result.data.message
-                        )
+                        it.copy(isLoading = false, purchaseSuccessMessage = result.data.message)
                     }
-                    // TODO: Clear the pending transaction from local storage.
-                    // paymentPrefManager.clearPendingTransaction()
                 }
 
                 is RepositoryResult.Error -> {
+                    // If backend verification fails, do NOT acknowledge. The purchase will be re-processed later.
                     _uiState.update { it.copy(isLoading = false, error = result.message) }
                 }
             }
         }
     }
 
-
+    /**
+     * Resets any displayed snackbar/toast messages.
+     */
     fun clearMessages() {
         _uiState.update { it.copy(purchaseSuccessMessage = null, error = null) }
+    }
+
+    /**
+     * Cleans up the BillingClient connection when the ViewModel is destroyed.
+     */
+    override fun onCleared() {
+        super.onCleared()
+        billingClient.endConnection()
     }
 }

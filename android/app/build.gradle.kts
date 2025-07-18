@@ -101,9 +101,6 @@ dependencies {
     // Secure Storage
     implementation(libs.androidx.security.crypto)
 
-    // ONNX Runtime (for TTS)
-    implementation(libs.onnxruntime.android)
-
     // Room (Local Database)
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.benchmark.common)
@@ -145,4 +142,5 @@ dependencies {
     implementation(libs.swipeablecard)
 
     implementation(libs.vosk.android)
+    implementation(libs.androidx.play.billing)
 }
