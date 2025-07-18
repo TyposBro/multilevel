@@ -45,8 +45,17 @@ object NetworkModule {
             .build()
     }
 
+    // This one is generic (no @Named annotation)
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(): OkHttpClient {
+        return OkHttpClient.Builder()
+            // No need for AuthInterceptor or heavy logging for asset downloads
+            .connectTimeout(60, TimeUnit.SECONDS) // Longer timeout for large files
+            .readTimeout(60, TimeUnit.SECONDS)
+            .build()
+    }
 
-    // This is correct: It depends on the named OkHttpClient.
     @Provides
     @Singleton
     fun provideApiService(@Named("StandardOkHttpClient") okHttpClient: OkHttpClient): ApiService {

@@ -16,6 +16,7 @@ import com.typosbro.multilevel.data.remote.models.RepositoryResult
 import com.typosbro.multilevel.data.remote.models.TranscriptEntry
 import com.typosbro.multilevel.data.repositories.DebugLogRepository
 import com.typosbro.multilevel.data.repositories.ExamRepository
+import com.typosbro.multilevel.features.prefetch.AssetPrefetcher
 import com.typosbro.multilevel.features.vosk.VoskService
 import com.typosbro.multilevel.utils.AudioPlayer
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -52,19 +53,14 @@ object MULTILEVEL_TIMEOUTS {
     const val PART1_1_ANSWER = 30
     const val PART1_2_PREP_FIRST = 3
     const val PART1_2_PREP_FOLLOWUP = 3
-    const val PART1_2_ANSWER_FIRST = 3
-    const val PART1_2_ANSWER_FOLLOWUP = 10
-    const val PART2_PREP = 3
-    const val PART2_SPEAKING = 10
-    const val PART3_PREP = 3
-    const val PART3_SPEAKING = 10
+    const val PART1_2_ANSWER_FIRST = 45 // Adjusted for comparison
+    const val PART1_2_ANSWER_FOLLOWUP = 20 // Adjusted for follow-up
+    const val PART2_PREP = 60
+    const val PART2_SPEAKING = 90
+    const val PART3_PREP = 60
+    const val PART3_SPEAKING = 120
 }
 
-/**
- * UPDATED: The UI state no longer holds the entire conversation history.
- * `transcript` has been replaced with `currentAnswerTranscript` to only show the user's
- * response for the active question, simplifying the UI.
- */
 data class MultilevelUiState(
     val stage: MultilevelExamStage = MultilevelExamStage.NOT_STARTED,
     val examContent: MultilevelExamResponse? = null,
@@ -73,7 +69,7 @@ data class MultilevelUiState(
     val part1_2_QuestionIndex: Int = 0,
     val timerValue: Int = 0,
     val isRecording: Boolean = false,
-    val currentAnswerTranscript: String = "", // CHANGED: Was `transcript: List<...>`
+    val currentAnswerTranscript: String = "",
     val liveTranscript: String? = null,
     val error: String? = null,
     val finalResultId: String? = null
@@ -84,14 +80,14 @@ class ExamViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: ExamRepository,
     private val voskService: VoskService,
+    private val audioPlayer: AudioPlayer,
+    val assetPrefetcher: AssetPrefetcher, // Make it public to access from UI
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MultilevelUiState())
     val uiState = _uiState.asStateFlow()
 
-    // This internal list stores the full conversation for the final analysis,
-    // hidden from the real-time UI.
     private val fullTranscriptHistory = mutableListOf<TranscriptEntry>()
 
     private val practicePart: PracticePart =
@@ -122,9 +118,7 @@ class ExamViewModel @Inject constructor(
         }
 
         voskService.resultListener = { text ->
-            // Add the final text to our internal history for analysis
             addEntryToFullTranscript(TranscriptEntry("User", text))
-            // Append the final text to the visible current answer on the UI
             _uiState.update {
                 it.copy(
                     currentAnswerTranscript = (it.currentAnswerTranscript + " " + text).trim(),
@@ -158,7 +152,13 @@ class ExamViewModel @Inject constructor(
                 }
                 return@launch
             }
-            updateState("startExam: Success") { it.copy(examContent = result.data) }
+
+            val examContent = result.data
+            updateState("startExam: Success") { it.copy(examContent = examContent) }
+
+            // Kick off asset prefetching in the background
+            val urlsToPrefetch = extractAssetUrlsInOrder(examContent)
+            assetPrefetcher.prefetch(urlsToPrefetch)
 
             when (practicePart) {
                 PracticePart.FULL -> {
@@ -188,6 +188,23 @@ class ExamViewModel @Inject constructor(
         }
     }
 
+    private fun extractAssetUrlsInOrder(exam: MultilevelExamResponse): List<String> {
+        val urls = mutableListOf<String>()
+        exam.part1_1.forEach { urls.add(it.audioUrl) }
+        exam.part1_2.let { part ->
+            part.questions.forEach { q -> urls.add(q.audioUrl) }
+            urls.add(part.image1Url)
+            urls.add(part.image2Url)
+        }
+        exam.part2.let { part ->
+            part.questions.firstOrNull()?.audioUrl?.let { urls.add(it) }
+            if (!part.imageUrl.isNullOrBlank()) {
+                urls.add(part.imageUrl)
+            }
+        }
+        return urls.filter { it.isNotBlank() }
+    }
+
     private suspend fun executePart1_1() {
         updateState("executePart1_1: Intro") { it.copy(stage = MultilevelExamStage.INTRO) }
         playInstructionAndWait(R.raw.multilevel_part1_intro)
@@ -199,11 +216,11 @@ class ExamViewModel @Inject constructor(
                     stage = MultilevelExamStage.PART1_1_QUESTION,
                     currentQuestionText = question.questionText,
                     part1_1_QuestionIndex = index,
-                    currentAnswerTranscript = "" // CLEAR transcript for new question
+                    currentAnswerTranscript = ""
                 )
             }
             addEntryToFullTranscript(TranscriptEntry("Examiner", question.questionText))
-            AudioPlayer.playFromUrlAndWait(context, question.audioUrl)
+            audioPlayer.playFromUrlAndWait(question.audioUrl)
             startAnswerTimer(MULTILEVEL_TIMEOUTS.PART1_1_PREP, MULTILEVEL_TIMEOUTS.PART1_1_ANSWER)
         }
     }
@@ -232,11 +249,11 @@ class ExamViewModel @Inject constructor(
                     stage = currentStage,
                     currentQuestionText = question.text,
                     part1_2_QuestionIndex = index,
-                    currentAnswerTranscript = "" // CLEAR transcript for new question
+                    currentAnswerTranscript = ""
                 )
             }
             addEntryToFullTranscript(TranscriptEntry("Examiner", question.text))
-            AudioPlayer.playFromUrlAndWait(context, question.audioUrl)
+            audioPlayer.playFromUrlAndWait(question.audioUrl)
             startAnswerTimer(prepTime, answerTime)
         }
     }
@@ -250,11 +267,13 @@ class ExamViewModel @Inject constructor(
             it.copy(
                 stage = MultilevelExamStage.PART2_PREP,
                 currentQuestionText = fullQuestionText,
-                currentAnswerTranscript = "" // CLEAR transcript for new monologue
+                currentAnswerTranscript = ""
             )
         }
         addEntryToFullTranscript(TranscriptEntry("Examiner", fullQuestionText))
-        AudioPlayer.playFromUrlAndWait(context, set.questions.firstOrNull()?.audioUrl ?: "")
+        set.questions.firstOrNull()?.audioUrl?.let { audioUrl ->
+            audioPlayer.playFromUrlAndWait(audioUrl)
+        }
         startMonologueTimer(
             MULTILEVEL_TIMEOUTS.PART2_PREP,
             MULTILEVEL_TIMEOUTS.PART2_SPEAKING,
@@ -266,31 +285,22 @@ class ExamViewModel @Inject constructor(
         updateState("executePart3: Intro") { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
         playInstructionAndWait(R.raw.multilevel_part3_intro)
         val set = _uiState.value.examContent?.part3 ?: return
-
-        // Build a single, formatted string containing the topic and all points.
         val fullPrompt = buildString {
             appendLine(set.topic)
-            appendLine() // Add a blank line for readability
+            appendLine()
             appendLine("For:")
-            set.forPoints.forEach { point ->
-                appendLine("- $point")
-            }
+            set.forPoints.forEach { point -> appendLine("- $point") }
             appendLine()
             appendLine("Against:")
-            set.againstPoints.forEach { point ->
-                appendLine("- $point")
-            }
+            set.againstPoints.forEach { point -> appendLine("- $point") }
         }.trim()
 
-        // Add the complete, formatted prompt to the transcript history.
         addEntryToFullTranscript(TranscriptEntry("Examiner", fullPrompt))
-
         updateState("executePart3: Prep") {
             it.copy(
                 stage = MultilevelExamStage.PART3_PREP,
-                // Display the complete prompt in the UI.
                 currentQuestionText = fullPrompt,
-                currentAnswerTranscript = "" // CLEAR transcript for new monologue
+                currentAnswerTranscript = ""
             )
         }
         startMonologueTimer(
@@ -420,7 +430,7 @@ class ExamViewModel @Inject constructor(
 
     private suspend fun playInstructionAndWait(@RawRes resId: Int) {
         try {
-            AudioPlayer.playFromRawAndWait(context, resId)
+            audioPlayer.playFromRawAndWait(resId)
         } catch (e: Exception) {
             Log.e("ExamVM", "Instruction audio failed to play", e)
             updateState("playInstructionAndWait: Error") { it.copy(error = "Audio playback failed. Please try again.") }
@@ -429,7 +439,7 @@ class ExamViewModel @Inject constructor(
 
     private suspend fun playStartSpeakingSound() {
         try {
-            AudioPlayer.playFromRawAndWait(context, R.raw.start_speaking_sound)
+            audioPlayer.playFromRawAndWait(R.raw.start_speaking_sound)
         } catch (e: Exception) {
             Log.e("ExamVM", "Start speaking sound failed", e)
         }
@@ -449,7 +459,7 @@ class ExamViewModel @Inject constructor(
     fun stopExam() {
         examJob?.cancel()
         voskService.release()
-        AudioPlayer.release()
+        audioPlayer.release()
         updateState("stopExam: Force stop") {
             it.copy(
                 stage = MultilevelExamStage.FINISHED_ERROR,
@@ -463,5 +473,6 @@ class ExamViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         stopExam()
+        assetPrefetcher.clearCache()
     }
 }
