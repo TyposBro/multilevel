@@ -77,7 +77,7 @@ export const analyzeExam = async (c) => {
   try {
     const user = c.get("user"); // Attached by `protect` and `checkSubscriptionStatus` middleware
     const { transcript, examContent, practicePart } = await c.req.json();
-    const isSinglePartPractice = !!practicePart;
+    const isSinglePartPractice = !!practicePart && practicePart !== "FULL";
 
     if (!transcript || transcript.length === 0) {
       return c.json({ message: "Transcript is required for analysis." }, 400);
