@@ -29,21 +29,30 @@ data class GenericExamResultSummary(
     val examDate: Long,
     val score: Double,
     val scoreLabel: String,
-    val practicePart: String = "FULL"
+    val practicePart: String
 )
 
 data class ProgressUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val selectedDuration: DurationFilter = DurationFilter.ALL,
-    val ieltsHistory: List<GenericExamResultSummary> = emptyList(),
-    val multilevelHistory: Map<String, List<GenericExamResultSummary>> = emptyMap(),
+    // Holds all history from the DB, ungrouped
+    val allMultilevelHistory: List<GenericExamResultSummary> = emptyList(),
+    // The currently selected part to display, e.g., "FULL", "P1_1"
     val selectedMultilevelPart: String = "FULL",
-    // Filtered data based on current filters
-    val filteredIeltsHistory: List<GenericExamResultSummary> = emptyList(),
-    val filteredMultilevelHistory: Map<String, List<GenericExamResultSummary>> = emptyMap(),
-    // Available parts for multilevel (only parts that have data)
-    val availableMultilevelParts: Set<String> = emptySet()
+    // History grouped by part and filtered by duration
+    val filteredMultilevelHistory: Map<String, List<GenericExamResultSummary>> = emptyMap()
+) {
+    // Provides a list of available parts for the filter dropdown based on current data
+    val availableMultilevelParts: Set<String> get() = filteredMultilevelHistory.keys
+}
+
+data class ExamStatistics(
+    val totalExams: Int = 0,
+    val averageScore: Double = 0.0,
+    val bestScore: Double = 0.0,
+    val latestScore: Double = 0.0,
+    val improvement: Double = 0.0 // Change between latest and second-to-last
 )
 
 @HiltViewModel
@@ -62,38 +71,33 @@ class ProgressViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             examRepository.getLocalHistorySummary().collect { results ->
-                val historyMap = results
-                    .toGenericSummary()
-                    .groupBy { it.practicePart }
-
+                val allHistory = results.toGenericSummary()
                 _uiState.update { currentState ->
-                    val newState = currentState.copy(
-                        isLoading = false,
-                        multilevelHistory = historyMap,
-                        availableMultilevelParts = historyMap.keys,
-                        selectedMultilevelPart = if (historyMap.containsKey("FULL")) "FULL"
-                        else historyMap.keys.firstOrNull() ?: "FULL"
+                    // Set the initial selected part to "FULL" if available, otherwise the first one.
+                    val initialPart = if (allHistory.any { it.practicePart == "FULL" }) "FULL"
+                    else allHistory.firstOrNull()?.practicePart ?: "FULL"
+
+                    applyFilters(
+                        currentState.copy(
+                            isLoading = false,
+                            allMultilevelHistory = allHistory,
+                            selectedMultilevelPart = initialPart
+                        )
                     )
-                    // Apply current filters to the new data
-                    applyFilters(newState)
                 }
             }
-
         }
     }
 
-
     fun selectMultilevelPart(part: String) {
         _uiState.update { currentState ->
-            val newState = currentState.copy(selectedMultilevelPart = part)
-            applyFilters(newState)
+            applyFilters(currentState.copy(selectedMultilevelPart = part))
         }
     }
 
     fun selectDuration(duration: DurationFilter) {
         _uiState.update { currentState ->
-            val newState = currentState.copy(selectedDuration = duration)
-            applyFilters(newState)
+            applyFilters(currentState.copy(selectedDuration = duration))
         }
     }
 
@@ -104,76 +108,61 @@ class ProgressViewModel @Inject constructor(
             Instant.now().minus(state.selectedDuration.days, ChronoUnit.DAYS).toEpochMilli()
         }
 
-        val filteredIelts = state.ieltsHistory.filter { it.examDate >= cutoffTime }
+        val filteredAndGroupedHistory = state.allMultilevelHistory
+            .filter { it.examDate >= cutoffTime }
+            .groupBy { it.practicePart }
 
-        val filteredMultilevel = state.multilevelHistory.mapValues { (_, results) ->
-            results.filter { it.examDate >= cutoffTime }
-        }.filter { (_, results) -> results.isNotEmpty() }
-
-        return state.copy(
-            filteredIeltsHistory = filteredIelts,
-            filteredMultilevelHistory = filteredMultilevel
-        )
+        return state.copy(filteredMultilevelHistory = filteredAndGroupedHistory)
     }
 
-    // Get the currently displayed history based on selected filters
+    // A helper to get the list of results for the currently selected part
     fun getCurrentHistory(): List<GenericExamResultSummary> {
-        val currentState = _uiState.value
-        return currentState.filteredMultilevelHistory[currentState.selectedMultilevelPart]
-            ?: emptyList()
+        val state = _uiState.value
+        return state.filteredMultilevelHistory[state.selectedMultilevelPart] ?: emptyList()
     }
 
-    // Get available parts for the current duration filter
+    // A helper to get the set of available parts for the dropdown
     fun getAvailableMultilevelParts(): Set<String> {
-        return _uiState.value.filteredMultilevelHistory.keys
+        return _uiState.value.availableMultilevelParts
     }
 
-    // Get statistics for the current selection
+    // Calculates statistics for the currently selected and filtered list of results
     fun getStatistics(): ExamStatistics {
         val history = getCurrentHistory()
-        if (history.isEmpty()) {
-            return ExamStatistics()
-        }
+        if (history.isEmpty()) return ExamStatistics()
 
         val scores = history.map { it.score }
-        val averageScore = scores.average()
-        val bestScore = scores.maxOrNull() ?: 0.0
-        val latestScore = history.firstOrNull()?.score ?: 0.0
-        val improvement = if (history.size >= 2) {
-            latestScore - history.last().score
+        val latestScore = history.first().score
+        val improvement = if (history.size > 1) {
+            // Improvement is the delta between the latest and the one before it
+            latestScore - history[1].score
         } else 0.0
 
         return ExamStatistics(
-            totalExams = history.size,
-            averageScore = averageScore,
-            bestScore = bestScore,
+            totalExams = scores.size,
+            averageScore = scores.average(),
+            bestScore = scores.maxOrNull() ?: 0.0,
             latestScore = latestScore,
             improvement = improvement
         )
     }
 }
 
-data class ExamStatistics(
-    val totalExams: Int = 0,
-    val averageScore: Double = 0.0,
-    val bestScore: Double = 0.0,
-    val latestScore: Double = 0.0,
-    val improvement: Double = 0.0
-)
-
-// Helper function to convert DB entities to UI models
+// Helper function to convert DB entities to UI-ready summary models
 private fun List<ExamResultEntity>.toGenericSummary(): List<GenericExamResultSummary> {
+    // Define the maximum score for each part
     val multilevelMaxScores =
         mapOf("FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0)
-    return this.map { summary ->
-        val maxScore = multilevelMaxScores[summary.practicedPart] ?: summary.totalScore
-        GenericExamResultSummary(
-            id = summary.id,
-            examDate = Instant.parse(summary.createdAt).toEpochMilli(),
-            score = summary.totalScore.toDouble(),
-            scoreLabel = "Score: ${summary.totalScore} / ${maxScore.toInt()}",
-            practicePart = summary.practicedPart
-        )
-    }.sortedByDescending { it.examDate }
-}
 
+    return this.map { entity ->
+        val maxScore = multilevelMaxScores[entity.practicedPart] ?: entity.totalScore.toDouble()
+        GenericExamResultSummary(
+            id = entity.id,
+            examDate = Instant.parse(entity.createdAt).toEpochMilli(),
+            score = entity.totalScore.toDouble(),
+            // Create the desired "Score: 10 / 12" label
+            scoreLabel = "Score: ${entity.totalScore} / ${maxScore.toInt()}",
+            practicePart = entity.practicedPart
+        )
+    }.sortedByDescending { it.examDate } // Ensure latest is always first
+}

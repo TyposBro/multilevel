@@ -1,4 +1,3 @@
-// {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/repositories/MultilevelExamRepository.kt
 package com.typosbro.multilevel.data.repositories
 
 import com.typosbro.multilevel.data.local.ExamResultDao
@@ -24,9 +23,11 @@ class ExamRepository @Inject constructor(
         return when (val apiResult = safeApiCall { apiService.analyzeMultilevelExam(request) }) {
             is RepositoryResult.Success -> {
                 val resultResponse = apiResult.data
+                // CORRECTLY save the result with the specific part that was practiced.
                 examResultDao.insert(
                     ExamResultEntity.fromResponse(
-                        resultResponse
+                        response = resultResponse,
+                        practicedPart = request.practicePart ?: "FULL"
                     )
                 )
                 RepositoryResult.Success(resultResponse.id)

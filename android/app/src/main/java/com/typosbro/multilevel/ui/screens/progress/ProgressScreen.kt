@@ -41,7 +41,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -76,7 +75,7 @@ fun ProgressScreen(
 
     val multilevelMaxScores =
         mapOf("FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0)
-    val yMaxForChart = multilevelMaxScores[uiState.selectedMultilevelPart] ?: 75.0
+    val yMaxForChart = multilevelMaxScores[uiState.selectedMultilevelPart] ?: 72.0
 
     Scaffold(
         topBar = {
@@ -114,7 +113,6 @@ fun ProgressScreen(
                     item {
                         StatisticsCard(
                             statistics = statistics,
-                            selectedPart = uiState.selectedMultilevelPart,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
@@ -207,17 +205,15 @@ fun FiltersRow(
             modifier = Modifier.weight(1f)
         )
 
-        // Multilevel Part Filter Dropdown (only show for multilevel tab)
-        if (availableMultilevelParts.isNotEmpty()) {
-            val partsToShow = multilevelPartOrder.filter { it in availableMultilevelParts }
-            if (partsToShow.size > 1) {
-                MultilevelPartDropdown(
-                    availableParts = partsToShow,
-                    selectedPart = selectedMultilevelPart,
-                    onPartSelected = onMultilevelPartSelected,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+        // Multilevel Part Filter Dropdown
+        val partsToShow = multilevelPartOrder.filter { it in availableMultilevelParts }
+        if (partsToShow.size > 1) {
+            MultilevelPartDropdown(
+                availableParts = partsToShow,
+                selectedPart = selectedMultilevelPart,
+                onPartSelected = onMultilevelPartSelected,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -241,9 +237,7 @@ fun DurationFilterDropdown(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         Icons.Default.FilterList,
                         contentDescription = null,
@@ -263,10 +257,7 @@ fun DurationFilterDropdown(
             }
         }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             DurationFilter.values().forEach { duration ->
                 DropdownMenuItem(
                     text = { Text(duration.displayName) },
@@ -289,7 +280,7 @@ fun MultilevelPartDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    val getPartLabel = { part: String ->
+    val getPartLabel = @Composable { part: String ->
         when (part) {
             "FULL" -> "Full Mock"
             "P1_1" -> "Part 1.1"
@@ -311,10 +302,7 @@ fun MultilevelPartDropdown(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = getPartLabel(selectedPart),
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text(text = getPartLabel(selectedPart), style = MaterialTheme.typography.bodyMedium)
                 Icon(
                     Icons.Default.ArrowDropDown,
                     contentDescription = null,
@@ -323,10 +311,7 @@ fun MultilevelPartDropdown(
             }
         }
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             availableParts.forEach { part ->
                 DropdownMenuItem(
                     text = { Text(getPartLabel(part)) },
@@ -341,32 +326,15 @@ fun MultilevelPartDropdown(
 }
 
 @Composable
-fun StatisticsCard(
-    statistics: ExamStatistics,
-    selectedPart: String,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
+fun StatisticsCard(statistics: ExamStatistics, modifier: Modifier = Modifier) {
+    Card(modifier = modifier, elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = "Statistics",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-
-            if (selectedPart != "FULL") {
-                Text(
-                    text = "Part ${selectedPart.replace("P", "").replace("_", ".")}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
             Spacer(Modifier.height(12.dp))
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -375,26 +343,12 @@ fun StatisticsCard(
                     label = "Avg Score",
                     value = statistics.averageScore.roundToInt().toString()
                 )
-
-                StatItem(
-                    label = "Best Score",
-                    value = statistics.bestScore.roundToInt().toString()
-                )
-
-                StatItem(
-                    label = "Latest",
-                    value = statistics.latestScore.roundToInt().toString()
-                )
-
+                StatItem(label = "Best Score", value = statistics.bestScore.roundToInt().toString())
+                StatItem(label = "Latest", value = statistics.latestScore.roundToInt().toString())
                 StatItem(
                     label = "Change",
-                    value = if (statistics.improvement > 0) {
-                        "+${statistics.improvement.roundToInt()}"
-                    } else if (statistics.improvement < 0) {
-                        statistics.improvement.roundToInt().toString()
-                    } else {
-                        "0"
-                    },
+                    value = if (statistics.improvement > 0) "+${statistics.improvement.roundToInt()}" else statistics.improvement.roundToInt()
+                        .toString(),
                     valueColor = when {
                         statistics.improvement > 0 -> MaterialTheme.colorScheme.primary
                         statistics.improvement < 0 -> MaterialTheme.colorScheme.error
@@ -415,7 +369,7 @@ fun StatItem(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value,
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
             color = valueColor
         )
@@ -428,10 +382,7 @@ fun StatItem(
 }
 
 @Composable
-fun EmptyStateCard(
-    selectedDuration: DurationFilter,
-    selectedPart: String
-) {
+fun EmptyStateCard(selectedDuration: DurationFilter, selectedPart: String) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -448,25 +399,16 @@ fun EmptyStateCard(
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(8.dp))
-
-            val message = when {
-                selectedPart != "FULL" -> {
-                    "No results for Part ${
-                        selectedPart.replace("P", "").replace("_", ".")
-                    } in the ${selectedDuration.displayName.lowercase()}"
-                }
-
-                selectedDuration != DurationFilter.ALL -> {
-                    "No results in the ${selectedDuration.displayName.lowercase()}"
-                }
-
-                else -> {
-                    "No results available"
-                }
+            val partLabel = when (selectedPart) {
+                "FULL" -> "Full Mock exams"
+                "P1_1" -> "Part 1.1 exams"
+                "P1_2" -> "Part 1.2 exams"
+                "P2" -> "Part 2 exams"
+                "P3" -> "Part 3 exams"
+                else -> ""
             }
-
             Text(
-                text = message,
+                text = "You have no completed $partLabel in the ${selectedDuration.displayName.lowercase()}.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -475,21 +417,12 @@ fun EmptyStateCard(
     }
 }
 
-
 @Composable
 fun ExamHistoryItem(result: GenericExamResultSummary, onClick: () -> Unit) {
     val dateFormatter = remember { SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()) }
-
     ListItem(
-        headlineContent = {
-            Text(
-                result.scoreLabel,
-                fontWeight = FontWeight.SemiBold
-            )
-        },
-        supportingContent = {
-            Text(dateFormatter.format(Date(result.examDate)))
-        },
+        headlineContent = { Text(result.scoreLabel, fontWeight = FontWeight.SemiBold) },
+        supportingContent = { Text(dateFormatter.format(Date(result.examDate))) },
         trailingContent = {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
@@ -505,37 +438,24 @@ fun ScoreHistoryChart(scores: List<Double>, yMax: Double, modifier: Modifier = M
     if (scores.size < 2) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(
-                text = if (scores.size == 1) "Complete more exams to see progress chart"
-                else stringResource(id = R.string.progress_no_enough_data),
+                text = "Complete at least two exams for this part to see your progress chart.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(16.dp)
             )
         }
         return
     }
 
     val primaryColor = MaterialTheme.colorScheme.primary
-    val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant
 
     Canvas(modifier = modifier) {
         val xStep = if (scores.size > 1) size.width / (scores.size - 1) else 0f
         val yMin = 0.0
 
-        // Draw grid lines
-        val gridLines = 5
-        for (i in 0..gridLines) {
-            val y = size.height - (i.toFloat() / gridLines * size.height)
-            drawLine(
-                color = surfaceVariant,
-                start = Offset(0f, y),
-                end = Offset(size.width, y),
-                strokeWidth = 1.dp.toPx()
-            )
-        }
-
-        // Draw the line chart
         val path = Path()
+        // Draw the scores in chronological order (oldest to newest)
         scores.reversed().forEachIndexed { index, score ->
             val x = index * xStep
             val y = size.height - ((score - yMin) / (yMax - yMin) * size.height).toFloat()
@@ -546,16 +466,7 @@ fun ScoreHistoryChart(scores: List<Double>, yMax: Double, modifier: Modifier = M
             } else {
                 path.lineTo(x, clampedY)
             }
-
-            // Draw points
-            drawCircle(
-                color = primaryColor,
-                radius = 6.dp.toPx(),
-                center = Offset(x, clampedY)
-            )
         }
-
-        // Draw the line
         drawPath(
             path = path,
             color = primaryColor,
