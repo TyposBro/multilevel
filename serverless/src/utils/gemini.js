@@ -1,10 +1,12 @@
 // {PATH_TO_PROJECT}/src/utils/gemini.js
 
-const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models";
+// CHANGED: Updated the base URL to point to the OpenRouter API.
+const OPENROUTER_API_BASE_URL = "https://openrouter.ai/api/v1";
 
 /**
  * A robust JSON parser that extracts JSON from a string,
  * even if it's wrapped in Markdown code blocks or other text.
+ * NOTE: No changes are needed for this function. It's a general utility.
  * @param {string} text The raw text response from the LLM.
  * @returns {object|null} The parsed JSON object, or null if no valid JSON is found.
  */
@@ -33,44 +35,58 @@ export const safeJsonParse = (text) => {
 };
 
 /**
- * Generates a single, non-streamed response from the Gemini model using its REST API.
+ * Generates a single, non-streamed response from a model via OpenRouter.
  * @param {object} c - The Hono context, for accessing environment variables.
  * @param {string} prompt - The prompt to send to the model.
  * @returns {Promise<string>} The text content of the response.
  */
 export async function generateText(c, prompt) {
-  const apiKey = c.env.GEMINI_API_KEY;
+  // CHANGED: Use OPEN_ROUTER_API from your environment secrets.
+  // REMINDER: You must set this secret in your wrangler.toml or Cloudflare dashboard.
+  const apiKey = c.env.OPEN_ROUTER_API;
   if (!apiKey) {
-    throw new Error("FATAL ERROR: GEMINI_API_KEY is not set in wrangler.toml secrets.");
+    throw new Error("FATAL ERROR: OPEN_ROUTER_API is not set in wrangler.toml secrets.");
   }
 
-  const model = "gemini-2.5-flash"; // Or another Gemini model you prefer
-  const url = `${GEMINI_API_BASE_URL}/${model}:generateContent?key=${apiKey}`;
+  // CHANGED: Set the model to the specific OpenRouter model ID.
+  const model = "google/gemini-2.5-flash-lite-preview-06-17";
+  const url = `${OPENROUTER_API_BASE_URL}/chat/completions`;
 
-  console.log("\n----------- PROMPT TO GEMINI -----------");
+  console.log("\n----------- PROMPT TO OPENROUTER -----------");
   console.log(prompt);
-  console.log("----------------------------------------\n");
+  console.log("------------------------------------------\n");
 
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      // CHANGED: Authentication is now done via the Authorization header.
+      Authorization: `Bearer ${apiKey}`,
+      // Optional, but recommended by OpenRouter for identifying your app.
+      // Replace with your actual site and app name.
+      // "HTTP-Referer": "https://YOUR_SITE_URL",
+      // "X-Title": "YOUR_APP_NAME",
+    },
+    // CHANGED: The request body now uses the standard OpenAI chat completions format.
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      model: model,
+      messages: [{ role: "user", content: prompt }],
     }),
   });
 
   if (!response.ok) {
     const errorBody = await response.text();
-    console.error("Gemini API Error:", errorBody);
-    throw new Error(`Gemini API request failed with status ${response.status}`);
+    console.error("OpenRouter API Error:", errorBody);
+    throw new Error(`OpenRouter API request failed with status ${response.status}`);
   }
 
   const data = await response.json();
-  const text = data.candidates[0]?.content?.parts[0]?.text || "";
+  // CHANGED: The response structure is different. The text is in `choices[0].message.content`.
+  const text = data.choices[0]?.message?.content || "";
 
-  console.log("\n---------- RAW RESPONSE FROM GEMINI ----------");
+  console.log("\n---------- RAW RESPONSE FROM OPENROUTER ----------");
   console.log(text);
-  console.log("------------------------------------------\n");
+  console.log("----------------------------------------------\n");
 
   return text;
 }

@@ -1,5 +1,6 @@
 package com.typosbro.multilevel.ui.screens.practice
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,12 +51,13 @@ import com.typosbro.multilevel.ui.viewmodels.ResultViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MultilevelResultScreen(
+fun ResultScreen(
     onNavigateBack: () -> Unit,
     viewModel: ResultViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    BackHandler(onBack = onNavigateBack)
     Scaffold(
         topBar = {
             TopAppBar(

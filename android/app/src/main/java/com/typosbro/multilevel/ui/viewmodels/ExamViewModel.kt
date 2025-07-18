@@ -80,7 +80,7 @@ data class MultilevelUiState(
 )
 
 @HiltViewModel
-class MultilevelExamViewModel @Inject constructor(
+class ExamViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: ExamRepository,
     private val voskService: VoskService,
