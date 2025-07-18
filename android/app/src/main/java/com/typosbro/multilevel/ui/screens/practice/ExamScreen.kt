@@ -62,6 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -173,17 +174,17 @@ fun ExamScreen(
                     }
                 }
 
-                // Place the transcript overlay specifically for Part 3 speaking stage
-                if (uiState.stage == MultilevelExamStage.PART3_SPEAKING) {
-                    TranscriptOverlay(
-                        currentAnswer = uiState.currentAnswerTranscript,
-                        liveTranscript = uiState.liveTranscript,
-                        isRecording = uiState.isRecording,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .zIndex(1f) // Lower z-index than cue card
-                    )
-                }
+//                // Place the transcript overlay specifically for Part 3 speaking stage
+//                if (uiState.stage == MultilevelExamStage.PART3_SPEAKING) {
+//                    TranscriptOverlay(
+//                        currentAnswer = uiState.currentAnswerTranscript,
+//                        liveTranscript = uiState.liveTranscript,
+//                        isRecording = uiState.isRecording,
+//                        modifier = Modifier
+//                            .fillMaxSize()
+//                            .zIndex(1f) // Lower z-index than cue card
+//                    )
+//                }
             }
 
 
@@ -194,19 +195,16 @@ fun ExamScreen(
                 exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 2 })
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    // Only show TranscriptDisplay for non-Part3 stages
-                    if (uiState.stage != MultilevelExamStage.PART3_SPEAKING) {
-                        TranscriptDisplay(
-                            currentAnswer = uiState.currentAnswerTranscript,
-                            liveTranscript = uiState.liveTranscript,
-                            isRecording = uiState.isRecording
-                        )
-                    }
+                    TranscriptDisplay(
+                        currentAnswer = uiState.currentAnswerTranscript,
+                        liveTranscript = uiState.liveTranscript,
+                        isRecording = uiState.isRecording
+                    )
                     RecognitionControls(
                         isRecording = uiState.isRecording,
                         onStartRecording = { /* Disabled */ },
                         onStopRecording = { viewModel.onStopRecordingClicked() },
-                        modifier = Modifier.padding(bottom = 16.dp),
+                        modifier = Modifier.padding(bottom = 8.dp),
                         enabled = uiState.isRecording
                     )
                 }
@@ -285,7 +283,7 @@ fun Part3_View(uiState: MultilevelUiState) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(24.dp)
+            .padding(horizontal = 24.dp, vertical = 8.dp)
             .zIndex(10f), // Higher z-index than transcript
         contentAlignment = Alignment.TopCenter
     ) {
@@ -316,7 +314,7 @@ fun Part3CueCard(topic: Part3Topic) {
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
             val paragraphStyle = ParagraphStyle(textIndent = TextIndent(restLine = 12.sp))
 
@@ -342,7 +340,7 @@ fun Part3CueCard(topic: Part3Topic) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
             Text(
                 text = "AGAINST",
@@ -697,26 +695,26 @@ fun TranscriptDisplay(
     }
 
     Box(
+        contentAlignment = Alignment.BottomEnd,
         modifier = Modifier
             .fillMaxWidth()
-            .height(90.dp)
+            .height(72.dp)
             .padding(horizontal = 24.dp, vertical = 8.dp)
             .verticalScroll(scrollState)
             // Add lower z-index to transcript
             .zIndex(-10f)
-            .drawWithContent {
-                val fadeHeight = 25.dp.toPx()
-                drawContent()
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black),
-                        startY = 0f,
-                        endY = fadeHeight
-                    ),
-                    blendMode = BlendMode.DstIn
-                )
-            },
-        contentAlignment = Alignment.BottomEnd
+//            .drawWithContent {
+//                val fadeHeight = 25.dp.toPx()
+//                drawContent()
+//                drawRect(
+//                    brush = Brush.verticalGradient(
+//                        colors = listOf(Color.Transparent, Color.Black),
+//                        startY = 0f,
+//                        endY = fadeHeight
+//                    ),
+//                    blendMode = BlendMode.DstIn
+//                )
+//            },
     ) {
         Column(horizontalAlignment = Alignment.End) {
             if (currentAnswer.isNotBlank()) {
@@ -744,4 +742,19 @@ private fun formatTime(seconds: Int): String {
     val minutes = seconds / 60
     val remainingSeconds = seconds % 60
     return String.format("%02d:%02d", minutes, remainingSeconds)
+}
+
+@Preview
+@Composable
+fun ExamScreenPreview() {
+    Part3_View(
+        uiState = MultilevelUiState(
+            stage = MultilevelExamStage.PART3_SPEAKING,
+            examContent = null, // Replace with actual content if needed
+            currentAnswerTranscript = "This is a sample answer for Part 3.",
+            liveTranscript = "This is the live transcript.",
+            isRecording = true,
+            timerValue = 120
+        )
+    )
 }

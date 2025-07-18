@@ -44,7 +44,7 @@ fun RecognitionControls(
             // Stop Button
             FilledIconButton(
                 onClick = onStopRecording,
-                modifier = modifier.size(64.dp),
+                modifier = modifier.size(42.dp),
                 // The button is only clickable if the parent says it's enabled.
                 enabled = enabled,
                 colors = IconButtonDefaults.filledIconButtonColors(
@@ -54,21 +54,21 @@ fun RecognitionControls(
                 Icon(
                     imageVector = Icons.Default.Stop,
                     contentDescription = stringResource(id = R.string.recording_stop),
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         } else {
             // Start Button
             FilledIconButton(
                 onClick = onStartRecording,
-                modifier = modifier.size(64.dp),
+                modifier = modifier.size(42.dp),
                 // The button is only clickable if the parent says it's enabled.
                 enabled = enabled
             ) {
                 Icon(
                     imageVector = Icons.Default.Mic,
                     contentDescription = stringResource(id = R.string.recording_start),
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }
