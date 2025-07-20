@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      This is a dummy style to satisfy the resource linker for the Click SDK,
+      which expects a style from the now-replaced com.wang.avi:library.
+      The actual view (SpinKit) will use its own internal styling.
+    -->
+    <style name="AVLoadingIndicatorView" />
+</resources>

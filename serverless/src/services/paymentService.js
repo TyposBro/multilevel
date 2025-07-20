@@ -1,31 +1,23 @@
-// {PATH_TO_PROJECT}/src/services/paymentService.js
+// serverless/src/services/paymentService.js
 
 import { db } from "../db/d1-client";
 import PLANS from "../config/plans";
 import * as paymeService from "./providers/paymeService";
 import * as googlePlayService from "./providers/googlePlayService";
-// import * as clickService from './providers/clickService'; // Example for another provider
+import * as clickService from "./providers/clickService"; // Import the new service
 
-/**
- * Initiates a payment process for web-based providers by dispatching to the correct service.
- * @param {object} c - The Hono context.
- * @param {string} provider - The name of the payment provider (e.g., 'payme', 'click').
- * @param {string} planId - The ID of the plan to purchase.
- * @param {string} userId - The ID of the user making the purchase.
- * @returns {Promise<object>} An object containing the paymentUrl and a receiptId.
- */
 export const initiatePayment = async (c, provider, planId, userId) => {
   const plan = PLANS[planId];
   if (!plan) {
     throw new Error("Plan not found");
   }
 
-  // This flow is for providers that require redirecting to a web checkout.
   switch (provider.toLowerCase()) {
     case "payme":
       return paymeService.createTransaction(c, plan, userId);
-    // case 'click':
-    //   return clickService.createTransaction(c, plan, userId);
+    case "click":
+      // This returns parameters for the Android SDK, not a URL
+      return clickService.prepareTransactionForMobile(c, plan, userId);
     default:
       throw new Error(`Unsupported payment provider for creation: ${provider}`);
   }

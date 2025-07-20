@@ -20,6 +20,18 @@ npx wrangler secret put PAYME_SECRET_KEY_LIVE
 npx wrangler secret put PAYME_MERCHANT_ID_TEST
 npx wrangler secret put PAYME_SECRET_KEY_TEST
 
+# --- Click Credentials ---
+# Test
+npx wrangler secret put CLICK_MERCHANT_ID_TEST
+npx wrangler secret put CLICK_MERCHANT_USER_ID_TEST
+npx wrangler secret put CLICK_SERVICE_ID_TEST
+npx wrangler secret put CLICK_SECRET_KEY_TEST
+# Live
+npx wrangler secret put CLICK_MERCHANT_ID_LIVE
+npx wrangler secret put CLICK_MERCHANT_USER_ID_LIVE
+npx wrangler secret put CLICK_SERVICE_ID_LIVE
+npx wrangler secret put CLICK_SECRET_KEY_LIVE
+
 # --- Google Play Billing ---
 npx wrangler secret put GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
 # (Go to Google Cloud Console -> IAM & Admin -> Service Accounts -> Create Key -> JSON)

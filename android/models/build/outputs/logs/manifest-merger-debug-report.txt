@@ -1,16 +1,16 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml:2:13-83
-INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml:2:13-83
+ADDED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml:2:13-83
+INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml:2:13-83
 	package
-		INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml
+		INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml
 	xmlns:android
-		ADDED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml:2:23-81
+		ADDED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml:2:23-81
 uses-sdk
-INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml reason: use-sdk injection requested
-INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml
-INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml
+INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml reason: use-sdk injection requested
+INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml
+INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml
 	android:targetSdkVersion
-		INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml
+		INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml
 	android:minSdkVersion
-		INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest4273879719057496653.xml
+		INJECTED from /home/ched54/Documents/android/multilevel/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest5024984742915836284.xml

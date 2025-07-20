@@ -1,5 +1,4 @@
 // {PATH_TO_PROJECT}/app/build.gradle.kts
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -63,6 +62,17 @@ android {
     packaging {
         resources.pickFirsts.add("**/libc++_shared.so")
         resources.pickFirsts.add("**/libkaldi_jni.so") // This might be needed depending on the Vosk version
+    }
+}
+
+// THIS IS THE NEW AND CRITICAL BLOCK
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        // Find the problematic dependency
+        substitute(module("com.wang.avi:library:2.1.3"))
+            // And replace it with a modern, available alternative
+            .using(module("com.github.ybq:Android-SpinKit:1.4.0"))
+            .because("com.wang.avi:library is on the deprecated JCenter and is causing network resolution issues.")
     }
 }
 
@@ -143,4 +153,6 @@ dependencies {
 
     implementation(libs.vosk.android)
     implementation(libs.androidx.play.billing)
+
+    implementation(libs.android.msdk)
 }

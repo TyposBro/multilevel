@@ -344,4 +344,49 @@ export const db = {
       throw new Error(`Failed to delete content from ${tableName}`);
     }
   },
+
+  // --- Payment Transaction Functions ---
+
+  async createPaymentTransaction(d1, { userId, planId, provider, amount }) {
+    const transactionId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    try {
+      return await d1
+        .prepare(
+          `INSERT INTO payment_transactions (id, userId, planId, provider, amount, createdAt, updatedAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
+        )
+        .bind(transactionId, userId, planId, provider, amount, now, now)
+        .first();
+    } catch (e) {
+      console.error("D1 createPaymentTransaction Error:", e.message);
+      throw new Error("Failed to create payment transaction record.");
+    }
+  },
+
+  async getPaymentTransaction(d1, id) {
+    try {
+      return await d1.prepare("SELECT * FROM payment_transactions WHERE id = ?").bind(id).first();
+    } catch (e) {
+      console.error("D1 getPaymentTransaction Error:", e.message);
+      return null;
+    }
+  },
+
+  async updatePaymentTransaction(d1, id, { status, providerTransactionId }) {
+    const now = new Date().toISOString();
+    try {
+      return await d1
+        .prepare(
+          `UPDATE payment_transactions
+           SET status = ?, providerTransactionId = ?, updatedAt = ?
+           WHERE id = ? RETURNING *`
+        )
+        .bind(status, providerTransactionId, now, id)
+        .first();
+    } catch (e) {
+      console.error("D1 updatePaymentTransaction Error:", e.message);
+      throw new Error("Failed to update payment transaction.");
+    }
+  },
 };

@@ -1,8 +1,9 @@
+// android/app/src/main/java/org/milliytechnology/spiko/ui/screens/subscription/SubscriptionScreen.kt
+
 package org.milliytechnology.spiko.ui.screens.subscription
 
 import android.util.Log
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,6 +44,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -67,7 +69,9 @@ fun SubscriptionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val activity = LocalContext.current as ComponentActivity
+    // FIX: Cast to FragmentActivity, which is required by the Click SDK for its FragmentManager.
+    // Since MainActivity inherits from AppCompatActivity, this cast is safe.
+    val activity = LocalContext.current as FragmentActivity
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // Define subscription plans using resource IDs only (no @Composable calls here)
@@ -171,8 +175,9 @@ fun SubscriptionScreen(
                                 ).show()
                             }
                         },
-                        onPayWithLocalProvider = {
-                            viewModel.createWebPayment(activity, "payme", plan.productId)
+                        onPayWithClick = {
+                            // FIX: Call the correct ViewModel function for Click payments
+                            viewModel.createClickPayment(activity, plan.productId)
                         }
                     )
                 }
@@ -190,7 +195,7 @@ private fun SubscriptionTierCard(
     plan: SubscriptionPlan,
     productDetails: ProductDetails?,
     onPayWithGoogle: () -> Unit,
-    onPayWithLocalProvider: () -> Unit,
+    onPayWithClick: () -> Unit,
 ) {
     ElevatedCard(
         modifier = Modifier.fillMaxWidth()
@@ -217,7 +222,7 @@ private fun SubscriptionTierCard(
 
             PaymentButtons(
                 onPayWithGoogle = onPayWithGoogle,
-                onPayWithLocalProvider = onPayWithLocalProvider,
+                onPayWithClick = onPayWithClick,
                 isGooglePayEnabled = productDetails != null
             )
         }
@@ -244,7 +249,7 @@ private fun FeatureRow(text: String, modifier: Modifier = Modifier) {
 @Composable
 private fun PaymentButtons(
     onPayWithGoogle: () -> Unit,
-    onPayWithLocalProvider: () -> Unit,
+    onPayWithClick: () -> Unit,
     isGooglePayEnabled: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -263,9 +268,8 @@ private fun PaymentButtons(
             Text(stringResource(R.string.subscription_google_play_button))
         }
         Button(
-            onClick = onPayWithGoogle,
+            onClick = onPayWithClick,
             modifier = Modifier.fillMaxWidth(),
-            enabled = isGooglePayEnabled
         ) {
             Icon(
                 painter = painterResource(id = R.drawable.ic_click_logo),

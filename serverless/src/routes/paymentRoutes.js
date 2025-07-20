@@ -1,18 +1,27 @@
-// {PATH_TO_PROJECT}/src/routes/paymentRoutes.js
+// serverless/src/routes/paymentRoutes.js
 
 import { Hono } from "hono";
 import { protectAndLoadUser } from "../middleware/authMiddleware";
-import { createPayment, verifyPayment } from "../controllers/payments/paymentController";
+import {
+  createPayment,
+  verifyPayment,
+  handleСlickWebhook,
+} from "../controllers/payments/paymentController";
 
 const paymentRoutes = new Hono();
 
-// All payment routes should be protected
-paymentRoutes.use("/*", protectAndLoadUser);
+// --- PUBLIC WEBHOOK FOR CLICK ---
+// This route must NOT be protected by user auth middleware.
+paymentRoutes.post("/click/webhook", handleСlickWebhook);
 
-// Route to create the payment and get the URL
+// All other payment routes should be protected
+paymentRoutes.use("/create", protectAndLoadUser);
+paymentRoutes.use("/verify", protectAndLoadUser);
+
+// Route to create the payment and get the URL/params
 paymentRoutes.post("/create", createPayment);
 
-// Route to verify the payment after user returns from Payme/Click
+// Route to verify the payment after user returns from providers
 paymentRoutes.post("/verify", verifyPayment);
 
 export default paymentRoutes;

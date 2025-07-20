@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      These are dummy attributes to satisfy the resource linker for the Click SDK,
+      which expects attributes from the now-replaced com.wang.avi:library.
+      The actual view (SpinKit) does not use these, but they must exist for the build to pass.
+    -->
+    <declare-styleable name="AVLoadingIndicatorView">
+        <attr name="indicatorName" format="string" />
+        <attr name="indicatorColor" format="color" />
+    </declare-styleable>
+</resources>
