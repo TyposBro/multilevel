@@ -111,8 +111,9 @@
     <string name="profile_item_subtitle_permanent">Это действие необратимо</string>
 
     <string name="subscription_title">Выберите свой план</string>
-    <string name="subscription_loading_price">Загрузка цены...</string>
+    <string name="subscription_loading_price">Загрузка цены…</string>
     <string name="subscription_google_play_button">Оплатить через Google Play</string>
+    <string name="subscription_click_button">Оплатить через Click</string>
     <string name="subscription_other_methods_button">Другие способы оплаты</string>
 
     <string name="tier_free">Бесплатно</string>

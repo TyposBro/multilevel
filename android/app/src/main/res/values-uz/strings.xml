@@ -112,8 +112,9 @@
     <string name="profile_item_subtitle_permanent">Bu harakat doimiydir</string>
 
     <string name="subscription_title">Rejangizni tanlang</string>
-    <string name="subscription_loading_price">Narx yuklanmoqda...</string>
+    <string name="subscription_loading_price">Narx yuklanmoqda…</string>
     <string name="subscription_google_play_button">Google Play orqali to\'lash</string>
+    <string name="subscription_click_button">Click orqali to\'lash</string>
     <string name="subscription_other_methods_button">Boshqa to\'lov usullari</string>
 
     <string name="tier_free">Bepul</string>

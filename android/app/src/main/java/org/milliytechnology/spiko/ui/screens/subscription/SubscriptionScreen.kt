@@ -27,7 +27,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -263,11 +262,19 @@ private fun PaymentButtons(
             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
             Text(stringResource(R.string.subscription_google_play_button))
         }
-        OutlinedButton(
-            onClick = onPayWithLocalProvider,
+        Button(
+            onClick = onPayWithGoogle,
             modifier = Modifier.fillMaxWidth(),
+            enabled = isGooglePayEnabled
         ) {
-            Text(stringResource(R.string.subscription_other_methods_button))
+            Icon(
+                painter = painterResource(id = R.drawable.ic_click_logo),
+                contentDescription = null, // Decorative
+                modifier = Modifier.size(ButtonDefaults.IconSize),
+                tint = Color.Unspecified
+            )
+            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+            Text(stringResource(R.string.subscription_click_button))
         }
     }
 }

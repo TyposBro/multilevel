@@ -118,6 +118,7 @@
     <string name="subscription_title">Choose Your Plan</string>
     <string name="subscription_loading_price">Loading price…</string>
     <string name="subscription_google_play_button">Pay with Google Play</string>
+    <string name="subscription_click_button">Pay with Click</string>
     <string name="subscription_other_methods_button">Other Payment Methods</string>
 
     <string name="tier_free">Free</string>
