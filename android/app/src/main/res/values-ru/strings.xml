@@ -1,103 +1,157 @@
-<!-- res/values-ru/strings.xml -->
 <resources>
     <string name="app_name">Spiko</string>
+    <string name="google_web_client_id" translatable="false">118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com</string>
+    <string name="url_privacy_policy" translatable="false">https://milliytechnology.org/privacy</string>
+    <string name="url_faq" translatable="false">https://milliytechnology.org/faq</string>
+    <string name="about_copyright">© 2025 MilliyTechnology LLC</string>
 
-    <!--  MULTILEVEL INSTRUCTIONS  -->
-
-    <!--  NAV BAR  -->
     <string name="navbar_practice">Практика</string>
     <string name="navbar_progress">Прогресс</string>
     <string name="navbar_vocabulary">Словарь</string>
     <string name="navbar_profile">Профиль</string>
 
-    <!--  LOGIN SCREEN  -->
-    <string name="login_google">Войти через Google</string>
-    <string name="login_telegram">Войти через  Telegram</string>
-
-    <string name="login_google_error">Не удалось войти через Google. Пожалуйста, попробуйте еще раз.</string>
     <string name="login_title">С возвращением</string>
     <string name="login_subtitle">Войдите, чтобы продолжить</string>
-    <string name="login_email">Эл. почта</string>
+    <string name="login_email">Электронная почта</string>
     <string name="login_pwd">Пароль</string>
     <string name="login_button">Войти</string>
     <string name="login_or">Или</string>
-    <string name="login_question">Нет аккаунта? Зарегистрируйтесь</string>
+    <string name="login_google">Войти через Google</string>
+    <string name="login_telegram">Войти через Telegram</string>
+    <string name="login_google_error">Ошибка входа через Google. Пожалуйста, попробуйте еще раз.</string>
+    <string name="login_question">Нет аккаунта? Зарегистрироваться</string>
 
-    <!--  REGISTRATION SCREEN  -->
     <string name="register_title">Создать аккаунт</string>
     <string name="register_subtitle">Начните, заполнив форму ниже</string>
     <string name="register_pwd_confirm">Подтвердите пароль</string>
-    <string name="register_pwd_error">Пароли не совпадают</string>
-    <string name="register_pwd_confirm_error">Пароли не совпадают</string>
+    <string name="register_pwd_error">Подтвердите пароль</string>
+    <string name="register_pwd_confirm_error">Подтвердите пароль</string>
     <string name="register_button">Создать аккаунт</string>
-    <string name="register_question">Уже есть аккаунт? Войдите</string>
+    <string name="register_question">Уже есть аккаунт? Войти</string>
 
-    <!--  EXAM RESULT SCREEN  -->
+    <string name="practice_hub_title">Центр практики</string>
+    <string name="practice_hub_multilevel">Многоуровневая разговорная речь</string>
+    <string name="practice_hub_multilevel_description">Сымитируйте полный 15-минутный тест.</string>
+    <string name="practice_hub_ielts">IELTS Speaking (экспериментально)</string>
+    <string name="practice_hub_ielts_description">Сымитируйте полный 11–14-минутный тест.</string>
+    <string name="practice_full_title">Полный пробный экзамен</string>
+    <string name="practice_full_description">Полная 3-х частная симуляция устной речи.</string>
+    <string name="practice_p1_1_title">Практика. Часть 1.1</string>
+    <string name="practice_p1_1_description">Ответьте на личные вопросы.</string>
+    <string name="practice_p1_2_title">Практика. Часть 1.2</string>
+    <string name="practice_p1_2_description">Сравните и сопоставьте две картинки.</string>
+    <string name="practice_p2_title">Практика. Часть 2</string>
+    <string name="practice_p2_description">Произнесите монолог по карточке с подсказками.</string>
+    <string name="practice_p3_title">Практика. Часть 3</string>
+    <string name="practice_p3_description">Обсудите и аргументируйте заданную тему.</string>
+
+    <string name="PART1_HEADER" translatable="false">Часть 1</string>
+    <string name="PART1_1_INTRO" translatable="false">В этой части я задам вам три коротких вопроса о вас и ваших интересах. Затем вы увидите несколько фотографий и ответите на вопросы о них. У вас будет 30 секунд, чтобы ответить на каждый вопрос. Начните говорить, когда услышите этот звук.</string>
+    <string name="PART1_2_INTRO" translatable="false">Теперь я попрошу вас сравнить две картинки и задам вам два вопроса о них</string>
+    <string name="PART2_HEADER" translatable="false">Часть 2</string>
+    <string name="PART2_INTRO" translatable="false">В этой части я покажу вам картинку и задам 3 вопроса. У вас будет одна минута, чтобы обдумать свои ответы, прежде чем вы начнете говорить. У вас будет две минуты, чтобы ответить на все три вопроса. Начните говорить, когда услышите этот звук.</string>
+    <string name="PART3_HEADER" translatable="false">Часть 3</string>
+    <string name="PART3_INTRO" translatable="false">В этой части вы будете говорить на определенную тему в течение двух минут. Вы увидите тему на экране и два списка пунктов - «за» и «против» - связанные с темой. Выберите два пункта из каждого списка и приведите сбалансированный аргумент, чтобы представить обе стороны темы. У вас есть одна минута на подготовку аргумента. Затем у вас будет две минуты, чтобы говорить. Начните говорить, когда услышите этот звук.</string>
+    <string name="notice_english_only">⚠️ Обратите внимание: Все инструкции и вопросы экзамена будут на английском языке, как и на официальном устном тесте.</string>
+
     <string name="exam_result_title">Результат экзамена</string>
+    <string name="exam_result_overall">Общий балл</string>
+    <string name="exam_result_part_score">Оценка за часть</string>
     <string name="exam_result_feedback">Обратная связь</string>
     <string name="exam_result_transcript">Транскрипт</string>
-    <string name="exam_result_overall">Общий балл</string>
     <string name="exam_result_suggestion">Примеры и предложения</string>
     <string name="exam_result_suggestion_description">Предложение</string>
 
-    <!--  PRACTICE HUB SCREEN  -->
-    <string name="practice_hub_title">Центр практики</string>
-    <string name="practice_hub_multilevel">Многоуровневый разговорный тест</string>
-    <string name="practice_hub_multilevel_description">Симуляция полного теста длительностью 11–14 минут.</string>
-    <string name="practice_hub_ielts">IELTS Speaking (Experimental)</string>
-    <string name="practice_hub_ielts_description">Симуляция полного теста длительностью 11–14 минут.</string>
-
-    <!--  PROFILE SCREEN  -->
-    <string name="profile_title">Профиль иamp; Настройки</string>
-    <string name="profile_section_title_account">Аккаунт</string>
-    <string name="profile_section_title_support">Поддержка иamp; О приложении</string>
-    <string name="profile_section_title_settings">Настройки</string>
-    <string name="profile_section_title_action">Действия</string>
-    <string name="profile_item_membership">Участник с</string>
-    <string name="profile_item_subscription">Подписка</string>
-    <string name="profile_item_dark_mode">Тёмный режим</string>
-    <string name="profile_item_help">Помощь</string>
-    <string name="profile_item_privacy">Политика конфиденциальности</string>
-    <string name="profile_item_about">О приложении</string>
-    <string name="profile_item_delete">Удалить аккаунт</string>
-    <string name="profile_item_subtitle_permanent">Это действие необратимо</string>
-    <string name="profile_item_language">Язык</string> <!-- ADD THIS -->
-    <string name="language_dialog_title">Выберите язык</string>
-
-    <!--  PROGRESS SCREEN  -->
     <string name="progress_title">Прогресс</string>
-    <string name="progress_empty">Пока нет истории экзаменов %s.</string>
-    <string name="progress_score">Динамика баллов</string>
+    <string name="progress_empty">Пока нет истории экзаменов по %s.</string>
+    <string name="progress_score">Баллы за период</string>
+    <string name="progress_chart_empty_state">Недостаточно данных для отображения графика прогресса. Пройдите больше оценок, чтобы увидеть свой прогресс здесь.</string>
     <string name="progress_history">История экзаменов</string>
     <string name="progress_no_enough_data">Пройдите как минимум два теста, чтобы увидеть график.</string>
     <string name="progress_detail">Посмотреть детали</string>
+    <string name="progress_no_results_found">Результаты не найдены</string>
+    <string name="progress_no_completed_exams">Вы не прошли ни одного %1$s в %2$s.</string>
+    <string name="progress_statistics">Статистика</string>
+    <string name="progress_avg_score">Средний балл</string>
+    <string name="progress_best_score">Лучший балл</string>
+    <string name="progress_latest">Последний балл</string>
+    <string name="progress_change">Изменение</string>
 
-    <!--  RECORDING COMPONENT  -->
+    <string name="topics_for_level">Темы для уровня %s</string>
+    <string name="no_new_topics_found">Новых тем для уровня %s не найдено.</string>
+    <string name="action_remove">Удалить</string>
+    <string name="action_add">Добавить</string>
+    <string name="review_session_title">Повторение слов</string>
+    <string name="no_words_to_review">На данный момент у вас нет слов для повторения. Добавьте больше слов в свой словарный запас или дождитесь запланированных повторений.</string>
+    <string name="review_again">Снова</string>
+    <string name="review_hard">Сложно</string>
+    <string name="review_good">Хорошо</string>
+    <string name="review_easy">Легко</string>
+    <string name="example_prefix">Пример:\n%s</string>
+    <string name="session_complete_title">Сессия завершена!</string>
+    <string name="session_complete_description">Вы просмотрели все доступные слова на данный момент. Зайдите позже, чтобы увидеть больше или добавить новые слова!</string>
+
+    <string name="profile_title">Профиль и настройки</string>
+    <string name="profile_section_title_account">Аккаунт</string>
+    <string name="profile_item_membership">Участник с</string>
+    <string name="profile_item_subscription">Подписка</string>
+    <string name="profile_section_title_settings">Настройки</string>
+    <string name="profile_item_dark_mode">Темный режим</string>
+    <string name="profile_item_language">Язык</string>
+    <string name="language_dialog_title">Выбрать язык</string>
+    <string name="profile_section_title_support">Поддержка и о приложении</string>
+    <string name="profile_item_help">Помощь</string>
+    <string name="profile_item_privacy">Политика конфиденциальности</string>
+    <string name="profile_item_about">О приложении</string>
+    <string name="about_title">О многоуровневом приложении</string>
+    <string name="about_subtitle">Многоуровневое приложение для изучения и практики английского языка.</string>
+    <string name="about_version">Версия: %s</string>
+    <string name="profile_section_title_action">Действия</string>
+    <string name="profile_item_delete">Удалить аккаунт</string>
+    <string name="profile_item_subtitle_permanent">Это действие необратимо</string>
+
+    <string name="subscription_title">Выберите свой план</string>
+    <string name="subscription_loading_price">Загрузка цены...</string>
+    <string name="subscription_google_play_button">Оплатить через Google Play</string>
+    <string name="subscription_other_methods_button">Другие способы оплаты</string>
+
+    <string name="tier_free">Бесплатно</string>
+    <string name="tier_silver">Серебро</string>
+    <string name="tier_gold">Золото</string>
+
+    <string name="feature_unlimited_part_practices">Неограниченная практика по частям</string>
+    <string name="feature_5_mock_exams_month">5 полных пробных экзаменов в месяц</string>
+    <string name="feature_6_month_history_retention">Сохранение истории за 6 месяцев</string>
+
+    <string name="feature_everything_in_silver">Все, что есть в Silver</string>
+    <string name="feature_unlimited_full_mock_exams">Неограниченные полные пробные экзамены</string>
+    <string name="feature_unlimited_history_retention">Неограниченное сохранение истории</string>
+
+    <string name="button_back">Назад</string>
+    <string name="error_generic_message">Ошибка: %s</string>
+    <string name="plan_not_available">План недоступен</string>
+    <string name="navigate_back">Вернуться назад</string>
+    <string name="button_ok">ОК</string>
+    <string name="button_cancel">Отмена</string>
+    <string name="button_refresh">Обновить</string>
+    <string name="button_logout">Выйти</string>
+    <string name="button_warning">Предупреждение</string>
+    <string name="go_back">Вернуться</string>
+
+    <string name="error_message">Ошибка: %s</string>
+    <string name="image_load_error">Не удалось загрузить изображение</string>
+    <string name="permission_record_audio">Для прохождения экзамена требуется разрешение на использование микрофона.</string>
+
     <string name="recording_start">Начать запись</string>
     <string name="recording_stop">Остановить запись</string>
 
-    <!--  ABOUT COMPONENT  -->
-    <string name="about_title">О Multilevel</string>
-    <string name="about_subtitle">Многоуровневое приложение для изучения и практики английского языка.</string>
-    <string name="about_version">Версия: %s</string>
-
-    <!--  REUSABLE  -->
-    <string name="error_message">Ошибка: %s</string>
-    <string name="button_ok">Выйти</string>
-    <string name="button_back">Кнопка Назад</string>
-    <string name="button_logout">Выйти</string>
-    <string name="button_cancel">Отмена</string>
-    <string name="button_warning">Предупреждение</string>
-    <string name="button_refresh">Обновить</string>
-    <string name="delete_permanent">Удалить навсегда</string>
-    <string name="tier_free">Бесплатный тариф</string>
-    <string name="tier_premium">Премиум-тариф</string>
-    <string name="logout_confirm_title">Подтвердите выход</string>
+    <string name="logout_confirm_title">Подтверждение выхода</string>
     <string name="logout_confirm_subtitle">Вы уверены, что хотите выйти?</string>
     <string name="delete_confirm_title">Удалить ваш аккаунт?</string>
-    <string name="delete_confirm_subtitle">Это действие необратимо. Все ваши данные будут удалены навсегда. Это действие нельзя отменить. Вы уверены, что хотите продолжить?</string>
+    <string name="delete_confirm_subtitle">Это действие необратимо. Все ваши данные будут удалены навсегда. Это невозможно отменить. Вы уверены, что хотите продолжить?</string>
+    <string name="delete_permanent">Удалить навсегда</string>
+
     <string name="logo_google_description">Логотип Google</string>
     <string name="logo_app">Логотип приложения</string>
-    <string name="permission_record_audio">Для сдачи экзамена требуется разрешение на использование микрофона.</string>
-    <string name="notice_english_only">⚠️ Обратите внимание: все инструкции и вопросы к экзамену будут на английском языке, как и в официальном тесте по говорению.</string>
+
 </resources>

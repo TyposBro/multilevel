@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/org/milliytechnology/spiko/ui/screens/wordbank/WordReviewScreen.kt
 package org.milliytechnology.spiko.ui.screens.wordbank
 
 import androidx.compose.animation.core.animateFloatAsState
@@ -17,33 +18,37 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.alexstyl.swipeablecard.ExperimentalSwipeableCardApi
-import kotlinx.coroutines.launch
+import org.milliytechnology.spiko.R
 import org.milliytechnology.spiko.data.local.WordEntity
 import org.milliytechnology.spiko.features.srs.ReviewQuality
 import org.milliytechnology.spiko.ui.viewmodels.WordBankViewModel
@@ -56,22 +61,34 @@ fun WordReviewScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val currentWord = uiState.currentWord
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+
 
     LaunchedEffect(Unit) {
         viewModel.startReviewSession()
     }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text("Review Session") },
+                title = { Text(stringResource(R.string.review_session_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.navigate_back)
+                        )
                     }
-                }
+                },
+                scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer
+                )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.surface
     ) { padding ->
         Box(
             modifier = Modifier
@@ -79,124 +96,131 @@ fun WordReviewScreen(
                 .fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
-            if (uiState.isSessionFinished) {
-                SessionComplete(onNavigateBack)
-            } else if (uiState.isSessionActive && currentWord == null) {
-                CircularProgressIndicator()
-            } else if (uiState.isSessionActive && currentWord != null) {
-                val scope = rememberCoroutineScope()
-
-                fun onReview(quality: ReviewQuality) {
-                    viewModel.handleReview(currentWord, quality)
+            when {
+                uiState.isSessionFinished -> {
+                    SessionComplete(onNavigateBack)
                 }
 
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(
-                        20.dp,
-                        alignment = Alignment.CenterVertically
+                uiState.isLoading && currentWord == null -> {
+                    CircularProgressIndicator()
+                }
+
+                uiState.isSessionActive && currentWord != null -> {
+                    Reviewer(
+                        currentWord = currentWord,
+                        onReview = { quality ->
+                            viewModel.handleReview(currentWord, quality)
+                        }
                     )
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        WordReviewCard(
-                            word = currentWord,
-                        )
-                    }
-
-                    // --- NEW: 2x2 Grid Layout for Buttons ---
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Top Row: Again, Hard
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            ReviewButton(
-                                text = "Again",
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                scope.launch { onReview(ReviewQuality.AGAIN) }
-                            }
-                            ReviewButton(
-                                text = "Hard",
-                                color = Color(0xFFFFA726),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                scope.launch { onReview(ReviewQuality.HARD) }
-                            }
-                        }
-                        // Bottom Row: Good, Easy
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            ReviewButton(
-                                text = "Good",
-                                color = Color(0xFF42A5F5),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                scope.launch { onReview(ReviewQuality.GOOD) }
-                            }
-                            ReviewButton(
-                                text = "Easy",
-                                color = Color(0xFF66BB6A),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                scope.launch { onReview(ReviewQuality.EASY) }
-                            }
-                        }
-                    }
                 }
-            } else {
-                Text(
-                    "No words to review right now. Come back later!",
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(16.dp)
-                )
+
+                else -> {
+                    Text(
+                        text = stringResource(R.string.no_words_to_review),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
             }
         }
     }
 }
 
-// --- UPDATED: Helper for larger, more readable buttons ---
 @Composable
-private fun ReviewButton(
-    text: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
+private fun Reviewer(
+    currentWord: WordEntity,
+    onReview: (ReviewQuality) -> Unit
 ) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(56.dp), // Increased height for better tap target
-        colors = ButtonDefaults.buttonColors(containerColor = color)
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp, alignment = Alignment.CenterVertically)
     ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyLarge, // Larger font
-            fontWeight = FontWeight.Bold // Bolder font
-        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            WordReviewCard(word = currentWord)
+        }
+
+        // --- UPDATED: 2x2 Grid Layout for M3 Themed Buttons ---
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            val buttonModifier = Modifier
+                .height(56.dp)
+                .weight(1f)
+            // Top Row: Again, Hard
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Button(
+                    onClick = { onReview(ReviewQuality.AGAIN) },
+                    modifier = buttonModifier,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                ) {
+                    Text(
+                        text = stringResource(R.string.review_again),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                OutlinedButton(
+                    onClick = { onReview(ReviewQuality.HARD) },
+                    modifier = buttonModifier
+                ) {
+                    Text(
+                        text = stringResource(R.string.review_hard),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            // Bottom Row: Good, Easy
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                FilledTonalButton(
+                    onClick = { onReview(ReviewQuality.GOOD) },
+                    modifier = buttonModifier
+                ) {
+                    Text(
+                        text = stringResource(R.string.review_good),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Button(
+                    onClick = { onReview(ReviewQuality.EASY) },
+                    modifier = buttonModifier
+                ) {
+                    Text(
+                        text = stringResource(R.string.review_easy),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
     }
 }
 
 
-@OptIn(ExperimentalSwipeableCardApi::class)
 @Composable
-fun WordReviewCard(
-    word: WordEntity,
-) {
+fun WordReviewCard(word: WordEntity) {
     var isRevealed by remember { mutableStateOf(false) }
 
     // When a new word is displayed, reset the revealed state
@@ -209,21 +233,17 @@ fun WordReviewCard(
             .fillMaxWidth(0.9f)
             .aspectRatio(3f / 4f)
     ) {
-        // Our new FlippableCard handles the rotation and content switching
         FlippableCard(
             isFlipped = isRevealed,
             onClick = { isRevealed = !isRevealed },
             front = {
-                // Content for the front of the card
                 CardContent(
                     title = word.word,
                     titleStyle = MaterialTheme.typography.displayMedium,
                     example = word.example1,
-
-                    )
+                )
             },
             back = {
-                // Content for the back of the card
                 CardContent(
                     title = word.translation,
                     titleStyle = MaterialTheme.typography.headlineMedium,
@@ -235,9 +255,7 @@ fun WordReviewCard(
     }
 }
 
-/**
- * A reusable composable that shows a card with a front and back that can be flipped.
- */
+
 @Composable
 fun FlippableCard(
     isFlipped: Boolean,
@@ -246,7 +264,6 @@ fun FlippableCard(
     front: @Composable () -> Unit,
     back: @Composable () -> Unit,
 ) {
-    // Animate the rotationY value between 0f (front) and 180f (back)
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
         animationSpec = tween(durationMillis = 500),
@@ -257,15 +274,14 @@ fun FlippableCard(
         onClick = onClick,
         modifier = modifier
             .fillMaxSize()
-            // Apply the animated rotation to the graphics layer
             .graphicsLayer {
                 rotationY = rotation
-                // Add a perspective effect
                 cameraDistance = 12 * density
-            }
+            },
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+        )
     ) {
-        // Show the back of the card if the rotation is past 90 degrees, otherwise show the front.
-        // The back is also rotated so it's not mirrored.
         if (rotation <= 90f) {
             Box(Modifier.fillMaxSize()) {
                 front()
@@ -274,7 +290,6 @@ fun FlippableCard(
             Box(
                 Modifier
                     .fillMaxSize()
-                    // Rotate the back content so it's facing the correct way
                     .graphicsLayer { rotationY = 180f }
             ) {
                 back()
@@ -283,10 +298,7 @@ fun FlippableCard(
     }
 }
 
-/**
- * A generic composable for displaying content inside the review card.
- * Used for both the front and back sides.
- */
+
 @Composable
 private fun CardContent(
     title: String,
@@ -297,7 +309,7 @@ private fun CardContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(24.dp), // Increased padding
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -308,15 +320,14 @@ private fun CardContent(
             textAlign = TextAlign.Center
         )
 
-        if (example != null) {
+        if (!example.isNullOrBlank()) {
             Spacer(Modifier.height(32.dp))
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "e.g. $example",
-                    style = MaterialTheme.typography.bodyLarge,
-                    textAlign = TextAlign.Center
-                )
-            }
+            Text(
+                text = stringResource(R.string.example_prefix, example),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -328,11 +339,20 @@ fun SessionComplete(onNavigateBack: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         modifier = Modifier.padding(32.dp)
     ) {
-        Text("Great job!", style = MaterialTheme.typography.headlineLarge)
-        Text("You've finished your review session.", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            text = stringResource(R.string.session_complete_title),
+            style = MaterialTheme.typography.headlineLarge,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.session_complete_description),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Spacer(Modifier.height(24.dp))
         Button(onClick = onNavigateBack) {
-            Text("Go back")
+            Text(stringResource(R.string.go_back))
         }
     }
 }

@@ -19,11 +19,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -118,11 +117,10 @@ fun ProgressScreen(
 
                     // Score Chart
                     item {
-                        Card(
+                        ElevatedCard(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
                                 Row(
@@ -232,7 +230,7 @@ fun DurationFilterDropdown(
                 .clickable { expanded = true }
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -297,7 +295,7 @@ fun MultilevelPartDropdown(
                 .clickable { expanded = true }
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -326,10 +324,10 @@ fun MultilevelPartDropdown(
 
 @Composable
 fun StatisticsCard(statistics: ExamStatistics, modifier: Modifier = Modifier) {
-    Card(modifier = modifier, elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)) {
+    ElevatedCard(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Statistics",
+                text = stringResource(R.string.progress_statistics),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -339,17 +337,23 @@ fun StatisticsCard(statistics: ExamStatistics, modifier: Modifier = Modifier) {
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 StatItem(
-                    label = "Avg Score",
+                    label = stringResource(R.string.progress_avg_score),
                     value = statistics.averageScore.roundToInt().toString()
                 )
-                StatItem(label = "Best Score", value = statistics.bestScore.roundToInt().toString())
-                StatItem(label = "Latest", value = statistics.latestScore.roundToInt().toString())
                 StatItem(
-                    label = "Change",
+                    label = stringResource(R.string.progress_best_score),
+                    value = statistics.bestScore.roundToInt().toString()
+                )
+                StatItem(
+                    label = stringResource(R.string.progress_latest),
+                    value = statistics.latestScore.roundToInt().toString()
+                )
+                StatItem(
+                    label = stringResource(R.string.progress_change),
                     value = if (statistics.improvement > 0) "+${statistics.improvement.roundToInt()}" else statistics.improvement.roundToInt()
                         .toString(),
                     valueColor = when {
-                        statistics.improvement > 0 -> MaterialTheme.colorScheme.primary
+                        statistics.improvement > 0 -> MaterialTheme.colorScheme.primary // Consider a dedicated positive color if available
                         statistics.improvement < 0 -> MaterialTheme.colorScheme.error
                         else -> MaterialTheme.colorScheme.onSurface
                     }
@@ -382,18 +386,18 @@ fun StatItem(
 
 @Composable
 fun EmptyStateCard(selectedDuration: DurationFilter, selectedPart: String) {
-    Card(
+    ElevatedCard(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .padding(16.dp)
     ) {
         Column(
             modifier = Modifier.padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "No Results Found",
+                text = stringResource(R.string.progress_no_results_found),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -407,7 +411,11 @@ fun EmptyStateCard(selectedDuration: DurationFilter, selectedPart: String) {
                 else -> ""
             }
             Text(
-                text = "You have no completed $partLabel in the ${selectedDuration.displayName.lowercase()}.",
+                text = stringResource(
+                    R.string.progress_no_completed_exams,
+                    partLabel,
+                    selectedDuration.displayName.lowercase()
+                ),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -437,7 +445,7 @@ fun ScoreHistoryChart(scores: List<Double>, yMax: Double, modifier: Modifier = M
     if (scores.size < 2) {
         Box(modifier = modifier, contentAlignment = Alignment.Center) {
             Text(
-                text = "Complete at least two exams for this part to see your progress chart.",
+                text = stringResource(R.string.progress_chart_empty_state),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

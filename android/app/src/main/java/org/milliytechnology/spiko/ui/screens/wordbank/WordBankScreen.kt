@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/org/milliytechnology/spiko/ui/screens/wordbank/WordBankScreen.kt
 package org.milliytechnology.spiko.ui.screens.wordbank
 
 import androidx.compose.animation.AnimatedVisibility
@@ -6,12 +7,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,13 +20,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -36,10 +44,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -55,8 +64,9 @@ fun WordBankScreen(
     viewModel: WordBankViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var expandedLevels by remember { mutableStateOf(setOf<String>()) }
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior(rememberTopAppBarState())
 
+    // Fetches data when the screen is resumed
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = object : DefaultLifecycleObserver {
@@ -71,72 +81,50 @@ fun WordBankScreen(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("Decks") }) }
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            TopAppBar(
+                title = { Text("Decks") },
+                scrollBehavior = scrollBehavior
+            )
+        }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
+            // M3: Redesigned stats bar for a cleaner look
             StatsBar(
                 due = uiState.totalDue,
                 new = uiState.totalNew,
                 total = uiState.totalWords
             )
 
-            // This Box will now correctly contain either the loader or the weighted list.
-            Box(modifier = Modifier.weight(1f)) { // --- FIX 1: Give this Box the weight ---
+            Box(modifier = Modifier.weight(1f)) {
                 if (uiState.isLoading && uiState.deckHierarchy.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                } else {
-                    // --- FIX 2: Remove fillMaxSize() from here, the weight modifier handles it ---
-                    LazyColumn {
-                        items(uiState.deckHierarchy, key = { it.name }) { levelDeck ->
-                            Column {
-                                DeckItemRow(
-                                    deck = levelDeck,
-                                    isExpanded = levelDeck.name in expandedLevels,
-                                    onExpandToggle = { isNowExpanded ->
-                                        expandedLevels = if (isNowExpanded) {
-                                            expandedLevels + levelDeck.name
-                                        } else {
-                                            expandedLevels - levelDeck.name
-                                        }
-                                    },
-                                    onReviewClick = {
-                                        if (levelDeck.dueCount > 0) {
-                                            viewModel.startReviewSession(level = levelDeck.level)
-                                            onNavigateToReview()
-                                        }
-                                    }
-                                )
-
-                                AnimatedVisibility(visible = levelDeck.name in expandedLevels) {
-                                    Column {
-                                        levelDeck.subDecks.forEach { topicDeck ->
-                                            DeckItemRow(
-                                                deck = topicDeck,
-                                                isSubItem = true,
-                                                onReviewClick = {
-                                                    if (topicDeck.dueCount > 0) {
-                                                        viewModel.startReviewSession(
-                                                            level = topicDeck.level,
-                                                            topic = topicDeck.topic
-                                                        )
-                                                        onNavigateToReview()
-                                                    }
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                } else if (!uiState.isLoading && uiState.deckHierarchy.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Your word bank is empty.\nExplore new words to get started!",
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
+                } else {
+                    DeckList(
+                        decks = uiState.deckHierarchy,
+                        onNavigateToReview = onNavigateToReview,
+                        onStartReview = viewModel::startReviewSession,
+                    )
                 }
             }
 
-            // --- FIX 3: Remove the Spacer. The weight on the Box above handles this now. ---
-
-            // This button will now correctly appear at the bottom.
             OutlinedButton(
                 onClick = onNavigateToExplore,
                 modifier = Modifier
@@ -149,89 +137,174 @@ fun WordBankScreen(
     }
 }
 
-// StatsBar, DeckItemRow, and CountBadge composables remain unchanged.
 @Composable
-private fun StatsBar(due: Int, new: Int, total: Int) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(text = "Due: ", fontWeight = FontWeight.Bold)
-        Text(text = "$due", color = Color(0xFF4CAF50), fontWeight = FontWeight.Bold)
-        Spacer(Modifier.width(16.dp))
-        Text(text = "New: ", fontWeight = FontWeight.Bold)
-        Text(text = "$new", color = Color(0xFF42A5F5), fontWeight = FontWeight.Bold)
-        Spacer(Modifier.width(16.dp))
-        Text(text = "Total: ", fontWeight = FontWeight.Bold)
-        Text(text = "$total", color = Color(0xFFFFA726), fontWeight = FontWeight.Bold)
+private fun DeckList(
+    decks: List<DeckInfo>,
+    onNavigateToReview: () -> Unit,
+    onStartReview: (String?, String?) -> Unit
+) {
+    var expandedLevels by remember { mutableStateOf(setOf<String>()) }
+
+    LazyColumn(contentPadding = PaddingValues(bottom = 8.dp)) {
+        items(decks, key = { it.name }) { levelDeck ->
+            val isExpanded = levelDeck.name in expandedLevels
+            DeckItemRow(
+                deck = levelDeck,
+                isExpanded = isExpanded,
+                onExpandToggle = {
+                    expandedLevels = if (isExpanded) {
+                        expandedLevels - levelDeck.name
+                    } else {
+                        expandedLevels + levelDeck.name
+                    }
+                },
+                onReviewClick = {
+                    onStartReview(levelDeck.level, null)
+                    onNavigateToReview()
+                }
+            )
+            Divider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column {
+                    levelDeck.subDecks.forEach { topicDeck ->
+                        DeckItemRow(
+                            deck = topicDeck,
+                            isSubItem = true,
+                            onReviewClick = {
+                                onStartReview(topicDeck.level, topicDeck.topic)
+                                onNavigateToReview()
+                            }
+                        )
+                        Divider(modifier = Modifier.padding(start = 48.dp, end = 16.dp))
+                    }
+                }
+            }
+        }
     }
 }
 
+// M3: Redesigned stats bar to be cleaner and use theme colors.
+@Composable
+private fun StatsBar(due: Int, new: Int, total: Int) {
+    Surface(
+        // Uses a subtle container color from the theme for visual separation.
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceAround,
+        ) {
+            StatItem(count = due, label = "Due", color = MaterialTheme.colorScheme.tertiary)
+            StatItem(count = new, label = "New", color = MaterialTheme.colorScheme.primary)
+            StatItem(
+                count = total,
+                label = "Total",
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatItem(count: Int, label: String, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.titleMedium,
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// M3: Replaced the custom row with a standard ListItem for consistency.
 @Composable
 private fun DeckItemRow(
     deck: DeckInfo,
     isExpanded: Boolean = false,
     isSubItem: Boolean = false,
-    onExpandToggle: ((Boolean) -> Unit)? = null,
+    onExpandToggle: (() -> Unit)? = null,
     onReviewClick: () -> Unit
 ) {
     val isClickable = deck.dueCount > 0
-    Row(
+
+    ListItem(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(enabled = isClickable, onClick = onReviewClick)
-            .padding(
-                start = if (isSubItem) 32.dp else 16.dp,
-                end = 16.dp,
-                top = 12.dp,
-                bottom = 12.dp
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        if (onExpandToggle != null) {
-            Icon(
-                imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.ChevronRight,
-                contentDescription = if (isExpanded) "Collapse" else "Expand",
-                modifier = Modifier.clickable { onExpandToggle(!isExpanded) }
-            )
-        } else {
-            Spacer(Modifier.width(24.dp))
-        }
-
-        Text(
-            text = deck.name,
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-            color = if (isClickable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(
+            // Indent sub-items for clear hierarchy
+            .padding(start = if (isSubItem) 16.dp else 0.dp),
+        colors = ListItemDefaults.colors(
+            // Use transparent to blend with the scaffold background
+            containerColor = Color.Transparent,
+            // Automatically uses appropriate colors for disabled state
+            headlineColor = if (isClickable) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(
                 alpha = 0.6f
             )
-        )
-
-        CountBadge(count = deck.dueCount, color = Color(0xFF4CAF50))
-        CountBadge(count = deck.newCount, color = Color(0xFF42A5F5))
-        CountBadge(count = deck.totalCount, color = Color(0xFFFFA726))
-    }
+        ),
+        headlineContent = { Text(text = deck.name) },
+        leadingContent = {
+            if (onExpandToggle != null) {
+                // The expand/collapse icon is now the leading content.
+                IconButton(onClick = onExpandToggle) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.ChevronRight,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    )
+                }
+            }
+        },
+        trailingContent = {
+            // The count badges are now the trailing content.
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                CountBadge(
+                    count = deck.dueCount,
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                CountBadge(
+                    count = deck.newCount,
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    )
 }
 
+// M3: CountBadge now uses container/content color pairs from the theme.
 @Composable
-private fun CountBadge(count: Int, color: Color) {
+private fun CountBadge(
+    count: Int,
+    containerColor: Color,
+    contentColor: Color
+) {
+    // Determine colors based on whether the count is zero (inactive)
+    val currentContainerColor =
+        if (count > 0) containerColor else MaterialTheme.colorScheme.surfaceVariant
+    val currentContentColor =
+        if (count > 0) contentColor else MaterialTheme.colorScheme.onSurfaceVariant
+
     Box(
         modifier = Modifier
-            .width(40.dp)
+            .size(width = 32.dp, height = 24.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(color.copy(alpha = if (count > 0) 1f else 0.3f)),
+            .background(currentContainerColor),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = count.toString(),
-            color = Color.White,
-            fontSize = 12.sp,
+            color = currentContentColor,
+            style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(vertical = 4.dp)
         )
     }
 }

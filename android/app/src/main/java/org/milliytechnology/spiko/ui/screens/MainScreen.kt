@@ -1,11 +1,16 @@
 package org.milliytechnology.spiko.ui.screens
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -14,9 +19,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -35,11 +42,39 @@ import org.milliytechnology.spiko.ui.screens.wordbank.ExploreTopicScreen
 import org.milliytechnology.spiko.ui.screens.wordbank.WordBankScreen
 import org.milliytechnology.spiko.ui.screens.wordbank.WordReviewScreen
 
+// --- Navigation Destinations & Items ---
+
+/**
+ * A sealed class to define the primary navigation items in the bottom bar.
+ * This provides better type safety and readability than using Triple or Pair.
+ */
+sealed class MainNavigationItem(
+    val route: String,
+    @StringRes val labelResId: Int,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector
+) {
+    object Practice : MainNavigationItem(
+        "practice", R.string.navbar_practice, Icons.Filled.Home, Icons.Outlined.Home
+    )
+
+    object WordBank : MainNavigationItem(
+        "wordbank",
+        R.string.navbar_vocabulary,
+        Icons.AutoMirrored.Filled.MenuBook,
+        Icons.AutoMirrored.Outlined.MenuBook
+    )
+
+    object Progress : MainNavigationItem(
+        "progress", R.string.navbar_progress, Icons.Filled.History, Icons.Outlined.History
+    )
+
+    object Profile : MainNavigationItem(
+        "profile", R.string.navbar_profile, Icons.Filled.Person, Icons.Outlined.Person
+    )
+}
+
 object MainDestinations {
-    const val PRACTICE_ROUTE = "practice"
-    const val WORDBANK_ROUTE = "wordbank"
-    const val PROGRESS_ROUTE = "progress"
-    const val PROFILE_ROUTE = "profile"
     const val SUBSCRIPTION_ROUTE = "subscription"
 }
 
@@ -49,6 +84,9 @@ object WordBankDestinations {
     const val EXPLORE_LEVEL_ROUTE = "wordbank_explore_level"
     const val EXPLORE_TOPIC_ROUTE = "wordbank_explore_topic/{level}"
 }
+
+
+// --- Main Screen Composable ---
 
 @Composable
 fun MainScreen(
@@ -63,10 +101,10 @@ fun MainScreen(
     ) { innerPadding ->
         NavHost(
             navController = mainNavController,
-            startDestination = MainDestinations.PRACTICE_ROUTE,
+            startDestination = MainNavigationItem.Practice.route,
             modifier = Modifier.padding(innerPadding)
         ) {
-            composable(MainDestinations.PRACTICE_ROUTE) {
+            composable(MainNavigationItem.Practice.route) {
                 PracticeHubScreen(
                     onPartSelected = { practicePart ->
                         onNavigateToMultilevel(practicePart.name)
@@ -74,55 +112,19 @@ fun MainScreen(
                 )
             }
 
-            navigation(
-                startDestination = WordBankDestinations.HUB_ROUTE,
-                route = MainDestinations.WORDBANK_ROUTE
-            ) {
-                composable(WordBankDestinations.HUB_ROUTE) {
-                    WordBankScreen(
-                        onNavigateToReview = {
-                            mainNavController.navigate(WordBankDestinations.REVIEW_ROUTE)
-                        },
-                        onNavigateToExplore = {
-                            mainNavController.navigate(WordBankDestinations.EXPLORE_LEVEL_ROUTE)
-                        }
-                    )
-                }
-                composable(WordBankDestinations.REVIEW_ROUTE) {
-                    WordReviewScreen(
-                        onNavigateBack = { mainNavController.popBackStack() }
-                    )
-                }
-                composable(WordBankDestinations.EXPLORE_LEVEL_ROUTE) {
-                    ExploreLevelScreen(
-                        onLevelSelected = { level ->
-                            mainNavController.navigate("wordbank_explore_topic/$level")
-                        },
-                        onNavigateBack = { mainNavController.popBackStack() }
-                    )
-                }
-                composable(
-                    route = WordBankDestinations.EXPLORE_TOPIC_ROUTE,
-                    arguments = listOf(navArgument("level") { type = NavType.StringType })
-                ) { backStackEntry ->
-                    ExploreTopicScreen(
-                        level = backStackEntry.arguments?.getString("level") ?: "",
-                        onNavigateBack = { mainNavController.popBackStack() }
-                    )
-                }
-            }
+            // Encapsulate WordBank navigation into its own graph builder function
+            wordBankNavGraph(mainNavController)
 
-            composable(MainDestinations.PROGRESS_ROUTE) {
+            composable(MainNavigationItem.Progress.route) {
                 ProgressScreen(
                     onNavigateToMultilevelResult = onNavigateToMultilevelResult,
                 )
             }
-            composable(MainDestinations.PROFILE_ROUTE) {
+            composable(MainNavigationItem.Profile.route) {
                 ProfileScreen(onNavigateToSubscription = {
                     mainNavController.navigate(MainDestinations.SUBSCRIPTION_ROUTE)
                 })
             }
-
             composable(MainDestinations.SUBSCRIPTION_ROUTE) {
                 SubscriptionScreen(onNavigateBack = { mainNavController.popBackStack() })
             }
@@ -130,22 +132,52 @@ fun MainScreen(
     }
 }
 
+// --- Navigation Graph Builders ---
+
+/**
+ * Encapsulates the WordBank feature's navigation logic into a modular graph.
+ */
+private fun NavGraphBuilder.wordBankNavGraph(navController: NavHostController) {
+    navigation(
+        startDestination = WordBankDestinations.HUB_ROUTE,
+        route = MainNavigationItem.WordBank.route
+    ) {
+        composable(WordBankDestinations.HUB_ROUTE) {
+            WordBankScreen(
+                onNavigateToReview = { navController.navigate(WordBankDestinations.REVIEW_ROUTE) },
+                onNavigateToExplore = { navController.navigate(WordBankDestinations.EXPLORE_LEVEL_ROUTE) }
+            )
+        }
+        composable(WordBankDestinations.REVIEW_ROUTE) {
+            WordReviewScreen(onNavigateBack = { navController.popBackStack() })
+        }
+        composable(WordBankDestinations.EXPLORE_LEVEL_ROUTE) {
+            ExploreLevelScreen(
+                onLevelSelected = { level -> navController.navigate("wordbank_explore_topic/$level") },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+        composable(
+            route = WordBankDestinations.EXPLORE_TOPIC_ROUTE,
+            arguments = listOf(navArgument("level") { type = NavType.StringType })
+        ) { backStackEntry ->
+            ExploreTopicScreen(
+                level = backStackEntry.arguments?.getString("level") ?: "",
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+    }
+}
+
+// --- UI Components ---
+
 @Composable
 fun BottomNavigationBar(navController: NavHostController) {
-    val practiceString = stringResource(id = R.string.navbar_practice)
-    val vocabularyString = stringResource(id = R.string.navbar_vocabulary)
-    val progressString = stringResource(id = R.string.navbar_progress)
-    val profileString = stringResource(id = R.string.navbar_profile)
-
     val items = listOf(
-        Triple(practiceString, Icons.Default.Home, MainDestinations.PRACTICE_ROUTE),
-        Triple(
-            vocabularyString,
-            Icons.AutoMirrored.Filled.MenuBook,
-            MainDestinations.WORDBANK_ROUTE
-        ),
-        Triple(progressString, Icons.Default.History, MainDestinations.PROGRESS_ROUTE),
-        Triple(profileString, Icons.Default.Person, MainDestinations.PROFILE_ROUTE)
+        MainNavigationItem.Practice,
+        MainNavigationItem.WordBank,
+        MainNavigationItem.Progress,
+        MainNavigationItem.Profile
     )
 
     NavigationBar {
@@ -153,15 +185,28 @@ fun BottomNavigationBar(navController: NavHostController) {
         val currentDestination = navBackStackEntry?.destination
 
         items.forEach { item ->
-            val route = item.third
+            val isSelected = currentDestination?.hierarchy?.any { it.route == item.route } == true
+            val label = stringResource(item.labelResId)
             NavigationBarItem(
-                icon = { Icon(item.second, contentDescription = item.first) },
-                label = { Text(item.first) },
-                selected = currentDestination?.hierarchy?.any { it.route == route } == true,
+                icon = {
+                    // Use filled icon when selected, outlined otherwise
+                    val icon = if (isSelected) item.selectedIcon else item.unselectedIcon
+                    Icon(icon, contentDescription = label)
+                },
+                label = { Text(label) },
+                selected = isSelected,
                 onClick = {
-                    navController.navigate(route) {
-                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    navController.navigate(item.route) {
+                        // Pop up to the start destination of the graph to
+                        // avoid building up a large stack of destinations
+                        // on the back stack as users select items
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        // Avoid multiple copies of the same destination when
+                        // re-selecting the same item
                         launchSingleTop = true
+                        // Restore state when re-selecting a previously selected item
                         restoreState = true
                     }
                 }

@@ -1,102 +1,158 @@
-<!-- res/values-uz/strings.xml -->
 <resources>
     <string name="app_name">Spiko</string>
+    <string name="google_web_client_id" translatable="false">118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com</string>
+    <string name="url_privacy_policy" translatable="false">https://milliytechnology.org/privacy</string>
+    <string name="url_faq" translatable="false">https://milliytechnology.org/faq</string>
+    <string name="about_copyright">© 2025 MilliyTechnology MChJ</string>
 
-    <!--  MULTILEVEL INSTRUCTIONS  -->
-
-    <!--  NAV BAR  -->
-    <string name="navbar_practice">Amaliyot</string>
-    <string name="navbar_progress">Natijalar</string>
+    <string name="navbar_practice">Mashq</string>
+    <string name="navbar_progress">Progres</string>
     <string name="navbar_vocabulary">Lug\'at</string>
     <string name="navbar_profile">Profil</string>
 
-    <!--  LOGIN SCREEN  -->
-    <string name="login_google">Google orqali kirish</string>
-    <string name="login_telegram">Telegram orqali kirish</string>
-    <string name="login_google_error">Google orqali kirishda xatolik. Iltimos, qaytadan urining.</string>
     <string name="login_title">Xush kelibsiz</string>
-    <string name="login_subtitle">Davom etish uchun kiring</string>
+    <string name="login_subtitle">Davom etish uchun tizimga kiring</string>
     <string name="login_email">Elektron pochta</string>
     <string name="login_pwd">Parol</string>
     <string name="login_button">Kirish</string>
     <string name="login_or">Yoki</string>
-    <string name="login_question">Hisobingiz yo\'qmi? Ro\'yxatdan o\'ting</string>
+    <string name="login_google">Google orqali kirish</string>
+    <string name="login_telegram">Telegram orqali kirish</string>
+    <string name="login_google_error">Google orqali kirishda xatolik yuz berdi. Iltimos, qayta urinib ko\'ring.</string>
+    <string name="login_question">Hisobingiz yo\'qmi? Ro\'yxatdan o\'tish</string>
 
-    <!--  REGISTRATION SCREEN  -->
     <string name="register_title">Hisob yaratish</string>
-    <string name="register_subtitle">Boshlash uchun quyidagi shaklni to\'ldiring</string>
-    <string name="register_pwd_confirm">Parolni tasdiqlang</string>
-    <string name="register_pwd_error">Parollar mos kelmadi</string>
-    <string name="register_pwd_confirm_error">Parollar mos kelmadi</string>
+    <string name="register_subtitle">Quyidagi shaklni to\'ldirish orqali boshlang</string>
+    <string name="register_pwd_confirm">Parolni tasdiqlash</string>
+    <string name="register_pwd_error">Parolni tasdiqlash</string>
+    <string name="register_pwd_confirm_error">Parolni tasdiqlash</string>
     <string name="register_button">Hisob yaratish</string>
-    <string name="register_question">Hisobingiz bormi? Kiring</string>
+    <string name="register_question">Hisobingiz bormi? Kirish</string>
 
-    <!--  EXAM RESULT SCREEN  -->
+    <string name="practice_hub_title">Mashq markazi</string>
+    <string name="practice_hub_multilevel">Ko\'p darajali nutq</string>
+    <string name="practice_hub_multilevel_description">To\'liq 15 daqiqalik testni simulyatsiya qiling.</string>
+    <string name="practice_hub_ielts">IELTS nutqi (eksperimental)</string>
+    <string name="practice_hub_ielts_description">To\'liq 11–14 daqiqalik testni simulyatsiya qiling.</string>
+    <string name="practice_full_title">To\'liq sinov imtihoni</string>
+    <string name="practice_full_description">To\'liq 3 qismli og\'zaki simulyatsiya.</string>
+    <string name="practice_p1_1_title">1.1-qism. Mashq</string>
+    <string name="practice_p1_1_description">Shaxsiy savollarga javob bering.</string>
+    <string name="practice_p1_2_title">1.2-qism. Mashq</string>
+    <string name="practice_p1_2_description">Ikki rasmni solishtiring va qarama-qarshi qo\'ying.</string>
+    <string name="practice_p2_title">2-qism. Mashq</string>
+    <string name="practice_p2_description">Berilgan karta asosida monolog bering.</string>
+    <string name="practice_p3_title">3-qism. Mashq</string>
+    <string name="practice_p3_description">Berilgan mavzuni muhokama qiling va bahslashing.</string>
+
+
+    <string name="PART1_HEADER" translatable="false">1-qism</string>
+    <string name="PART1_1_INTRO" translatable="false">Bu qismda men sizga o\'zingiz va qiziqishlaringiz haqida uchta qisqa savol beraman. Keyin, siz bir nechta fotosuratni ko\'rasiz va ular haqida savollarga javob berasiz. Har bir savolga javob berish uchun 30 soniyangiz bor. Ushbu tovushni eshitganingizda gapira boshlang.</string>
+    <string name="PART1_2_INTRO" translatable="false">Endi men sizdan ikkita rasmni solishtirishingizni so\'rayman va ular haqida ikkita savol beraman</string>
+    <string name="PART2_HEADER" translatable="false">2-qism</string>
+    <string name="PART2_INTRO" translatable="false">Bu qismda men sizga rasm ko\'rsataman va 3 ta savol beraman. Gapirishni boshlashdan oldin javoblaringiz haqida o\'ylash uchun bir daqiqangiz bor. Uchta savolga ham javob berish uchun ikki daqiqangiz bor. Ushbu tovushni eshitganingizda gapira boshlang.</string>
+    <string name="PART3_HEADER" translatable="false">3-qism</string>
+    <string name="PART3_INTRO" translatable="false">Bu qismda siz ikki daqiqa davomida mavzu bo\'yicha gapirasiz. Ekranda mavzu va mavzu bilan bog\'liq ikki xil fikrlar ro\'yxatini (yaxshi va yomon tomonlari) ko\'rishingiz mumkin. Har bir ro\'yxatdan ikkita elementni tanlang va mavzuning ikkala tomonini ham aks ettiruvchi muvozanatli argument bering. Argumentingizni tayyorlash uchun bir daqiqangiz bor. Keyin gapirish uchun ikki daqiqangiz bor. Ushbu tovushni eshitganingizda gapira boshlang.</string>
+    <string name="notice_english_only">⚠️ E\'tibor bering: Barcha imtihon ko\'rsatmalari va savollari rasmiy nutq testidagi kabi ingliz tilida bo\'ladi.</string>
+
     <string name="exam_result_title">Imtihon natijasi</string>
+    <string name="exam_result_overall">Umumiy ball</string>
+    <string name="exam_result_part_score">Qism bo\'yicha ball</string>
     <string name="exam_result_feedback">Fikr-mulohaza</string>
     <string name="exam_result_transcript">Transkript</string>
-    <string name="exam_result_overall">Umumiy ball</string>
     <string name="exam_result_suggestion">Misollar va takliflar</string>
     <string name="exam_result_suggestion_description">Taklif</string>
 
-    <!--  PRACTICE HUB SCREEN  -->
-    <string name="practice_hub_title">Amaliyot markazi</string>
-    <string name="practice_hub_multilevel">Ko\'p darajali nutq</string>
-    <string name="practice_hub_multilevel_description">To\'liq 11–14 daqiqalik test simulyatsiyasi.</string>
-    <string name="practice_hub_ielts">IELTS Speaking (Experimental)</string>
-    <string name="practice_hub_ielts_description">To\'liq 11–14 daqiqalik test simulyatsiyasi.</string>
+    <string name="progress_title">Progres</string>
+    <string name="progress_empty">Hozircha %s imtihon tarixi yo\'q.</string>
+    <string name="progress_score">Vaqt o\'tishi bilan ball</string>
+    <string name="progress_chart_empty_state">Progres grafigini ko\'rsatish uchun yetarli ma\'lumot yo\'q. Bu yerda taraqqiyotingizni ko\'rish uchun ko\'proq baholashlarni yakunlang.</string>
+    <string name="progress_history">Imtihon tarixi</string>
+    <string name="progress_no_enough_data">Grafikni ko\'rish uchun kamida ikkita test topshiring.</string>
+    <string name="progress_detail">Batafsil ko\'rish</string>
+    <string name="progress_no_results_found">Natijalar topilmadi</string>
+    <string name="progress_no_completed_exams">Siz %2$s da hech qanday %1$s yakunlamadingiz.</string>
+    <string name="progress_statistics">Statistika</string>
+    <string name="progress_avg_score">O\'rtacha ball</string>
+    <string name="progress_best_score">Eng yaxshi ball</string>
+    <string name="progress_latest">Oxirgi ball</string>
+    <string name="progress_change">O\'zgarish</string>
 
-    <!--  PROFILE SCREEN  -->
-    <string name="profile_title">Profil &amp; Sozlamalar</string>
-    <string name="profile_section_title_account">Hisob qaydnomasi</string>
-    <string name="profile_section_title_support">Qo\'llab-quvvatlash &amp; Dastur haqida</string>
-    <string name="profile_section_title_settings">Sozlamalar</string>
-    <string name="profile_section_title_action">Amallar</string>
-    <string name="profile_item_membership">A\'zolik sanasi</string>
+    <string name="topics_for_level">Daraja %s uchun mavzular</string>
+    <string name="no_new_topics_found">Daraja %s uchun yangi mavzular topilmadi.</string>
+    <string name="action_remove">O\'chirish</string>
+    <string name="action_add">Qo\'shish</string>
+    <string name="review_session_title">So\'z ko\'rib chiqish</string>
+    <string name="no_words_to_review">Hozirda sizda ko\'rib chiqish uchun so\'zlar yo\'q. So\'z bankiingizga ko\'proq so\'z qo\'shing yoki rejalashtirilgan ko\'rib chiqishlarni kuting.</string>
+    <string name="review_again">Yana</string>
+    <string name="review_hard">Qiyin</string>
+    <string name="review_good">Yaxshi</string>
+    <string name="review_easy">Oson</string>
+    <string name="example_prefix">Misol:\n%s</string>
+    <string name="session_complete_title">Sessiya yakunlandi!</string>
+    <string name="session_complete_description">Siz hozircha barcha mavjud so\'zlarni ko\'rib chiqdingiz. Keyinroq ko\'proq so\'zlar uchun tekshiring yoki yangi so\'zlar qo\'shing!</string>
+
+    <string name="profile_title">Profil va Sozlamalar</string>
+    <string name="profile_section_title_account">Hisob</string>
+    <string name="profile_item_membership">A\'zo</string>
     <string name="profile_item_subscription">Obuna</string>
+    <string name="profile_section_title_settings">Sozlamalar</string>
     <string name="profile_item_dark_mode">Tungi rejim</string>
-    <string name="profile_item_help">Yordam</string>
-    <string name="profile_item_privacy">Maxfiylik siyosati</string>
-    <string name="profile_item_about">Dastur haqida</string>
-    <string name="profile_item_delete">Hisobni o\'chirish</string>
-    <string name="profile_item_subtitle_permanent">Bu amalni bekor qilib bo\'lmaydi</string>
     <string name="profile_item_language">Til</string>
     <string name="language_dialog_title">Tilni tanlang</string>
-
-    <!--  PROGRESS SCREEN  -->
-    <string name="progress_title">Natijalar</string>
-    <string name="progress_empty">Hozircha %s imtihonlari tarixi mavjud emas.</string>
-    <string name="progress_score">Ballar o\'zgarishi</string>
-    <string name="progress_history">Imtihonlar tarixi</string>
-    <string name="progress_no_enough_data">Grafikni ko\'rish uchun kamida ikkita test topshiring.</string>
-    <string name="progress_detail">Tafsilotlarni ko\'rish</string>
-
-    <!--  RECORDING COMPONENT  -->
-    <string name="recording_start">Yozib olishni boshlash</string>
-    <string name="recording_stop">Yozib olishni to\'xtatish</string>
-
-    <!--  ABOUT COMPONENT  -->
-    <string name="about_title">Multilevel haqida</string>
-    <string name="about_subtitle">Ingliz tilini o\'rganish va mashq qilish uchun ko\'p darajali dastur.</string>
+    <string name="profile_section_title_support">Yordam va ilova haqida</string>
+    <string name="profile_item_help">Yordam</string>
+    <string name="profile_item_privacy">Maxfiylik siyosati</string>
+    <string name="profile_item_about">Bu ilova haqida</string>
+    <string name="about_title">Ko\'p darajali ilova haqida</string>
+    <string name="about_subtitle">Ko\'p darajali ingliz tilini o\'rganish va mashq qilish ilovasi.</string>
     <string name="about_version">Versiya: %s</string>
+    <string name="profile_section_title_action">Harakatlar</string>
+    <string name="profile_item_delete">Hisobni o\'chirish</string>
+    <string name="profile_item_subtitle_permanent">Bu harakat doimiydir</string>
 
-    <!--  REUSABLE  -->
-    <string name="error_message">Xatolik: %s</string>
-    <string name="button_ok">Chiqish</string>
-    <string name="button_back">Orqaga tugmasi</string>
-    <string name="button_logout">Chiqish</string>
+    <string name="subscription_title">Rejangizni tanlang</string>
+    <string name="subscription_loading_price">Narx yuklanmoqda...</string>
+    <string name="subscription_google_play_button">Google Play orqali to\'lash</string>
+    <string name="subscription_other_methods_button">Boshqa to\'lov usullari</string>
+
+    <string name="tier_free">Bepul</string>
+    <string name="tier_silver">Kumush</string>
+    <string name="tier_gold">Oltin</string>
+
+    <string name="feature_unlimited_part_practices">Cheklanmagan qism mashqlari</string>
+    <string name="feature_5_mock_exams_month">Oyiga 5 ta to\'liq sinov imtihonlari</string>
+    <string name="feature_6_month_history_retention">6 oylik tarixni saqlash</string>
+
+    <string name="feature_everything_in_silver">Kumush rejimidagi barcha narsalar</string>
+    <string name="feature_unlimited_full_mock_exams">Cheklanmagan to\'liq sinov imtihonlari</string>
+    <string name="feature_unlimited_history_retention">Cheklanmagan tarixni saqlash</string>
+
+    <string name="button_back">Orqaga</string>
+    <string name="error_generic_message">Xato: %s</string>
+    <string name="plan_not_available">Reja mavjud emas</string>
+    <string name="navigate_back">Orqaga qaytish</string>
+    <string name="button_ok">OK</string>
     <string name="button_cancel">Bekor qilish</string>
-    <string name="button_warning">Ogohlantirish</string>
     <string name="button_refresh">Yangilash</string>
-    <string name="delete_permanent">Butunlay o\'chirish</string>
-    <string name="tier_free">Bepul tarif</string>
-    <string name="tier_premium">Premium tarif</string>
-    <string name="logout_confirm_title">Chiqishni tasdiqlang</string>
-    <string name="logout_confirm_subtitle">Haqiqatan ham chiqishni xohlaysizmi?</string>
+    <string name="button_logout">Chiqish</string>
+    <string name="button_warning">Ogohlantirish</string>
+    <string name="go_back">Orqaga qaytish</string>
+
+    <string name="error_message">Xato: %s</string>
+    <string name="image_load_error">Rasmni yuklab bo\'lmadi</string>
+    <string name="permission_record_audio">Imtihon topshirish uchun mikrofon ruxsati talab qilinadi.</string>
+
+    <string name="recording_start">Yozishni boshlash</string>
+    <string name="recording_stop">Yozishni to\'xtatish</string>
+
+    <string name="logout_confirm_title">Chiqishni tasdiqlash</string>
+    <string name="logout_confirm_subtitle">Haqiqatan ham tizimdan chiqmoqchimisiz?</string>
     <string name="delete_confirm_title">Hisobingizni o\'chirishni istaysizmi?</string>
-    <string name="delete_confirm_subtitle">Bu amal qaytarib bo\'lmaydi. Barcha ma\'lumotlaringiz butunlay o\'chiriladi. Buni bekor qilib bo\'lmaydi. Davom etishni xohlaysizmi?</string>
+    <string name="delete_confirm_subtitle">Bu harakat doimiydir. Barcha ma\'lumotlaringiz butunlay o\'chiriladi. Bu qaytarib bo\'lmaydi. Davom etishni xohlaysizmi?</string>
+    <string name="delete_permanent">Doimiy o\'chirish</string>
+
     <string name="logo_google_description">Google logotipi</string>
-    <string name="logo_app">Dastur logotipi</string>
-    <string name="permission_record_audio">Imtihon topshirish uchun mikrofondan foydalanishga ruxsat talab qilinadi.</string>
-    <string name="notice_english_only">⚠️ Diqqat: Rasmiy Nutq Testi kabi, barcha imtihon ko\'rsatmalari va savollari ingliz tilida bo\'ladi.</string>
+    <string name="logo_app">Ilova logotipi</string>
+
 </resources>

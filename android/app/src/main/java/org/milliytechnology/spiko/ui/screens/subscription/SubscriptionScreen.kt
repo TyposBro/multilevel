@@ -1,5 +1,3 @@
-// android/app/src/main/java/com/typosbro/multilevel/ui/screens/subscription/SubscriptionScreen.kt
-
 package org.milliytechnology.spiko.ui.screens.subscription
 
 import android.util.Log
@@ -9,18 +7,22 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,9 +35,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -48,6 +53,13 @@ import com.android.billingclient.api.ProductDetails
 import org.milliytechnology.spiko.R
 import org.milliytechnology.spiko.ui.viewmodels.SubscriptionViewModel
 
+// This data class definition stores resource IDs (not @Composable calls)
+private data class SubscriptionPlan(
+    val tierNameResId: Int,
+    val productId: String,
+    val featureResIds: List<Int>
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubscriptionScreen(
@@ -58,6 +70,30 @@ fun SubscriptionScreen(
     val context = LocalContext.current
     val activity = LocalContext.current as ComponentActivity
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Define subscription plans using resource IDs only (no @Composable calls here)
+    val subscriptionPlans = remember {
+        listOf(
+            SubscriptionPlan(
+                tierNameResId = R.string.tier_silver,
+                productId = "silver_monthly",
+                featureResIds = listOf(
+                    R.string.feature_unlimited_part_practices,
+                    R.string.feature_5_mock_exams_month,
+                    R.string.feature_6_month_history_retention
+                )
+            ),
+            SubscriptionPlan(
+                tierNameResId = R.string.tier_gold,
+                productId = "gold_monthly",
+                featureResIds = listOf(
+                    R.string.feature_everything_in_silver,
+                    R.string.feature_unlimited_full_mock_exams,
+                    R.string.feature_unlimited_history_retention
+                )
+            )
+        )
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadProducts()
@@ -82,23 +118,30 @@ fun SubscriptionScreen(
             viewModel.clearMessages()
         }
     }
+
     LaunchedEffect(uiState.error) {
         uiState.error?.let {
-            Toast.makeText(context, "Error: $it", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                context,
+                context.getString(R.string.error_generic_message, it),
+                Toast.LENGTH_LONG
+            ).show()
             viewModel.clearMessages()
         }
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Upgrade Subscription") }, navigationIcon = {
-                IconButton(onClick = onNavigateBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(id = R.string.button_back)
-                    )
-                }
-            })
+            TopAppBar(
+                title = { Text(stringResource(R.string.subscription_title)) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(id = R.string.button_back)
+                        )
+                    }
+                })
         }
     ) { padding ->
         Box(
@@ -111,50 +154,26 @@ fun SubscriptionScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                item {
-                    val silverDetails =
-                        uiState.productDetails.find { it.productId == "silver_monthly" }
+                items(subscriptionPlans) { plan ->
+                    val productDetails =
+                        uiState.productDetails.find { it.productId == plan.productId }
+
                     SubscriptionTierCard(
-                        tierName = "Silver",
-                        productDetails = silverDetails,
-                        features = listOf(
-                            "Unlimited Part Practices",
-                            "5 Full Mock Exams / Month",
-                            "6-Month History Retention"
-                        ),
+                        plan = plan,
+                        productDetails = productDetails,
                         onPayWithGoogle = {
-                            if (silverDetails != null) {
-                                viewModel.launchGooglePlayPurchase(activity, silverDetails)
+                            if (productDetails != null) {
+                                viewModel.launchGooglePlayPurchase(activity, productDetails)
                             } else {
-                                Toast.makeText(context, "Plan not available", Toast.LENGTH_SHORT)
-                                    .show()
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.plan_not_available),
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         },
                         onPayWithLocalProvider = {
-                            viewModel.createWebPayment(activity, "payme", "silver_monthly")
-                        }
-                    )
-                }
-                item {
-                    val goldDetails = uiState.productDetails.find { it.productId == "gold_monthly" }
-                    SubscriptionTierCard(
-                        tierName = "Gold",
-                        productDetails = goldDetails,
-                        features = listOf(
-                            "Everything in Silver",
-                            "Unlimited Full Mock Exams",
-                            "Unlimited History Retention"
-                        ),
-                        onPayWithGoogle = {
-                            if (goldDetails != null) {
-                                viewModel.launchGooglePlayPurchase(activity, goldDetails)
-                            } else {
-                                Toast.makeText(context, "Plan not available", Toast.LENGTH_SHORT)
-                                    .show()
-                            }
-                        },
-                        onPayWithLocalProvider = {
-                            viewModel.createWebPayment(activity, "payme", "gold_monthly")
+                            viewModel.createWebPayment(activity, "payme", plan.productId)
                         }
                     )
                 }
@@ -169,48 +188,86 @@ fun SubscriptionScreen(
 
 @Composable
 private fun SubscriptionTierCard(
-    tierName: String,
+    plan: SubscriptionPlan,
     productDetails: ProductDetails?,
-    features: List<String>,
     onPayWithGoogle: () -> Unit,
     onPayWithLocalProvider: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(4.dp)
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            Text(tierName, style = MaterialTheme.typography.headlineMedium)
+            // Get tier name from string resource - this is fine because we're in @Composable context
             Text(
-                // Display localized price from Google Play, or a placeholder if still loading.
-                productDetails?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice
-                    ?: "Loading price...",
+                stringResource(plan.tierNameResId),
+                style = MaterialTheme.typography.headlineMedium
+            )
+            Text(
+                text = productDetails?.subscriptionOfferDetails?.firstOrNull()?.pricingPhases?.pricingPhaseList?.firstOrNull()?.formattedPrice
+                    ?: stringResource(R.string.subscription_loading_price),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(16.dp))
-            features.forEach { feature ->
-                Text("• $feature", style = MaterialTheme.typography.bodyMedium)
+            // Render features using string resource IDs - this is fine because we're in @Composable context
+            plan.featureResIds.forEach { featureResId ->
+                FeatureRow(text = stringResource(featureResId))
             }
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Payment Buttons
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onPayWithGoogle,
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = productDetails != null // Button is disabled until details are loaded
-                ) {
-                    Text("Subscribe with Google Play")
-                }
-                OutlinedButton(
-                    onClick = onPayWithLocalProvider,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Other Payment Methods")
-                }
-            }
+            PaymentButtons(
+                onPayWithGoogle = onPayWithGoogle,
+                onPayWithLocalProvider = onPayWithLocalProvider,
+                isGooglePayEnabled = productDetails != null
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeatureRow(text: String, modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.padding(vertical = 4.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Check,
+            contentDescription = null, // Decorative
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.size(12.dp))
+        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun PaymentButtons(
+    onPayWithGoogle: () -> Unit,
+    onPayWithLocalProvider: () -> Unit,
+    isGooglePayEnabled: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(
+            onClick = onPayWithGoogle,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = isGooglePayEnabled
+        ) {
+            Icon(
+                painter = painterResource(id = R.drawable.ic_google_play_logo),
+                contentDescription = null, // Decorative
+                modifier = Modifier.size(ButtonDefaults.IconSize),
+                tint = Color.Unspecified
+            )
+            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+            Text(stringResource(R.string.subscription_google_play_button))
+        }
+        OutlinedButton(
+            onClick = onPayWithLocalProvider,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.subscription_other_methods_button))
         }
     }
 }

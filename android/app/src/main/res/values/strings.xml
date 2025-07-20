@@ -3,36 +3,24 @@
     <string name="google_web_client_id" translatable="false">118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com</string>
     <string name="url_privacy_policy" translatable="false">https://milliytechnology.org/privacy</string>
     <string name="url_faq" translatable="false">https://milliytechnology.org/faq</string>
+    <string name="about_copyright">© 2025 MilliyTechnology LLC</string>
 
-    <!--  MULTILEVEL INSTRUCTIONS  -->
-    <string name="PART1_HEADER" translatable="false">Part 1</string>
-    <string name="PART1_1_INTRO" translatable="false">In this part I\'m going to ask you three short questions about yourself and your interests. And then, you will see some photos and answer some questions about them. You will have 30 seconds to reply to each question. Begin speaking when you hear this sound.</string>
-    <string name="PART1_2_INTRO" translatable="false">Now I\'m going to ask you to compare two pictures and I will ask you two questions about them</string>
-    <string name="PART2_HEADER" translatable="false">Part 2</string>
-    <string name="PART2_INTRO" translatable="false">In this part, I\'m going to show you a picture and ask you 3 questions. You will have one minute to think about your answers before you start speaking. You will have two minutes to answer all three questions. Begin speaking when you hear this sound.</string>
-    <string name="PART3_HEADER" translatable="false">Part 3</string>
-    <string name="PART3_INTRO" translatable="false">In this part, you are going to speak on a topic for two minutes. You can see the topic on the screen and two lists of points - for and against - related to the topic. Choose two items from each list and give a balanced argument to represent both sides of the topic. You have one minute to prepare your argument. You will then have two minutes to speak. Begin speaking when you hear this sound.</string>
-
-    <!--  NAV BAR  -->
     <string name="navbar_practice">Practice</string>
     <string name="navbar_progress">Progress</string>
     <string name="navbar_vocabulary">Vocabulary</string>
     <string name="navbar_profile">Profile</string>
 
-
-    <!--  LOGIN SCREEN  -->
-    <string name="login_google">Sign in with Google</string>
-    <string name="login_telegram">Login with Telegram</string>
-    <string name="login_google_error">Google sign in failed. Please try again.</string>
     <string name="login_title">Welcome Back</string>
     <string name="login_subtitle">Sign in to continue</string>
     <string name="login_email">Email</string>
     <string name="login_pwd">Password</string>
     <string name="login_button">Login</string>
     <string name="login_or">Or</string>
+    <string name="login_google">Sign in with Google</string>
+    <string name="login_telegram">Login with Telegram</string>
+    <string name="login_google_error">Google sign in failed. Please try again.</string>
     <string name="login_question">Don\'t have an account? Register</string>
 
-    <!--  REGISTRATION SCREEN  -->
     <string name="register_title">Create Account</string>
     <string name="register_subtitle">Get started by filling out the form below</string>
     <string name="register_pwd_confirm">Confirm Password</string>
@@ -41,76 +29,133 @@
     <string name="register_button">Create Account</string>
     <string name="register_question">Already have an account? Login</string>
 
-    <!--  EXAM RESULT SCREEN  -->
-    <string name="exam_result_title">Exam Result</string>
-    <string name="exam_result_feedback">Feedback</string>
-    <string name="exam_result_transcript">Transcript</string>
-    <string name="exam_result_overall">Overall Band Score</string>
-    <string name="exam_result_suggestion">Examples and Suggestions</string>
-    <string name="exam_result_suggestion_description">Suggestion</string>
-    <string name="exam_result_part_score">Part Score</string>
-    <!--  PRACTICE HUB SCREEN  -->
     <string name="practice_hub_title">Practice Hub</string>
     <string name="practice_hub_multilevel">Multilevel Speaking</string>
     <string name="practice_hub_multilevel_description">Simulate a full 15 minute test.</string>
     <string name="practice_hub_ielts">IELTS Speaking (Experimental)</string>
     <string name="practice_hub_ielts_description">Simulate a full 11–14 minute test.</string>
-    <string name="practice_hub_toefl">TOEFL Speaking (Coming Soon)</string>
-    <string name="practice_hub_toefl_description">Simulate a full test.</string>
 
-    <!--  PROFILE SCREEN  -->
-    <string name="profile_title">Profile &amp; Settings</string>
-    <string name="profile_section_title_account">Account</string>
-    <string name="profile_section_title_support">Support &amp; About</string>
-    <string name="profile_section_title_settings">Settings</string>
-    <string name="profile_section_title_action">Actions</string>
+    <!-- Practice Hub Screen Strings -->
+    <string name="practice_full_title">Full Mock Exam</string>
+    <string name="practice_full_description">A complete 3-part speaking simulation.</string>
 
-    <string name="profile_item_membership">Member Since</string>
-    <string name="profile_item_subscription">Subscription</string>
-    <string name="profile_item_dark_mode">Dark Mode</string>
-    <string name="profile_item_help">Help</string>
-    <string name="profile_item_privacy">Privacy Policy</string>
-    <string name="profile_item_about">About This App</string>
-    <string name="profile_item_delete">Delete Account</string>
-    <string name="profile_item_subtitle_permanent">This action is permanent</string>
-    <string name="profile_item_language">Language</string>
-    <string name="language_dialog_title">Select Language</string>
-    <!--  PROGRESS SCREEN  -->
+    <string name="practice_p1_1_title">Part 1.1 Practice</string>
+    <string name="practice_p1_1_description">Answer personal questions.</string>
+
+    <string name="practice_p1_2_title">Part 1.2 Practice</string>
+    <string name="practice_p1_2_description">Compare and contrast two pictures.</string>
+
+    <string name="practice_p2_title">Part 2 Practice</string>
+    <string name="practice_p2_description">Deliver a monologue based on a cue card.</string>
+
+    <string name="practice_p3_title">Part 3 Practice</string>
+    <string name="practice_p3_description">Discuss and argue a given topic.</string>
+
+    <string name="PART1_HEADER" translatable="false">Part 1</string>
+    <string name="PART1_1_INTRO" translatable="false">In this part I\'m going to ask you three short questions about yourself and your interests. And then, you will see some photos and answer some questions about them. You will have 30 seconds to reply to each question. Begin speaking when you hear this sound.</string>
+    <string name="PART1_2_INTRO" translatable="false">Now I\'m going to ask you to compare two pictures and I will ask you two questions about them</string>
+    <string name="PART2_HEADER" translatable="false">Part 2</string>
+    <string name="PART2_INTRO" translatable="false">In this part, I\'m going to show you a picture and ask you 3 questions. You will have one minute to think about your answers before you start speaking. You will have two minutes to answer all three questions. Begin speaking when you hear this sound.</string>
+    <string name="PART3_HEADER" translatable="false">Part 3</string>
+    <string name="PART3_INTRO" translatable="false">In this part, you are going to speak on a topic for two minutes. You can see the topic on the screen and two lists of points - for and against - related to the topic. Choose two items from each list and give a balanced argument to represent both sides of the topic. You have one minute to prepare your argument. You will then have two minutes to speak. Begin speaking when you hear this sound.</string>
+    <string name="notice_english_only">⚠️ Please note: All exam instructions and questions will be in English, just like the official Speaking Test.</string>
+
+    <string name="exam_result_title">Exam Result</string>
+    <string name="exam_result_overall">Overall Band Score</string>
+    <string name="exam_result_part_score">Part Score</string>
+    <string name="exam_result_feedback">Feedback</string>
+    <string name="exam_result_transcript">Transcript</string>
+    <string name="exam_result_suggestion">Examples and Suggestions</string>
+    <string name="exam_result_suggestion_description">Suggestion</string>
+
     <string name="progress_title">Progress</string>
     <string name="progress_empty">No %s exam history yet.</string>
     <string name="progress_score">Score Over Time</string>
+    <string name="progress_chart_empty_state">Not enough data to display progress chart. Complete more assessments to see your progress here.</string>
     <string name="progress_history">Exam History</string>
     <string name="progress_no_enough_data">Take at least two tests to see a chart.</string>
     <string name="progress_detail">View Details</string>
+    <string name="progress_no_results_found">No Results Found</string>
+    <string name="progress_no_completed_exams">You haven’t completed any %1$s in the %2$s.</string>
+    <string name="progress_statistics">Statistics</string>
+    <string name="progress_avg_score">Avg Score</string>
+    <string name="progress_best_score">Best Score</string>
+    <string name="progress_latest">Latest Score</string>
+    <string name="progress_change">Change</string>
 
+    <string name="topics_for_level">Topics for Level %s</string>
+    <string name="no_new_topics_found">No new topics found for level %s.</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_add">Add</string>
+    <string name="review_session_title">Word Review</string>
+    <string name="no_words_to_review">You have no words to review at the moment. Add more words to your word bank or wait for scheduled reviews.</string>
+    <string name="review_again">Again</string>
+    <string name="review_hard">Hard</string>
+    <string name="review_good">Good</string>
+    <string name="review_easy">Easy</string>
+    <string name="example_prefix">Example:\n%s</string>
+    <string name="session_complete_title">Session Complete!</string>
+    <string name="session_complete_description">You\'ve reviewed all available words for now. Check back later for more or add new words!</string>
 
-    <!--  RECORDING COMPONENT  -->
-    <string name="recording_start">Start recording</string>
-    <string name="recording_stop">Strop recording</string>
-
-    <!--  ABOUT COMPONENT  -->
+    <string name="profile_title">Profile &amp; Settings</string>
+    <string name="profile_section_title_account">Account</string>
+    <string name="profile_item_membership">Member Since</string>
+    <string name="profile_item_subscription">Subscription</string>
+    <string name="profile_section_title_settings">Settings</string>
+    <string name="profile_item_dark_mode">Dark Mode</string>
+    <string name="profile_item_language">Language</string>
+    <string name="language_dialog_title">Select Language</string>
+    <string name="profile_section_title_support">Support &amp; About</string>
+    <string name="profile_item_help">Help</string>
+    <string name="profile_item_privacy">Privacy Policy</string>
+    <string name="profile_item_about">About This App</string>
     <string name="about_title">About Multilevel</string>
     <string name="about_subtitle">A multi-level English learning and practice application.</string>
     <string name="about_version">Version: %s</string>
+    <string name="profile_section_title_action">Actions</string>
+    <string name="profile_item_delete">Delete Account</string>
+    <string name="profile_item_subtitle_permanent">This action is permanent</string>
+    <string name="subscription_title">Choose Your Plan</string>
+    <string name="subscription_loading_price">Loading price…</string>
+    <string name="subscription_google_play_button">Pay with Google Play</string>
+    <string name="subscription_other_methods_button">Other Payment Methods</string>
 
-    <!--  REUSABLE  -->
-    <string name="error_message">Error: %s</string>
-    <string name="button_ok">Logout</string>
-    <string name="button_back">Back button</string>
-    <string name="button_logout">Logout</string>
+    <string name="tier_free">Free</string>
+    <string name="tier_silver">Silver</string>
+    <string name="tier_gold">Gold</string>
+
+    <string name="feature_unlimited_part_practices">Unlimited Part Practices</string>
+    <string name="feature_5_mock_exams_month">5 Full Mock Exams / Month</string>
+    <string name="feature_6_month_history_retention">6-Month History Retention</string>
+
+    <string name="feature_everything_in_silver">Everything in Silver</string>
+    <string name="feature_unlimited_full_mock_exams">Unlimited Full Mock Exams</string>
+    <string name="feature_unlimited_history_retention">Unlimited History Retention</string>
+
+    <string name="button_back">Back</string>
+    <string name="error_generic_message">Error: %s</string>
+    <string name="plan_not_available">Plan not available</string>
+    <string name="navigate_back">Navigate back</string>
+    <string name="button_ok">OK</string>
     <string name="button_cancel">Cancel</string>
-    <string name="button_warning">Warning</string>
     <string name="button_refresh">Refresh</string>
-    <string name="delete_permanent">Delete Permanently</string>
-    <string name="tier_free">Free Tier</string>
-    <string name="tier_premium">Premium Tier</string>
+    <string name="button_logout">Logout</string>
+    <string name="button_warning">Warning</string>
+    <string name="go_back">Go Back</string>
+
+    <string name="error_message">Error: %s</string>
+    <string name="image_load_error">Could not load image</string>
+    <string name="permission_record_audio">Microphone permission is required to take the exam.</string>
+
+    <string name="recording_start">Start recording</string>
+    <string name="recording_stop">Stop recording</string>
     <string name="logout_confirm_title">Confirm Logout</string>
     <string name="logout_confirm_subtitle">Are you sure you want to log out?</string>
     <string name="delete_confirm_title">Delete Your Account?</string>
     <string name="delete_confirm_subtitle">This action is permanent. All of your data will be deleted forever. This cannot be undone. Are you sure you want to proceed?</string>
+    <string name="delete_permanent">Delete Permanently</string>
+
     <string name="logo_google_description">Google logo</string>
     <string name="logo_app">App logo</string>
-    <string name="permission_record_audio">Microphone permission is required to take the exam.</string>
-    <string name="notice_english_only">⚠️ Please note: All exam instructions and questions will be in English, just like the official Speaking Test.</string>
 
 </resources>
