@@ -12,11 +12,11 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.LaunchedEffect
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.typosbro.multilevel.navigation.AppNavigation
-import com.typosbro.multilevel.ui.theme.MultilevelTheme
-import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
-import com.typosbro.multilevel.ui.viewmodels.SettingsViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import org.milliytechnology.spiko.navigation.AppNavigation
+import org.milliytechnology.spiko.ui.theme.AppTheme
+import org.milliytechnology.spiko.ui.viewmodels.AuthViewModel
+import org.milliytechnology.spiko.ui.viewmodels.SettingsViewModel
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -45,7 +45,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            MultilevelTheme(darkTheme = isDarkTheme) {
+            AppTheme(darkTheme = isDarkTheme) {
                 AppNavigation()
             }
         }

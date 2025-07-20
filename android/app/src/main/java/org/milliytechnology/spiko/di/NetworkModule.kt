@@ -1,15 +1,15 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/di/NetworkModule.kt
 package org.milliytechnology.spiko.di
 
-import com.typosbro.multilevel.data.local.SessionManager
-import com.typosbro.multilevel.data.remote.ApiService
-import org.milliytechnology.spiko.data.remote.interceptors.AuthInterceptor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import org.milliytechnology.spiko.data.local.SessionManager
+import org.milliytechnology.spiko.data.remote.ApiService
+import org.milliytechnology.spiko.data.remote.interceptors.AuthInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit

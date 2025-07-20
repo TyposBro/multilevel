@@ -3,14 +3,14 @@ package org.milliytechnology.spiko.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.local.ExamResultEntity
-import org.milliytechnology.spiko.data.repositories.ExamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.milliytechnology.spiko.data.local.ExamResultEntity
+import org.milliytechnology.spiko.data.repositories.ExamRepository
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject

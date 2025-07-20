@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -25,23 +26,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
-import com.typosbro.multilevel.R
-import com.typosbro.multilevel.ui.component.DividerWithText
-import com.typosbro.multilevel.ui.component.GoogleSignInButton
-import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
-import com.typosbro.multilevel.ui.viewmodels.UiState
+import org.milliytechnology.spiko.R
+import org.milliytechnology.spiko.ui.component.DividerWithText
+import org.milliytechnology.spiko.ui.component.GoogleSignInButton
+import org.milliytechnology.spiko.ui.viewmodels.AuthViewModel
+import org.milliytechnology.spiko.ui.viewmodels.UiState
 
 @Composable
 fun LoginScreen(
@@ -49,10 +47,7 @@ fun LoginScreen(
 ) {
     // --- State Management ---
     val googleSignInState by authViewModel.googleSignInState.collectAsState()
-    // You might have a state for when the app is waiting for the deep link token verification
-    // val deepLinkVerifyState by authViewModel.deepLinkVerifyState.collectAsState()
-    val isLoading =
-        googleSignInState is UiState.Loading // || deepLinkVerifyState is UiState.Loading
+    val isLoading = googleSignInState is UiState.Loading
 
     // --- Google Sign-In Setup ---
     val context = LocalContext.current
@@ -96,11 +91,11 @@ fun LoginScreen(
                 text = stringResource(id = R.string.login_title),
                 style = MaterialTheme.typography.headlineLarge
             )
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = stringResource(id = R.string.login_subtitle),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.height(48.dp))
 
@@ -127,8 +122,6 @@ fun LoginScreen(
                 enabled = !isLoading,
                 onClick = {
                     val botUsername = "milliy_technology_bot" // Your bot username
-                    // This intent opens the Telegram app directly to your bot.
-                    // Telegram will send a webhook to your backend when the user clicks "Start".
                     val intent = Intent(
                         Intent.ACTION_VIEW,
                         "https://t.me/$botUsername".toUri()
@@ -136,15 +129,12 @@ fun LoginScreen(
                     try {
                         context.startActivity(intent)
                     } catch (e: Exception) {
-                        // Handle case where Telegram is not installed
                         Log.e("LoginScreen", "Failed to open Telegram", e)
-                        // You could show a Toast or Snackbar message here.
                     }
                 }
             )
 
             // --- Error Display ---
-            // You would also check the deepLinkVerifyState error here in a real implementation
             val googleError = (googleSignInState as? UiState.Error)?.message
             val errorMessage = googleError
 
@@ -154,7 +144,6 @@ fun LoginScreen(
                     text = errorMessage,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center
                 )
             }
         }
@@ -173,25 +162,23 @@ private fun TelegramNativeLoginButton(
 ) {
     Button(
         onClick = onClick,
-        modifier = modifier
-            .fillMaxWidth()
-            .height(48.dp),
+        modifier = modifier.fillMaxWidth(), // Removed hardcoded height
         enabled = enabled,
         colors = ButtonDefaults.buttonColors(
-            containerColor = Color(0xFF54A9E9), // Official Telegram Blue
-            contentColor = Color.White
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = MaterialTheme.colorScheme.onPrimary
         )
     ) {
         Icon(
-            painter = painterResource(id = R.drawable.ic_telegram_logo), // You need to add this drawable
+            painter = painterResource(id = R.drawable.ic_telegram_logo),
             contentDescription = null, // decorative
             modifier = Modifier.size(24.dp),
-            tint = Color.Unspecified // Icon color
+            tint = LocalContentColor.current
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
-            text = stringResource(id = R.string.login_telegram),
-            fontWeight = FontWeight.Bold
+            text = stringResource(id = R.string.login_telegram)
+            // Removed manual fontWeight, Button applies labelLarge style automatically
         )
     }
 }

@@ -2,18 +2,18 @@ package org.milliytechnology.spiko.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.local.SessionManager
-import com.typosbro.multilevel.data.remote.models.AuthResponse
-import com.typosbro.multilevel.data.remote.models.GoogleSignInRequest
-import com.typosbro.multilevel.data.remote.models.OneTimeTokenRequest
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
-import org.milliytechnology.spiko.data.repositories.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.milliytechnology.spiko.data.local.SessionManager
+import org.milliytechnology.spiko.data.remote.models.AuthResponse
+import org.milliytechnology.spiko.data.remote.models.GoogleSignInRequest
+import org.milliytechnology.spiko.data.remote.models.OneTimeTokenRequest
+import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.repositories.AuthRepository
 import javax.inject.Inject
 
 @HiltViewModel

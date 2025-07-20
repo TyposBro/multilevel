@@ -49,11 +49,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.typosbro.multilevel.R
-import com.typosbro.multilevel.ui.viewmodels.DurationFilter
-import com.typosbro.multilevel.ui.viewmodels.ExamStatistics
-import com.typosbro.multilevel.ui.viewmodels.GenericExamResultSummary
-import com.typosbro.multilevel.ui.viewmodels.ProgressViewModel
+import org.milliytechnology.spiko.R
+import org.milliytechnology.spiko.ui.viewmodels.DurationFilter
+import org.milliytechnology.spiko.ui.viewmodels.ExamStatistics
+import org.milliytechnology.spiko.ui.viewmodels.GenericExamResultSummary
+import org.milliytechnology.spiko.ui.viewmodels.ProgressViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -169,11 +169,11 @@ fun ProgressScreen(
                     }
 
                     // History Items
-                    items(currentHistory) { result ->
+                    items(currentHistory.size) { index ->
                         ExamHistoryItem(
-                            result = result,
+                            result = currentHistory[index],
                             onClick = {
-                                onNavigateToMultilevelResult(result.id)
+                                onNavigateToMultilevelResult(currentHistory[index].id)
                             }
                         )
                         HorizontalDivider(Modifier.padding(horizontal = 16.dp))

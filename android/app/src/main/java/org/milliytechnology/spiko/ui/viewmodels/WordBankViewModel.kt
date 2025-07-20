@@ -3,13 +3,6 @@ package org.milliytechnology.spiko.ui.viewmodels
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.local.WordDao
-import com.typosbro.multilevel.data.local.WordEntity
-import com.typosbro.multilevel.data.remote.models.ApiWord
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
-import com.typosbro.multilevel.data.repositories.WordBankRepository
-import com.typosbro.multilevel.features.srs.ReviewQuality
-import com.typosbro.multilevel.features.srs.SM2
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -22,6 +15,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.milliytechnology.spiko.data.local.WordDao
+import org.milliytechnology.spiko.data.local.WordEntity
+import org.milliytechnology.spiko.data.remote.models.ApiWord
+import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.repositories.WordBankRepository
+import org.milliytechnology.spiko.features.srs.ReviewQuality
+import org.milliytechnology.spiko.features.srs.SM2
 import javax.inject.Inject
 
 data class DeckInfo(

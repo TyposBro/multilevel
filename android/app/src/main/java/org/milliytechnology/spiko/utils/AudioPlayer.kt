@@ -6,9 +6,9 @@ import android.media.MediaPlayer
 import android.util.Log
 import androidx.annotation.RawRes
 import androidx.core.net.toUri
-import com.typosbro.multilevel.features.prefetch.AssetPrefetcher
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.milliytechnology.spiko.features.prefetch.AssetPrefetcher
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.coroutines.resume

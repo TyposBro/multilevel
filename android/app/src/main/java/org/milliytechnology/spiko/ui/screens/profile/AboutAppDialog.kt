@@ -16,7 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import com.typosbro.multilevel.R
+import org.milliytechnology.spiko.R
 import org.milliytechnology.spiko.utils.getAppVersion
 
 @Composable
@@ -31,7 +31,7 @@ fun AboutAppDialog(
         // Use your app's icon
         icon = {
             Image(
-                painter = painterResource(id = R.drawable.ic_launcher_round),
+                painter = painterResource(id = R.mipmap.ic_launcher),
                 contentDescription = stringResource(id = R.string.logo_app),
                 modifier = Modifier.size(48.dp)
             )

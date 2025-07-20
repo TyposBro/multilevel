@@ -45,8 +45,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.billingclient.api.ProductDetails
-import com.typosbro.multilevel.R
-import com.typosbro.multilevel.ui.viewmodels.SubscriptionViewModel
+import org.milliytechnology.spiko.R
+import org.milliytechnology.spiko.ui.viewmodels.SubscriptionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

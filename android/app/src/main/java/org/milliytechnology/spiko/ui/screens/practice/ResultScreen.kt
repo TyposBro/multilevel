@@ -1,3 +1,4 @@
+// {PATH_TO_PROJECT}/app/src/main/java/org/milliytechnology/spiko/ui/screens/practice/ResultScreen.kt
 package org.milliytechnology.spiko.ui.screens.practice
 
 import androidx.activity.compose.BackHandler
@@ -41,16 +42,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.typosbro.multilevel.R
+import org.milliytechnology.spiko.R
 import org.milliytechnology.spiko.data.remote.models.DetailedBreakdown
 import org.milliytechnology.spiko.data.remote.models.ExamResultResponse
 import org.milliytechnology.spiko.data.remote.models.FeedbackBreakdown
 import org.milliytechnology.spiko.data.remote.models.FeedbackCriterion
 import org.milliytechnology.spiko.data.remote.models.TranscriptEntry
-import com.typosbro.multilevel.ui.viewmodels.ResultViewModel
+import org.milliytechnology.spiko.ui.viewmodels.ResultViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +83,7 @@ fun ResultScreen(
         ) {
             when {
                 uiState.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                uiState.error != null -> ErrorView(uiState.error!!) // Reusing ErrorView
+                uiState.error != null -> ErrorView(uiState.error!!) // Reusing ErrorView from ExamScreen
                 uiState.result != null -> MultilevelResultContent(result = uiState.result!!)
             }
         }
@@ -149,6 +149,8 @@ fun OverallScoreCardMultilevel(score: Int, maxScore: Int?, isSinglePart: Boolean
                 Text(
                     text = "$score",
                     style = MaterialTheme.typography.displayLarge,
+                    // Note: Manual fontWeight is acceptable for key hero elements like this
+                    // if the default style doesn't match the desired visual hierarchy.
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -156,7 +158,7 @@ fun OverallScoreCardMultilevel(score: Int, maxScore: Int?, isSinglePart: Boolean
                     Text(
                         text = " / $maxScore",
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Light,
+                        fontWeight = FontWeight.Light, // Also a deliberate stylistic choice
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
@@ -188,13 +190,12 @@ fun FeedbackPartCard(feedback: FeedbackBreakdown) {
             ) {
                 Text(
                     text = feedback.part,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
+                    style = MaterialTheme.typography.titleLarge // Already bold in our theme
                 )
                 Text(
                     text = "${feedback.score}",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer, // Correct color for on top of primaryContainer
                     modifier = Modifier
                         .background(
                             MaterialTheme.colorScheme.primaryContainer,
@@ -205,25 +206,19 @@ fun FeedbackPartCard(feedback: FeedbackBreakdown) {
             }
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
-            // --- MODIFIED: Display detailed V2 feedback or fallback to V1 ---
             if (feedback.detailedBreakdown != null) {
-                // V2 Detailed Feedback
                 feedback.overallFeedback?.let {
                     Text(
                         text = it,
                         style = MaterialTheme.typography.bodyLarge,
-                        lineHeight = 24.sp,
-                        fontWeight = FontWeight.Medium,
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
                 }
                 DetailedFeedbackItems(detailedBreakdown = feedback.detailedBreakdown)
             } else if (feedback.feedback != null) {
-                // V1 Simple Feedback (Fallback)
                 Text(
                     text = feedback.feedback,
-                    style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = 22.sp
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
@@ -254,8 +249,7 @@ private fun CriteriaItem(title: String, criterion: FeedbackCriterion) {
     Column {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.titleMedium, // Already bold in our theme
             color = MaterialTheme.colorScheme.primary
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -272,16 +266,14 @@ private fun FeedbackDetailRow(label: String, text: String) {
     Row(Modifier.padding(top = 4.dp)) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.labelLarge, // Already medium weight in our theme
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(90.dp)
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.padding(start = 8.dp),
-            lineHeight = 20.sp
+            modifier = Modifier.padding(start = 8.dp)
         )
     }
 }
@@ -305,15 +297,20 @@ fun TranscriptTab(transcript: List<TranscriptEntry>) {
 fun TranscriptItem(entry: TranscriptEntry) {
     val isUser = entry.speaker.equals("User", ignoreCase = true)
     val alignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart
+
+    // Using surfaceContainer and primaryContainer for better semantic coloring
     val bubbleColor =
-        if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
+        if (isUser) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+    val textColor =
+        if (isUser) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
 
     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = alignment) {
         Card(colors = CardDefaults.cardColors(containerColor = bubbleColor)) {
             Text(
                 text = entry.text.trim(),
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.bodyLarge,
+                color = textColor
             )
         }
     }

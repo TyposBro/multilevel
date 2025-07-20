@@ -8,11 +8,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
-import com.typosbro.multilevel.data.repositories.PaymentRepository
-import com.typosbro.multilevel.data.repositories.SubscriptionRepository
-import org.milliytechnology.spiko.features.billing.BillingClientWrapper
-import org.milliytechnology.spiko.utils.openUrlInCustomTab
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +15,11 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.repositories.PaymentRepository
+import org.milliytechnology.spiko.data.repositories.SubscriptionRepository
+import org.milliytechnology.spiko.features.billing.BillingClientWrapper
+import org.milliytechnology.spiko.utils.openUrlInCustomTab
 import javax.inject.Inject
 
 data class SubscriptionUiState(

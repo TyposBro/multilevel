@@ -16,12 +16,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.typosbro.multilevel.data.local.SessionManager
+import org.milliytechnology.spiko.data.local.SessionManager
 import org.milliytechnology.spiko.ui.screens.MainScreen
-import com.typosbro.multilevel.ui.screens.auth.LoginScreen
-import com.typosbro.multilevel.ui.screens.practice.ExamScreen
-import com.typosbro.multilevel.ui.screens.practice.ResultScreen
-import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
+import org.milliytechnology.spiko.ui.screens.auth.LoginScreen
+import org.milliytechnology.spiko.ui.screens.practice.ExamScreen
+import org.milliytechnology.spiko.ui.screens.practice.ResultScreen
+import org.milliytechnology.spiko.ui.viewmodels.AuthViewModel
 
 // Define navigation routes
 object AppDestinations {

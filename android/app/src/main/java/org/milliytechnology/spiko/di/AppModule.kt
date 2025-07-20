@@ -6,14 +6,14 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
-import com.typosbro.multilevel.data.local.AppDatabase
-import com.typosbro.multilevel.data.local.ExamResultDao
-import com.typosbro.multilevel.data.local.WordDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import org.milliytechnology.spiko.data.local.AppDatabase
+import org.milliytechnology.spiko.data.local.ExamResultDao
+import org.milliytechnology.spiko.data.local.WordDao
 import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings_prefs")
@@ -48,5 +48,5 @@ object AppModule {
         return database.multilevelExamResultDao()
     }
 
-    
+
 }

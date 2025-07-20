@@ -2,13 +2,13 @@ package org.milliytechnology.spiko.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.preferences.LanguageRepository
-import com.typosbro.multilevel.data.preferences.ThemeRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import org.milliytechnology.spiko.data.preferences.LanguageRepository
+import org.milliytechnology.spiko.data.preferences.ThemeRepository
 import javax.inject.Inject
 
 @HiltViewModel

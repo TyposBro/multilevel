@@ -1,13 +1,13 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/repositories/WordBankRepository.kt
 package org.milliytechnology.spiko.data.repositories
 
-import com.typosbro.multilevel.data.remote.ApiService
-import com.typosbro.multilevel.data.remote.models.ApiWord
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
-import com.typosbro.multilevel.data.remote.models.safeApiCall
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import org.milliytechnology.spiko.data.remote.ApiService
+import org.milliytechnology.spiko.data.remote.models.ApiWord
+import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.remote.models.safeApiCall
 import javax.inject.Inject
 import javax.inject.Singleton
 

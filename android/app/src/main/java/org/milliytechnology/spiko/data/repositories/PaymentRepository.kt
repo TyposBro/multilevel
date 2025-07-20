@@ -1,10 +1,10 @@
 package org.milliytechnology.spiko.data.repositories
 
-import com.typosbro.multilevel.data.remote.ApiService
+import org.milliytechnology.spiko.data.remote.ApiService
 import org.milliytechnology.spiko.data.remote.models.CreatePaymentRequest // Create this
 import org.milliytechnology.spiko.data.remote.models.CreatePaymentResponse // Create this
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
-import com.typosbro.multilevel.data.remote.models.safeApiCall
+import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.remote.models.safeApiCall
 import javax.inject.Inject
 import javax.inject.Singleton
 

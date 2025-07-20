@@ -69,14 +69,14 @@ import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.typosbro.multilevel.R
+import org.milliytechnology.spiko.R
 import org.milliytechnology.spiko.data.remote.models.Part3Topic
-import com.typosbro.multilevel.ui.component.HandleAppLifecycle
-import com.typosbro.multilevel.ui.component.ImageLoader
-import com.typosbro.multilevel.ui.component.RecognitionControls
-import com.typosbro.multilevel.ui.viewmodels.ExamViewModel
-import com.typosbro.multilevel.ui.viewmodels.MultilevelExamStage
-import com.typosbro.multilevel.ui.viewmodels.MultilevelUiState
+import org.milliytechnology.spiko.ui.component.HandleAppLifecycle
+import org.milliytechnology.spiko.ui.component.ImageLoader
+import org.milliytechnology.spiko.ui.component.RecognitionControls
+import org.milliytechnology.spiko.ui.viewmodels.ExamViewModel
+import org.milliytechnology.spiko.ui.viewmodels.MultilevelExamStage
+import org.milliytechnology.spiko.ui.viewmodels.MultilevelUiState
 
 @RequiresApi(Build.VERSION_CODES.S)
 @OptIn(ExperimentalMaterial3Api::class)

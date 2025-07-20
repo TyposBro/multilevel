@@ -48,6 +48,5 @@ fun ImageLoader(
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = ContentScale.Fit,
-
-        )
+    )
 }

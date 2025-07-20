@@ -2,15 +2,15 @@ package org.milliytechnology.spiko.ui.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.typosbro.multilevel.data.remote.models.GenericSuccessResponse
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
-import com.typosbro.multilevel.data.remote.models.UserProfileResponse
-import org.milliytechnology.spiko.data.repositories.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import org.milliytechnology.spiko.data.remote.models.GenericSuccessResponse
+import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.remote.models.UserProfileResponse
+import org.milliytechnology.spiko.data.repositories.AuthRepository
 import java.text.SimpleDateFormat
 import java.util.Locale
 import javax.inject.Inject

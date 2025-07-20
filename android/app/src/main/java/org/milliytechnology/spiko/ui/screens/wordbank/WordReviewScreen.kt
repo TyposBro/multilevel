@@ -43,10 +43,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.alexstyl.swipeablecard.ExperimentalSwipeableCardApi
-import com.typosbro.multilevel.data.local.WordEntity
-import com.typosbro.multilevel.features.srs.ReviewQuality
-import org.milliytechnology.spiko.ui.viewmodels.WordBankViewModel
 import kotlinx.coroutines.launch
+import org.milliytechnology.spiko.data.local.WordEntity
+import org.milliytechnology.spiko.features.srs.ReviewQuality
+import org.milliytechnology.spiko.ui.viewmodels.WordBankViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

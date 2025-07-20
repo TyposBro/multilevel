@@ -1,13 +1,13 @@
 package org.milliytechnology.spiko.data.repositories
 
-import com.typosbro.multilevel.data.local.ExamResultDao
-import com.typosbro.multilevel.data.local.ExamResultEntity
-import com.typosbro.multilevel.data.remote.ApiService
+import kotlinx.coroutines.flow.Flow
+import org.milliytechnology.spiko.data.local.ExamResultDao
+import org.milliytechnology.spiko.data.local.ExamResultEntity
+import org.milliytechnology.spiko.data.remote.ApiService
 import org.milliytechnology.spiko.data.remote.models.AnalyzeRequest
 import org.milliytechnology.spiko.data.remote.models.MultilevelExamResponse
-import com.typosbro.multilevel.data.remote.models.RepositoryResult
-import com.typosbro.multilevel.data.remote.models.safeApiCall
-import kotlinx.coroutines.flow.Flow
+import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.remote.models.safeApiCall
 import javax.inject.Inject
 import javax.inject.Singleton
 

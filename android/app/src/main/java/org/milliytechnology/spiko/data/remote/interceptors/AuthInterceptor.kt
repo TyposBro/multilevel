@@ -1,10 +1,10 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/data/remote/interceptors/AuthInterceptor.kt
 package org.milliytechnology.spiko.data.remote.interceptors
 
-import com.typosbro.multilevel.data.local.SessionManager
 import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.Response
+import org.milliytechnology.spiko.data.local.SessionManager
 import javax.inject.Inject
 
 class AuthInterceptor @Inject constructor(

@@ -1,17 +1,17 @@
 package org.milliytechnology.spiko.data.remote
 
 import org.milliytechnology.spiko.data.remote.models.AnalyzeRequest
-import com.typosbro.multilevel.data.remote.models.ApiWord
-import com.typosbro.multilevel.data.remote.models.AuthResponse
+import org.milliytechnology.spiko.data.remote.models.ApiWord
+import org.milliytechnology.spiko.data.remote.models.AuthResponse
 import org.milliytechnology.spiko.data.remote.models.CreatePaymentRequest
 import org.milliytechnology.spiko.data.remote.models.CreatePaymentResponse
 import org.milliytechnology.spiko.data.remote.models.ExamResultResponse
-import com.typosbro.multilevel.data.remote.models.GenericSuccessResponse
-import com.typosbro.multilevel.data.remote.models.GoogleSignInRequest
+import org.milliytechnology.spiko.data.remote.models.GenericSuccessResponse
+import org.milliytechnology.spiko.data.remote.models.GoogleSignInRequest
 import org.milliytechnology.spiko.data.remote.models.MultilevelExamResponse
-import com.typosbro.multilevel.data.remote.models.OneTimeTokenRequest
+import org.milliytechnology.spiko.data.remote.models.OneTimeTokenRequest
 import org.milliytechnology.spiko.data.remote.models.SubscriptionResponse
-import com.typosbro.multilevel.data.remote.models.UserProfileResponse
+import org.milliytechnology.spiko.data.remote.models.UserProfileResponse
 import org.milliytechnology.spiko.data.remote.models.VerifyPurchaseRequest
 import retrofit2.Response
 import retrofit2.http.Body

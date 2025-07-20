@@ -3,7 +3,7 @@ package org.milliytechnology.spiko.data.local
 import androidx.room.TypeConverter
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.typosbro.multilevel.data.remote.models.Criterion
+import org.milliytechnology.spiko.data.remote.models.Criterion
 import org.milliytechnology.spiko.data.remote.models.FeedbackBreakdown
 import org.milliytechnology.spiko.data.remote.models.TranscriptEntry
 

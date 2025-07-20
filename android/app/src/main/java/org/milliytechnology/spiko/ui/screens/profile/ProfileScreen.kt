@@ -56,13 +56,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.typosbro.multilevel.R
-import com.typosbro.multilevel.ui.viewmodels.AuthViewModel
-import com.typosbro.multilevel.ui.viewmodels.ProfileViewModel
-import com.typosbro.multilevel.ui.viewmodels.SettingsViewModel
-import com.typosbro.multilevel.ui.viewmodels.UiState
-import org.milliytechnology.spiko.utils.openUrlInCustomTab
 import kotlinx.coroutines.launch
+import org.milliytechnology.spiko.R
+import org.milliytechnology.spiko.ui.viewmodels.AuthViewModel
+import org.milliytechnology.spiko.ui.viewmodels.ProfileViewModel
+import org.milliytechnology.spiko.ui.viewmodels.SettingsViewModel
+import org.milliytechnology.spiko.ui.viewmodels.UiState
+import org.milliytechnology.spiko.utils.openUrlInCustomTab
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

@@ -1,7 +1,7 @@
 // {PATH_TO_PROJECT}/app/src/main/java/com/typosbro/multilevel/features/srs/SM2.kt
 package org.milliytechnology.spiko.features.srs
 
-import com.typosbro.multilevel.data.local.WordEntity
+import org.milliytechnology.spiko.data.local.WordEntity
 import java.util.concurrent.TimeUnit
 import kotlin.math.ceil
 

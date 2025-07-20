@@ -25,13 +25,13 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navigation
-import com.typosbro.multilevel.R
-import com.typosbro.multilevel.ui.screens.practice.PracticeHubScreen
-import com.typosbro.multilevel.ui.screens.profile.ProfileScreen
-import com.typosbro.multilevel.ui.screens.progress.ProgressScreen
-import com.typosbro.multilevel.ui.screens.subscription.SubscriptionScreen
-import com.typosbro.multilevel.ui.screens.wordbank.ExploreLevelScreen
-import com.typosbro.multilevel.ui.screens.wordbank.ExploreTopicScreen
+import org.milliytechnology.spiko.R
+import org.milliytechnology.spiko.ui.screens.practice.PracticeHubScreen
+import org.milliytechnology.spiko.ui.screens.profile.ProfileScreen
+import org.milliytechnology.spiko.ui.screens.progress.ProgressScreen
+import org.milliytechnology.spiko.ui.screens.subscription.SubscriptionScreen
+import org.milliytechnology.spiko.ui.screens.wordbank.ExploreLevelScreen
+import org.milliytechnology.spiko.ui.screens.wordbank.ExploreTopicScreen
 import org.milliytechnology.spiko.ui.screens.wordbank.WordBankScreen
 import org.milliytechnology.spiko.ui.screens.wordbank.WordReviewScreen
 
