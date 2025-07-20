@@ -48,6 +48,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.ParagraphStyle
@@ -427,6 +428,7 @@ fun Part1_2_View(uiState: MultilevelUiState) {
                     ImageLoader(
                         imageUrl = content?.image1Url,
                         contentDescription = "Image 1",
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .weight(1f)
                             .clip(MaterialTheme.shapes.medium)
@@ -434,6 +436,7 @@ fun Part1_2_View(uiState: MultilevelUiState) {
                     ImageLoader(
                         imageUrl = content?.image2Url,
                         contentDescription = "Image 2",
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .weight(1f)
                             .clip(MaterialTheme.shapes.medium)
@@ -470,7 +473,7 @@ fun Part2_View(uiState: MultilevelUiState) {
             Column(modifier = Modifier.padding(20.dp)) {
                 if (!content?.imageUrl.isNullOrBlank()) {
                     ImageLoader(
-                        imageUrl = content?.imageUrl,
+                        imageUrl = content.imageUrl,
                         contentDescription = "Part 2 Image",
                         modifier = Modifier
                             .fillMaxWidth()
