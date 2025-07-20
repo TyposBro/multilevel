@@ -53,12 +53,12 @@ enum class MultilevelExamStage {
 object MULTILEVEL_TIMEOUTS {
     const val PART1_1_PREP = 5
     const val PART1_1_ANSWER = 30
-    const val PART1_2_PREP_FIRST = 3
-    const val PART1_2_PREP_FOLLOWUP = 3
-    const val PART1_2_ANSWER_FIRST = 45 // Adjusted for comparison
-    const val PART1_2_ANSWER_FOLLOWUP = 20 // Adjusted for follow-up
+    const val PART1_2_PREP_FIRST = 10
+    const val PART1_2_PREP_FOLLOWUP = 5
+    const val PART1_2_ANSWER_FIRST = 45
+    const val PART1_2_ANSWER_FOLLOWUP = 30
     const val PART2_PREP = 60
-    const val PART2_SPEAKING = 90
+    const val PART2_SPEAKING = 120
     const val PART3_PREP = 60
     const val PART3_SPEAKING = 120
 }
