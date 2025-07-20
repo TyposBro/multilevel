@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">multilevel</string>
+    <string name="app_name">Spiko</string>
     <string name="google_web_client_id" translatable="false">118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com</string>
-    <string name="url_privacy_policy" translatable="false">https://typosbro.github.io/multilevel-public/#/privacy</string>
-    <string name="url_faq" translatable="false">https://typosbro.github.io/multilevel-public/#/faq</string>
+    <string name="url_privacy_policy" translatable="false">https://milliytechnology.org/privacy</string>
+    <string name="url_faq" translatable="false">https://milliytechnology.org/faq</string>
 
     <!--  MULTILEVEL INSTRUCTIONS  -->
     <string name="PART1_HEADER" translatable="false">Part 1</string>

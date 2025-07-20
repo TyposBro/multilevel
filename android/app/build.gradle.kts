@@ -10,11 +10,11 @@ plugins {
 }
 
 android {
-    namespace = "com.typosbro.multilevel"
+    namespace = "org.milliytechnology.spiko"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.typosbro.multilevel"
+        applicationId = "org.milliytechnology.spiko"
         minSdk = 26
         targetSdk = 34
         versionCode = 1
