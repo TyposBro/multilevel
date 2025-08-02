@@ -19,17 +19,17 @@ app.use(
   "*",
   logger(),
   cors({
-    // THIS IS THE SECTION TO EDIT
     origin: [
       "http://localhost:3000", // Your main app's local dev server
-      "https://your-production-frontend-app.com", // Your main app's live URL
-
-      // --- ADD THESE LINES ---
+      "http://localhost:5500", // For local testing of static site
+      "http://127.0.0.1:5500", // For local testing of static site
       "http://localhost:5173", // Your admin panel's local dev server
       "https://typosbro.github.io", // The live URL for your admin panel
-      // --- END OF ADDED LINES ---
+      "https://milliytechnology.github.io", // The live URL for your main site
+      "https://milliytechnology.org", // The live URL for your main site
+      // Keep this for your mobile app if it uses a custom domain
+      "https://your-production-frontend-app.com",
     ],
-    // The rest of the configuration is likely fine
     allowHeaders: ["Authorization", "Content-Type"],
     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],

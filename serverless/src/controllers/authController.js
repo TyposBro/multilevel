@@ -89,10 +89,7 @@ export const verifyTelegramToken = async (c) => {
 
     const TELEGRAM_API = `https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}`;
 
-    // --- START OF FINAL FIX ---
-    // This function will be executed in the background. By placing a try/catch
-    // INSIDE it, we ensure that any error (like a failed fetch) is contained
-    // and cannot possibly affect the main request handler's execution.
+    // This function will be executed in the background.
     const deleteMessagesInBackground = async () => {
       try {
         await fetch(`${TELEGRAM_API}/deleteMessage`, {
@@ -116,7 +113,6 @@ export const verifyTelegramToken = async (c) => {
       }
     };
     c.executionCtx.waitUntil(deleteMessagesInBackground());
-    // --- END OF FINAL FIX ---
 
     let user = await db.findUserByProviderId(c.env.DB, {
       provider: "telegram",
@@ -138,7 +134,77 @@ export const verifyTelegramToken = async (c) => {
 };
 
 /**
+ * @desc    Handles web-based login via Telegram, generates JWT, and redirects to the account page.
+ */
+export const telegramLoginWeb = async (c) => {
+  try {
+    const oneTimeToken = c.req.query("token");
+    if (!oneTimeToken) {
+      return c.html("<html><body>Error: Missing login token.</body></html>", 400);
+    }
+
+    const foundToken = await db.findOneTimeTokenAndDelete(c.env.DB, oneTimeToken);
+    if (!foundToken) {
+      return c.html(
+        "<html><body>Error: Invalid or expired token. Please try again.</body></html>",
+        401
+      );
+    }
+
+    // This can run in the background without blocking the user's login.
+    const deleteMessagesInBackground = async () => {
+      try {
+        const TELEGRAM_API = `https://api.telegram.org/bot${c.env.TELEGRAM_BOT_TOKEN}`;
+        await fetch(`${TELEGRAM_API}/deleteMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: foundToken.telegramId,
+            message_id: foundToken.botMessageId,
+          }),
+        });
+        await fetch(`${TELEGRAM_API}/deleteMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: foundToken.telegramId,
+            message_id: foundToken.userMessageId,
+          }),
+        });
+      } catch (e) {
+        console.error("Non-blocking error during background message deletion:", e.message);
+      }
+    };
+    c.executionCtx.waitUntil(deleteMessagesInBackground());
+
+    let user = await db.findUserByProviderId(c.env.DB, {
+      provider: "telegram",
+      id: foundToken.telegramId,
+    });
+    if (!user) {
+      user = await db.createUser(c.env.DB, {
+        telegramId: foundToken.telegramId,
+        authProvider: "telegram",
+      });
+    }
+
+    const jwt = await generateToken(c, user.id);
+    // Redirect to the frontend account page, passing the JWT in the URL hash.
+    const redirectUrl = `${c.env.FRONTEND_ACCOUNT_URL}#token=${jwt}`;
+
+    return c.redirect(redirectUrl);
+  } catch (error) {
+    console.error("Error during web-based Telegram login:", error);
+    return c.html(
+      "<html><body>Server error during login. Please try again later.</body></html>",
+      500
+    );
+  }
+};
+
+/**
  * @desc    Serves a simple HTML page that redirects to the mobile app deep link.
+ * @desc    Enhanced to fall back to a web login flow if the app isn't installed.
  */
 export const telegramRedirect = (c) => {
   const token = c.req.query("token");
@@ -147,6 +213,7 @@ export const telegramRedirect = (c) => {
   }
 
   const deepLink = `multilevelapp://login?token=${token}`;
+  const webLoginUrl = `/api/auth/telegram/login-web?token=${token}`;
 
   // Use Hono's c.html() to send an HTML response
   return c.html(`
@@ -159,12 +226,34 @@ export const telegramRedirect = (c) => {
           body { font-family: sans-serif; text-align: center; padding-top: 50px; background-color: #f0f0f0; }
         </style>
         <script>
-          window.location.replace("${deepLink}");
+          // This script attempts to open the mobile app.
+          // If the app is not installed, the user remains on this page.
+          // A timeout then triggers a redirect to the web-based login flow.
+          (function() {
+            let redirected = false;
+            function handleVisibilityChange() {
+              if (document.hidden) {
+                redirected = true;
+              }
+            }
+            document.addEventListener("visibilitychange", handleVisibilityChange);
+
+            // After a short delay, check if we've successfully navigated away.
+            setTimeout(function() {
+              document.removeEventListener("visibilitychange", handleVisibilityChange);
+              if (!redirected) {
+                window.location.replace("${webLoginUrl}");
+              }
+            }, 1000);
+
+            // Immediately attempt to navigate to the app's custom URL scheme.
+            window.location.href = "${deepLink}";
+          })();
         </script>
       </head>
       <body>
         <p>Redirecting you to the app...</p>
-        <p>If you are not redirected automatically, <a href="${deepLink}">click here to log in</a>.</p>
+        <p>If you are not redirected automatically, <a href="${webLoginUrl}">click here to log in on the web</a>.</p>
       </body>
     </html>
   `);

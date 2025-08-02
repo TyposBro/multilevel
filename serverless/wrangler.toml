@@ -8,6 +8,7 @@ main = "src/index.js"
 
 # Ensures compatibility with modern Worker features
 compatibility_date = "2024-05-30"
+compatibility_flags = ["nodejs_compat"]
 
 # ==============================================================================
 #  AI Binding (Workers AI)
@@ -30,7 +31,7 @@ enabled = true
 # --- Storage Binding (Cloudflare R2) ---
 # Command: `npx wrangler r2 bucket create multilevel-cdn`
 [[r2_buckets]]
-binding = "CDN_BUCKET" # Variable name in your code: c.env.CDN_BUCKET
+binding = "CDN_BUCKET"         # Variable name in your code: c.env.CDN_BUCKET
 bucket_name = "multilevel-cdn" # The actual name of the R2 bucket
 
 
@@ -48,13 +49,13 @@ database_id = "b9cb6fe6-4dfa-4d42-9763-59327beb4f8c"
 [vars]
 # You can define different environments (e.g., [env.production], [env.staging])
 # For simplicity, we'll define them globally here.
-ENVIRONMENT = "development" # Change to "production" for deployments
-
+ENVIRONMENT = "development"                                        # Change to "production" for deployments
+FRONTEND_ACCOUNT_URL = "https://milliytechnology.org/account.html"
 
 # --- General Config ---
 JWT_EXPIRES_IN = "1d"
 JWT_EXPIRES_IN_ADMIN = "1d"
-SERVER_URL = "https://typosbro-multilevel-api.milliytechnology.workers.dev" # IMPORTANT: Update after first deploy
+SERVER_URL = "https://typosbro-multilevel-api.milliytechnology.workers.dev"
 TELEGRAM_BOT_USERNAME = "milliy_technology_bot"
 GOOGLE_CLIENT_ID = "118718851522-o03snn4pl8tpm2m2pogi67c2t9s8vb84.apps.googleusercontent.com"
 R2_PUBLIC_URL = "https://pub-39a14446ddab4d15ab33b351732ac903.r2.dev"
