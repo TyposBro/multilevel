@@ -23,6 +23,14 @@ export const db = {
     }
   },
 
+  async findUserByEmail(d1, email) {
+    try {
+      return await d1.prepare("SELECT * FROM users WHERE email = ?").bind(email).first();
+    } catch (e) {
+      console.error("D1 findUserByEmail Error:", e.message);
+      return null;
+    }
+  },
   async findUserByProviderId(d1, { provider, id }) {
     let query;
     if (provider === "google") {

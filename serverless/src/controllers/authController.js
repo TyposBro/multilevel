@@ -3,6 +3,42 @@
 import { db } from "../db/d1-client";
 import { generateToken } from "../utils/generateToken";
 
+// Add this to serverless/src/controllers/authController.js
+
+export const reviewerLogin = async (c) => {
+  try {
+    const { email } = await c.req.json();
+    const REVIEWER_EMAIL = "google.reviewer@typosbro.app"; // This is your "secret" username
+
+    if (email !== REVIEWER_EMAIL) {
+      return c.json({ message: "Invalid reviewer credentials." }, 401);
+    }
+
+    let user = await db.findUserByEmail(c.env.DB, REVIEWER_EMAIL);
+
+    if (!user) {
+      // Create a new reviewer user if one doesn't exist
+      user = await db.createUser(c.env.DB, {
+        email: REVIEWER_EMAIL,
+        authProvider: "reviewer", // Use a special provider name
+      });
+    }
+
+    // Grant permanent premium access
+    await db.updateUserSubscription(c.env.DB, user.id, {
+      tier: "gold", // Your highest tier
+      expiresAt: "2999-12-31T23:59:59Z", // A "never-expires" date
+    });
+
+    // Issue a standard, time-limited JWT
+    const token = await generateToken(c, user.id);
+    return c.json({ _id: user.id, email: user.email, token });
+  } catch (error) {
+    console.error("Reviewer Login Error:", error);
+    return c.json({ message: "Server error during reviewer login." }, 500);
+  }
+};
+
 /**
  * @desc    Get user profile
  */
