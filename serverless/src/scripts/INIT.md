@@ -11,6 +11,7 @@ npx wrangler secret put OPENAI_API_KEY
 
 # --- Telegram Bot ---
 npx wrangler secret put TELEGRAM_BOT_TOKEN
+npx wrangler secret put TELEGRAM_BOT_TOKEN_WEB
 
 # --- Payme Credentials ---
 # Live
