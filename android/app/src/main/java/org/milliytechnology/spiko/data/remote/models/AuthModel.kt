@@ -14,7 +14,7 @@ data class AuthResponse(
 // --- Social Auth Requests ---
 data class GoogleSignInRequest(val idToken: String)
 data class OneTimeTokenRequest(val oneTimeToken: String)
-
+data class ReviewerLoginRequest(val email: String)
 
 // --- User Profile Response ---
 // This model should also reflect that some fields can be null.

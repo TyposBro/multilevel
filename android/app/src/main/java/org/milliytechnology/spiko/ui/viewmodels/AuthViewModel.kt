@@ -13,6 +13,7 @@ import org.milliytechnology.spiko.data.remote.models.AuthResponse
 import org.milliytechnology.spiko.data.remote.models.GoogleSignInRequest
 import org.milliytechnology.spiko.data.remote.models.OneTimeTokenRequest
 import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.remote.models.ReviewerLoginRequest
 import org.milliytechnology.spiko.data.repositories.AuthRepository
 import javax.inject.Inject
 
@@ -32,6 +33,8 @@ class AuthViewModel @Inject constructor(
     private val _deepLinkVerifyState = MutableStateFlow<UiState<AuthResponse>>(UiState.Idle)
     val deepLinkVerifyState = _deepLinkVerifyState.asStateFlow()
 
+    private val _reviewerLoginState = MutableStateFlow<UiState<AuthResponse>>(UiState.Idle)
+    val reviewerLoginState = _reviewerLoginState.asStateFlow()
 
     fun signInWithGoogle(idToken: String) {
         viewModelScope.launch {
@@ -81,6 +84,26 @@ class AuthViewModel @Inject constructor(
      */
     fun setGoogleSignInError(message: String) {
         _googleSignInState.value = UiState.Error(message)
+    }
+
+    /**
+     * Logs in a reviewer using a special, non-public email.
+     */
+    fun loginAsReviewer(email: String) {
+        viewModelScope.launch {
+            _reviewerLoginState.value = UiState.Loading
+            val result = authRepository.reviewerLogin(ReviewerLoginRequest(email))
+            when (result) {
+                is RepositoryResult.Success -> {
+                    sessionManager.updateToken(result.data.token)
+                    _reviewerLoginState.value = UiState.Success(result.data)
+                }
+
+                is RepositoryResult.Error -> {
+                    _reviewerLoginState.value = UiState.Error(result.message)
+                }
+            }
+        }
     }
 
     /**

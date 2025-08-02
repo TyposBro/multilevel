@@ -9,6 +9,7 @@ import org.milliytechnology.spiko.data.remote.models.GenericSuccessResponse
 import org.milliytechnology.spiko.data.remote.models.GoogleSignInRequest
 import org.milliytechnology.spiko.data.remote.models.OneTimeTokenRequest
 import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.remote.models.ReviewerLoginRequest
 import org.milliytechnology.spiko.data.remote.models.UserProfileResponse
 import org.milliytechnology.spiko.data.remote.models.safeApiCall
 import javax.inject.Inject
@@ -28,6 +29,11 @@ class AuthRepository @Inject constructor( // <-- ADD @Inject constructor
     suspend fun verifyTelegramToken(request: OneTimeTokenRequest): RepositoryResult<AuthResponse> =
         withContext(Dispatchers.IO) {
             safeApiCall { apiService.verifyTelegramToken(request) }
+        }
+
+    suspend fun reviewerLogin(request: ReviewerLoginRequest): RepositoryResult<AuthResponse> =
+        withContext(Dispatchers.IO) {
+            safeApiCall { apiService.reviewerLogin(request) }
         }
 
     suspend fun getUserProfile(): RepositoryResult<UserProfileResponse> =

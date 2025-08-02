@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   email TEXT,
-  authProvider TEXT NOT NULL CHECK(authProvider IN ('google', 'telegram', 'apple')),
+  authProvider TEXT NOT NULL CHECK(authProvider IN ('google', 'telegram', 'apple', 'reviewer')),
   googleId TEXT UNIQUE,
   telegramId INTEGER UNIQUE,
   appleId TEXT UNIQUE,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS content_part3 (
   imageUrl TEXT,
   tags TEXT,
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL,
-  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL
+  updatedAt TEXT DEFAULT CURRENT_TIMESTAMP NOT NULL);
 
 -- Payment Transactions Table
 CREATE TABLE IF NOT EXISTS payment_transactions (

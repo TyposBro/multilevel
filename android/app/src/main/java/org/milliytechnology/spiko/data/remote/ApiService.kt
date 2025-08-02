@@ -10,6 +10,7 @@ import org.milliytechnology.spiko.data.remote.models.GenericSuccessResponse
 import org.milliytechnology.spiko.data.remote.models.GoogleSignInRequest
 import org.milliytechnology.spiko.data.remote.models.MultilevelExamResponse
 import org.milliytechnology.spiko.data.remote.models.OneTimeTokenRequest
+import org.milliytechnology.spiko.data.remote.models.ReviewerLoginRequest
 import org.milliytechnology.spiko.data.remote.models.SubscriptionResponse
 import org.milliytechnology.spiko.data.remote.models.UserProfileResponse
 import org.milliytechnology.spiko.data.remote.models.VerifyPurchaseRequest
@@ -31,9 +32,8 @@ interface ApiService {
     @POST("auth/verify-telegram-token")
     suspend fun verifyTelegramToken(@Body request: OneTimeTokenRequest): Response<AuthResponse>
 
-    // You would add one for Apple here too
-    // @POST("auth/apple-signin")
-    // suspend fun appleSignIn(@Body request: AppleSignInRequest): Response<AuthResponse>
+    @POST("auth/reviewer-login")
+    suspend fun reviewerLogin(@Body request: ReviewerLoginRequest): Response<AuthResponse>
 
 
     @GET("auth/profile")
