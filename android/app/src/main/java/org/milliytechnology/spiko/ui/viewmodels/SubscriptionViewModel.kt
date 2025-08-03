@@ -1,5 +1,3 @@
-// android/app/src/main/java/org/milliytechnology/spiko/ui/viewmodels/SubscriptionViewModel.kt
-
 package org.milliytechnology.spiko.ui.viewmodels
 
 import android.app.Activity
@@ -48,12 +46,10 @@ class SubscriptionViewModel @Inject constructor(
     init {
         billingClient.startConnection()
 
-        // --- NEW: A coroutine that waits for the connection to be ready ---
+        // This coroutine waits for the connection to be ready before loading products.
+        // This is the correct, safe way to do it.
         viewModelScope.launch {
-            // This will suspend until isReady becomes true
             billingClient.isReady.filter { it }.first()
-
-            // Once the connection is ready, load the products.
             Log.d("SubscriptionVM", "BillingClient is ready. Loading products.")
             loadProducts()
         }
@@ -63,7 +59,6 @@ class SubscriptionViewModel @Inject constructor(
         }.launchIn(viewModelScope)
 
         billingClient.purchases.onEach { purchases ->
-            // Process each purchase received from the BillingClient
             purchases.forEach { purchase ->
                 if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
                     val planId = purchase.products.firstOrNull()
@@ -84,12 +79,10 @@ class SubscriptionViewModel @Inject constructor(
     }
 
     private fun loadProducts() {
-        if (_uiState.value.productDetails.isNotEmpty()) return // Don't reload if already loaded
+        if (_uiState.value.productDetails.isNotEmpty()) return
         _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
-            // These IDs must match what you created in the Play Console
             val productIds = listOf("silver_monthly", "gold_monthly")
-            // By the time this is called, the connection is guaranteed to be ready.
             billingClient.queryProductDetails(productIds)
         }
     }
@@ -112,7 +105,6 @@ class SubscriptionViewModel @Inject constructor(
                         "SubscriptionVM",
                         "Backend verification successful. Acknowledging purchase."
                     )
-                    // This is crucial. Acknowledge the purchase with Google Play.
                     billingClient.acknowledgePurchase(purchase)
                     _uiState.update {
                         it.copy(isLoading = false, purchaseSuccessMessage = result.data.message)
@@ -166,31 +158,27 @@ class SubscriptionViewModel @Inject constructor(
             .theme(ThemeOptions.LIGHT)
             .build()
 
-        ClickMerchant.init(
-            activity.supportFragmentManager,
-            config,
-            object : ClickMerchantListener {
-                override fun onReceiveRequestId(id: String) {
-                    Log.d("ClickSDK", "Request ID received: $id")
-                }
-
-                override fun onSuccess(paymentId: Long) {
-                    _uiState.update { it.copy(purchaseSuccessMessage = "Payment successful! Your subscription is being activated.") }
-                }
-
-                override fun onFailure() {
-                    _uiState.update { it.copy(error = "Payment failed or was cancelled.") }
-                }
-
-                override fun onInvoiceCancelled() {
-                    _uiState.update { it.copy(error = "Payment invoice was cancelled.") }
-                }
-
-                override fun closeDialog() {
-                    ClickMerchant.dismiss()
-                }
+        ClickMerchant.init(activity.supportFragmentManager, config, object : ClickMerchantListener {
+            override fun onReceiveRequestId(id: String) {
+                Log.d("ClickSDK", "Request ID received: $id")
             }
-        )
+
+            override fun onSuccess(paymentId: Long) {
+                _uiState.update { it.copy(purchaseSuccessMessage = "Payment successful! Your subscription is being activated.") }
+            }
+
+            override fun onFailure() {
+                _uiState.update { it.copy(error = "Payment failed or was cancelled.") }
+            }
+
+            override fun onInvoiceCancelled() {
+                _uiState.update { it.copy(error = "Payment invoice was cancelled.") }
+            }
+
+            override fun closeDialog() {
+                ClickMerchant.dismiss()
+            }
+        })
     }
 
     fun clearMessages() {
