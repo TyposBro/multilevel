@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 import org.milliytechnology.spiko.data.remote.models.RepositoryResult
 import org.milliytechnology.spiko.data.repositories.PaymentRepository
 import org.milliytechnology.spiko.data.repositories.SubscriptionRepository
-import org.milliytechnology.spiko.features.billing.BillingClientWrapper
+import org.milliytechnology.spiko.features.billing.BillingClientWrapperImpl
 import uz.click.mobilesdk.core.ClickMerchant
 import uz.click.mobilesdk.core.ClickMerchantConfig
 import uz.click.mobilesdk.core.callbacks.ClickMerchantListener
@@ -37,7 +37,7 @@ data class SubscriptionUiState(
 class SubscriptionViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
     private val paymentRepository: PaymentRepository,
-    private val billingClient: BillingClientWrapper
+    private val billingClient: BillingClientWrapperImpl
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SubscriptionUiState())

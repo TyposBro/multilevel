@@ -47,6 +47,4 @@ object AppModule {
     fun provideExamResultDao(database: AppDatabase): ExamResultDao {
         return database.multilevelExamResultDao()
     }
-
-
 }
