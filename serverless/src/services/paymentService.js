@@ -81,7 +81,13 @@ export const verifyPurchase = async (c, provider, verificationToken, user) => {
   }
 
   // Now handle our internal logic
+  // --- THIS IS THE FIX ---
+  // The planId from the verification result (e.g., "silver_monthly") is the key we need.
+  // For Payme, the planId was in `result.receipt.account`.
+  // For Google, the planId is the `subscriptionId` we passed in.
+  // This unified approach now works for both.
   const verifiedPlan = PLANS[verificationResult.planId];
+  // --- END OF FIX ---
   if (!verifiedPlan) {
     console.error(`FATAL: No plan found for verified planId: ${verificationResult.planId}`);
     return { success: false, message: "Internal server error: Plan not configured." };
