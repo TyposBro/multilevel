@@ -65,7 +65,7 @@ export const verifyGooglePurchase = async (c, purchaseToken, subscriptionId) => 
       throw new Error("Google Service Account JSON is not configured.");
     }
     const serviceAccount = JSON.parse(serviceAccountJson);
-    const packageName = "com.typosbro.multilevel"; // Your app's package name
+    const packageName = "org.milliytechnology.spiko"; // Your app's package name
 
     // 1. Create JWT and get Access Token
     const signedJwt = await createGoogleAuthJwt(c, serviceAccount);

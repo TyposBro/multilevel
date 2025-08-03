@@ -35,6 +35,10 @@ class BillingClientWrapper @Inject constructor(
     private val _purchases = MutableSharedFlow<List<Purchase>>()
     val purchases = _purchases.asSharedFlow()
 
+    // --- NEW: A StateFlow to track the connection status ---
+    private val _isReady = MutableStateFlow(false)
+    val isReady = _isReady.asStateFlow()
+
     // The listener for purchase updates
     private val purchasesUpdatedListener = PurchasesUpdatedListener { billingResult, purchases ->
         if (billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
@@ -60,6 +64,8 @@ class BillingClientWrapper @Inject constructor(
             override fun onBillingSetupFinished(billingResult: BillingResult) {
                 if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                     Log.d("BillingClient", "Billing Client connected")
+                    // --- NEW: Update the connection status ---
+                    _isReady.value = true
                     // After setup, query for any existing unconsumed purchases.
                     queryPurchases()
                 } else {
@@ -72,6 +78,8 @@ class BillingClientWrapper @Inject constructor(
 
             override fun onBillingServiceDisconnected() {
                 Log.w("BillingClient", "Billing Client disconnected. Trying to reconnect...")
+                // --- NEW: Update the connection status ---
+                _isReady.value = false
                 // You might want to implement a retry policy here.
                 startConnection()
             }

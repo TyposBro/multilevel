@@ -1,6 +1,6 @@
 <lint-module
     format="1"
-    dir="/home/ched54/Documents/android/multilevel/android/models"
+    dir="/home/ched54/Documents/milliy/spiko/android/models"
     name=":models"
     type="LIBRARY"
     maven="multilevel:models:unspecified"

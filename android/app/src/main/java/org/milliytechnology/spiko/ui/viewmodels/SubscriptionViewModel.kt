@@ -4,9 +4,7 @@ package org.milliytechnology.spiko.ui.viewmodels
 
 import android.app.Activity
 import android.util.Log
-// REMOVE this import as we need the more specific one
-// import androidx.activity.ComponentActivity
-import androidx.fragment.app.FragmentActivity // IMPORT THIS
+import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.billingclient.api.ProductDetails
@@ -14,6 +12,8 @@ import com.android.billingclient.api.Purchase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
@@ -22,7 +22,6 @@ import org.milliytechnology.spiko.data.remote.models.RepositoryResult
 import org.milliytechnology.spiko.data.repositories.PaymentRepository
 import org.milliytechnology.spiko.data.repositories.SubscriptionRepository
 import org.milliytechnology.spiko.features.billing.BillingClientWrapper
-import org.milliytechnology.spiko.utils.openUrlInCustomTab
 import uz.click.mobilesdk.core.ClickMerchant
 import uz.click.mobilesdk.core.ClickMerchantConfig
 import uz.click.mobilesdk.core.callbacks.ClickMerchantListener
@@ -49,11 +48,22 @@ class SubscriptionViewModel @Inject constructor(
     init {
         billingClient.startConnection()
 
+        // --- NEW: A coroutine that waits for the connection to be ready ---
+        viewModelScope.launch {
+            // This will suspend until isReady becomes true
+            billingClient.isReady.filter { it }.first()
+
+            // Once the connection is ready, load the products.
+            Log.d("SubscriptionVM", "BillingClient is ready. Loading products.")
+            loadProducts()
+        }
+
         billingClient.productDetails.onEach { products ->
-            _uiState.update { it.copy(productDetails = products) }
+            _uiState.update { it.copy(isLoading = false, productDetails = products) }
         }.launchIn(viewModelScope)
 
         billingClient.purchases.onEach { purchases ->
+            // Process each purchase received from the BillingClient
             purchases.forEach { purchase ->
                 if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
                     val planId = purchase.products.firstOrNull()
@@ -66,40 +76,26 @@ class SubscriptionViewModel @Inject constructor(
                         )
                     } else {
                         Log.e("SubscriptionVM", "Purchase is missing product ID. Cannot verify.")
+                        _uiState.update { it.copy(error = "Purchase verification failed: Missing Product ID.") }
                     }
                 }
             }
         }.launchIn(viewModelScope)
     }
 
-    fun loadProducts() {
+    private fun loadProducts() {
+        if (_uiState.value.productDetails.isNotEmpty()) return // Don't reload if already loaded
+        _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
+            // These IDs must match what you created in the Play Console
             val productIds = listOf("silver_monthly", "gold_monthly")
+            // By the time this is called, the connection is guaranteed to be ready.
             billingClient.queryProductDetails(productIds)
         }
     }
 
     fun launchGooglePlayPurchase(activity: Activity, productDetails: ProductDetails) {
         billingClient.launchPurchaseFlow(activity, productDetails)
-    }
-
-    fun createWebPayment(activity: Activity, provider: String, planId: String) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            when (val result = paymentRepository.createPayment(provider, planId)) {
-                is RepositoryResult.Success -> {
-                    val paymentUrl = result.data.paymentUrl
-                    if (paymentUrl != null) {
-                        openUrlInCustomTab(activity, paymentUrl)
-                    }
-                    _uiState.update { it.copy(isLoading = false) }
-                }
-
-                is RepositoryResult.Error -> {
-                    _uiState.update { it.copy(isLoading = false, error = result.message) }
-                }
-            }
-        }
     }
 
     private fun verifyAndAcknowledgePurchase(
@@ -116,6 +112,7 @@ class SubscriptionViewModel @Inject constructor(
                         "SubscriptionVM",
                         "Backend verification successful. Acknowledging purchase."
                     )
+                    // This is crucial. Acknowledge the purchase with Google Play.
                     billingClient.acknowledgePurchase(purchase)
                     _uiState.update {
                         it.copy(isLoading = false, purchaseSuccessMessage = result.data.message)
@@ -129,7 +126,6 @@ class SubscriptionViewModel @Inject constructor(
         }
     }
 
-    // CHANGE THE PARAMETER TYPE HERE
     fun createClickPayment(activity: FragmentActivity, planId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -156,7 +152,6 @@ class SubscriptionViewModel @Inject constructor(
         }
     }
 
-    // AND CHANGE THE PARAMETER TYPE HERE
     private fun launchClickSdk(
         activity: FragmentActivity,
         params: org.milliytechnology.spiko.data.remote.models.CreatePaymentResponse
