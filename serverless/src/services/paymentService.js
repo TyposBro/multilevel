@@ -17,7 +17,8 @@ export const initiatePayment = async (c, provider, planId, userId) => {
       return paymeService.createTransaction(c, plan, userId);
     case "click":
       // This returns parameters for the Android SDK, not a URL
-      return clickService.prepareTransactionForMobile(c, plan, userId);
+      // Pass the plan key as well for better error messages
+      return clickService.prepareTransactionForMobile(c, plan, planId, userId);
     default:
       throw new Error(`Unsupported payment provider for creation: ${provider}`);
   }

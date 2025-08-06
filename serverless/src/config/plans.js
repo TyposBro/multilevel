@@ -12,7 +12,7 @@ const PLANS = {
     // providerIds are now only for providers who use different IDs than the main key
     providerIds: {
       payme: "product_id_for_silver_monthly", // Your Payme product/receipt identifier
-      click: "service_id_for_silver_monthly", // Your Click service ID
+      click: "80012", // Your Click service ID
     },
   },
   // The key "gold_monthly" should exactly match your Product ID in the Google Play Console.
@@ -25,7 +25,7 @@ const PLANS = {
     },
     providerIds: {
       payme: "product_id_for_gold_monthly",
-      click: "service_id_for_gold_monthly",
+      click: "80012",
     },
   },
 
@@ -40,7 +40,7 @@ const PLANS = {
     },
     providerIds: {
       payme: "product_id_for_gold_one_time",
-      click: "service_id_for_gold_one_time",
+      click: "80012",
     },
   },
 };

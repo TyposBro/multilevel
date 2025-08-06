@@ -9,30 +9,36 @@ import { createHmac } from "node:crypto";
  * This does NOT create a transaction with Click directly.
  *
  * @param {object} c - The Hono context.
- * @param {object} plan - The plan object from config.
+ * @param {object} plan - The plan object from config. * @param {string} planIdKey - The key for the plan in the PLANS object, for error logging.
  * @param {string} userId - The ID of the user.
  * @returns {Promise<object>} The parameters needed for the Click Android SDK.
  */
-export const prepareTransactionForMobile = async (c, plan, userId) => {
+export const prepareTransactionForMobile = async (c, plan, planIdKey, userId) => {
   const isProduction = c.env.ENVIRONMENT === "production";
   const merchantId = isProduction ? c.env.CLICK_MERCHANT_ID_LIVE : c.env.CLICK_MERCHANT_ID_TEST;
-  const serviceId = isProduction ? c.env.CLICK_SERVICE_ID_LIVE : c.env.CLICK_SERVICE_ID_TEST;
   const merchantUserId = isProduction
     ? c.env.CLICK_MERCHANT_USER_ID_LIVE
     : c.env.CLICK_MERCHANT_USER_ID_TEST;
+
+  // FIX: Get the service ID from the specific plan, not a global environment variable.
+  // This makes the system more flexible and less prone to configuration errors.
+  const serviceIdForPlan = plan.providerIds.click;
+  if (!serviceIdForPlan) {
+    throw new Error(`Click service ID is not configured for plan '${planIdKey}' in plans.js`);
+  }
 
   // Create a record in our database to track this payment attempt.
   // The `transactionParam` is our internal ID for this transaction.
   const transaction = await db.createPaymentTransaction(c.env.DB, {
     userId,
-    planId: plan.providerIds.click, // Using the specific planId for Click
+    planId: serviceIdForPlan, // Store the service ID for webhook lookup
     provider: "click",
     amount: plan.prices.uzs, // Click works with Tiyin
   });
 
   return {
     merchantId: parseInt(merchantId, 10),
-    serviceId: parseInt(serviceId, 10),
+    serviceId: parseInt(serviceIdForPlan, 10), // Return the correct service ID
     merchantUserId: parseInt(merchantUserId, 10),
     amount: plan.prices.uzs / 100, // The SDK expects the amount in UZS, not tiyin
     transactionParam: transaction.id, // This is our internal order ID

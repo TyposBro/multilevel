@@ -127,7 +127,11 @@ class SubscriptionViewModel @Inject constructor(
                     if (params.serviceId != null && params.merchantId != null && params.amount != null && params.transactionParam != null && params.merchantUserId != null) {
                         _uiState.update { it.copy(isLoading = false) }
                         launchClickSdk(activity, params)
-                    } else {
+                    }
+                    // --- THIS IS THE FIX ---
+                    // The `else` block was inside the `when` but should be outside
+                    // to handle the case where the required params are null.
+                    else {
                         _uiState.update {
                             it.copy(
                                 isLoading = false,

@@ -22,29 +22,23 @@ npx wrangler secret put PAYME_SECRET_KEY_TEST
 
 # --- Click Credentials ---
 # Test
-npx wrangler secret put CLICK_MERCHANT_ID_TEST
-npx wrangler secret put CLICK_MERCHANT_USER_ID_TEST
-npx wrangler secret put CLICK_SERVICE_ID_TEST
-npx wrangler secret put CLICK_SECRET_KEY_TEST
+npx wrangler secret put CLICK_MERCHANT_ID_TEST 
+
+npx wrangler secret put CLICK_MERCHANT_USER_ID_TEST 
+(This is often the same as the merchant ID, but confirm with Click)
+
+
+npx wrangler secret put CLICK_SECRET_KEY_TEST 
+# Paste your redacted secret key here
+
 # Live
 npx wrangler secret put CLICK_MERCHANT_ID_LIVE
 npx wrangler secret put CLICK_MERCHANT_USER_ID_LIVE
 npx wrangler secret put CLICK_SERVICE_ID_LIVE
 npx wrangler secret put CLICK_SECRET_KEY_LIVE
 
+
 # --- Google Play Billing ---
 npx wrangler secret put GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
 # (Go to Google Cloud Console -> IAM & Admin -> Service Accounts -> Create Key -> JSON)
 # (Paste the entire single-line JSON blob)
-
-
-# --- DEPRECATED/REPLACED Secrets ---
-# The following credentials are for Node.js SDKs that don't work in Workers.
-# The functionality has been replaced by Cloudflare R2 and D1.
-
-# If you were to use Supabase, the KEY would be a secret:
-# npx wrangler secret put SUPABASE_KEY
-
-# For Firebase, you would store the entire JSON content as a secret:
-# npx wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON
-# (Then paste the entire single-line JSON blob)
