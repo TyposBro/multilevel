@@ -65,14 +65,16 @@ android {
     }
 }
 
-// THIS IS THE NEW AND CRITICAL BLOCK
+// --- THIS IS THE FIX ---
+// The old `com.wang.avi:library` is a transitive dependency brought in by another
+// library. It was hosted on the now-defunct JCenter and is known to cause
+// reflective serialization crashes with modern tools. We are forcing Gradle
+// to replace it with a modern, well-maintained alternative (`Android-SpinKit`).
 configurations.all {
     resolutionStrategy.dependencySubstitution {
-        // Find the problematic dependency
         substitute(module("com.wang.avi:library:2.1.3"))
-            // And replace it with a modern, available alternative
             .using(module("com.github.ybq:Android-SpinKit:1.4.0"))
-            .because("com.wang.avi:library is on the deprecated JCenter and is causing network resolution issues.")
+            .because("The com.wang.avi:library is obsolete and causes reflective serialization crashes with the Click SDK's internal Moshi dependency.")
     }
 }
 

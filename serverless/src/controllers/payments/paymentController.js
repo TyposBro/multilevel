@@ -61,7 +61,7 @@ export const verifyPayment = async (c) => {
  */
 export const handleСlickWebhook = async (c) => {
   const data = await c.req.json();
-  const { action, error, merchant_trans_id, amount, merchant_prepare_id } = data;
+  const { action, error, merchant_trans_id, amount, merchant_prepare_id, service_id } = data;
 
   // 1. Verify the signature
   if (!verifyWebhookSignature(c, data)) {
@@ -112,11 +112,14 @@ export const handleСlickWebhook = async (c) => {
       return c.json({ error: -4, error_note: "Already paid" });
     }
 
-    // Grant subscription
-    const plan = Object.values(PLANS).find((p) => p.providerIds.click === transaction.planId);
+    // --- THIS IS THE FIX ---
+    // Look up the plan using the service_id from the webhook, not the planId from our DB.
+    const plan = Object.values(PLANS).find((p) => p.providerIds.click === service_id.toString());
+    // --- END OF FIX ---
+
     if (!plan) {
       // Critical internal error, but we must respond to Click successfully
-      console.error(`Webhook success, but plan not found for ID: ${transaction.planId}`);
+      console.error(`Webhook success, but plan not found for service_id: ${service_id}`);
       responsePayload.merchant_confirm_id = transaction.id;
       return c.json(responsePayload);
     }

@@ -1,5 +1,3 @@
-// serverless/src/services/providers/clickService.js
-
 import { db } from "../../db/d1-client";
 import PLANS from "../../config/plans";
 import { createHmac } from "node:crypto";
@@ -31,7 +29,10 @@ export const prepareTransactionForMobile = async (c, plan, planIdKey, userId) =>
   // The `transactionParam` is our internal ID for this transaction.
   const transaction = await db.createPaymentTransaction(c.env.DB, {
     userId,
-    planId: serviceIdForPlan, // Store the service ID for webhook lookup
+    // --- THIS IS THE FIX ---
+    // We were incorrectly storing the service_id here. We must store our internal planIdKey.
+    planId: planIdKey,
+    // --- END OF FIX ---
     provider: "click",
     amount: plan.prices.uzs, // Click works with Tiyin
   });
