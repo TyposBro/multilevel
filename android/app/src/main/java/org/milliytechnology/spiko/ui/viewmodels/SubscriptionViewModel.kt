@@ -152,6 +152,7 @@ class SubscriptionViewModel @Inject constructor(
         activity: FragmentActivity,
         params: org.milliytechnology.spiko.data.remote.models.CreatePaymentResponse
     ) {
+        Log.d("ClickSDK", "Launching Click SDK with params: $params")
         val config = ClickMerchantConfig.Builder()
             .serviceId(params.serviceId!!)
             .merchantId(params.merchantId!!)

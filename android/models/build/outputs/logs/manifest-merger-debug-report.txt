@@ -1,16 +1,16 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml:2:13-83
-INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml:2:13-83
+ADDED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml:2:13-83
+INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml:2:13-83
 	package
-		INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml
+		INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml
 	xmlns:android
-		ADDED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml:2:23-81
+		ADDED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml:2:23-81
 uses-sdk
-INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml reason: use-sdk injection requested
-INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml
-INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml
+INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml reason: use-sdk injection requested
+INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml
+INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml
 	android:targetSdkVersion
-		INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml
+		INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml
 	android:minSdkVersion
-		INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest1114940270206734493.xml
+		INJECTED from /home/ched54/Documents/milliy/spiko/android/models/build/intermediates/tmp/ProcessLibraryManifest/debug/tempAndroidManifest18391227369290580184.xml
