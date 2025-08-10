@@ -1,3 +1,4 @@
+// serverless/src/routes/authRoutes.test.js
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import app from "../index";
 import { db } from "../db/d1-client";
@@ -11,6 +12,7 @@ describe("Auth Routes", () => {
     JWT_SECRET: "a-secure-test-secret-for-users",
     TELEGRAM_BOT_TOKEN: "fake-token",
     SERVER_URL: "https://test.com",
+    FRONTEND_ACCOUNT_URL: "https://example.com/account.html",
     DB: db,
   };
   const mockUser = { id: "user-123", email: "test@example.com", firstName: "Test" };
@@ -143,7 +145,8 @@ describe("Auth Routes", () => {
       const res = await app.request("/api/auth/telegram/redirect?token=test-token", {}, MOCK_ENV);
       expect(res.status).toBe(200);
       const text = await res.text();
-      expect(text).toContain('window.location.replace("multilevelapp://login?token=test-token")');
+      // FIX: The redirect is now performed with `window.location.href`.
+      expect(text).toContain('window.location.href = "multilevelapp://login?token=test-token"');
     });
 
     it("GET /telegram/redirect should return error HTML without a token", async () => {

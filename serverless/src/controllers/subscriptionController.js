@@ -10,7 +10,6 @@ import { verifyPurchase } from "../services/paymentService";
  */
 export const verifyAndGrantAccess = async (c) => {
   try {
-    // The user object is attached by our `protect` middleware.
     const user = c.get("user");
     const { provider, token, planId } = await c.req.json();
 
@@ -18,9 +17,8 @@ export const verifyAndGrantAccess = async (c) => {
       return c.json({ message: "Provider, token, and planId are required." }, 400);
     }
 
-    // Pass the context 'c' to the service so it can access env vars.
-    // The user object is also passed directly.
-    const result = await verifyPurchase(c, provider, token, user);
+    // Pass planId as a direct argument to the service function.
+    const result = await verifyPurchase(c, provider, token, user, planId);
 
     if (result.success) {
       return c.json({ message: result.message, subscription: result.subscription });
@@ -46,7 +44,6 @@ export const startGoldTrial = async (c) => {
       return c.json({ message: "Trials are only for free users." }, 400);
     }
 
-    // Note the change from `hasUsedGoldTrial` (boolean) to `subscription_hasUsedGoldTrial` (integer 0 or 1)
     if (user.subscription_hasUsedGoldTrial === 1) {
       return c.json({ message: "Free trial has already been used." }, 400);
     }

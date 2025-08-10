@@ -30,12 +30,11 @@ export const initiatePayment = async (c, provider, planId, userId) => {
  * @param {string} provider - The provider name ('google', 'payme', etc.).
  * @param {string} verificationToken - The purchase token (from Google) or receipt ID (from Payme).
  * @param {object} user - The user object from the database.
+ * @param {string} planId - The plan ID from the client, required for some providers.
  * @returns {Promise<{success: boolean, message: string, subscription?: object}>}
  */
-export const verifyPurchase = async (c, provider, verificationToken, user) => {
+export const verifyPurchase = async (c, provider, verificationToken, user, planId) => {
   let verificationResult;
-  // The planId is required for Google Play verification and is sent from the client.
-  const { planId } = await c.req.json();
 
   switch (provider.toLowerCase()) {
     case "google":
@@ -80,14 +79,7 @@ export const verifyPurchase = async (c, provider, verificationToken, user) => {
     return { success: false, message: verificationResult.error || "Purchase verification failed." };
   }
 
-  // Now handle our internal logic
-  // --- THIS IS THE FIX ---
-  // The planId from the verification result (e.g., "silver_monthly") is the key we need.
-  // For Payme, the planId was in `result.receipt.account`.
-  // For Google, the planId is the `subscriptionId` we passed in.
-  // This unified approach now works for both.
   const verifiedPlan = PLANS[verificationResult.planId];
-  // --- END OF FIX ---
   if (!verifiedPlan) {
     console.error(`FATAL: No plan found for verified planId: ${verificationResult.planId}`);
     return { success: false, message: "Internal server error: Plan not configured." };
@@ -95,7 +87,6 @@ export const verifyPurchase = async (c, provider, verificationToken, user) => {
 
   // --- Success Path: Grant subscription ---
   const now = new Date();
-  // If the user has an active subscription, extend it. Otherwise, start from now.
   const startDate =
     user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
       ? new Date(user.subscription_expiresAt)
@@ -107,7 +98,6 @@ export const verifyPurchase = async (c, provider, verificationToken, user) => {
   const updatedUser = await db.updateUserSubscription(c.env.DB, user.id, {
     tier: verifiedPlan.tier,
     expiresAt: newExpiresAt.toISOString(),
-    // providerSubscriptionId can be stored here if needed for provider-specific logic later
   });
 
   console.log(

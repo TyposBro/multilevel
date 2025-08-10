@@ -2,7 +2,8 @@
 
 import { db } from "../../db/d1-client";
 import PLANS from "../../config/plans";
-import { createHmac } from "node:crypto";
+// FIX: Import createHash, as Click uses a simple MD5 hash of a string containing the secret.
+import { createHash } from "node:crypto";
 
 /**
  * Creates a Click payment URL for a web-based checkout flow.
@@ -20,7 +21,6 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
     ? c.env.CLICK_MERCHANT_USER_ID_LIVE
     : c.env.CLICK_MERCHANT_USER_ID_TEST;
 
-  // Use the correct base URL for Click's web payments
   const baseUrl = "https://my.click.uz/services/pay";
 
   if (!merchantId || !merchantUserId) {
@@ -34,21 +34,19 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
     throw new Error(`Click service ID is not configured for plan '${planIdKey}' in plans.js`);
   }
 
-  // 1. Create a transaction record in our database to track this payment attempt.
   const transaction = await db.createPaymentTransaction(c.env.DB, {
     userId,
     planId: planIdKey,
     provider: "click",
-    amount: plan.prices.uzs, // Click uses Tiyin on the backend, but amount in URL is in UZS
+    amount: plan.prices.uzs,
   });
 
-  // 2. Construct the URL with query parameters.
   const paymentUrl = new URL(baseUrl);
   paymentUrl.searchParams.append("service_id", serviceIdForPlan);
   paymentUrl.searchParams.append("merchant_id", merchantId);
   paymentUrl.searchParams.append("merchant_user_id", merchantUserId);
-  paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString()); // Amount in UZS for URL
-  paymentUrl.searchParams.append("transaction_param", transaction.id); // Our internal ID
+  paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString());
+  paymentUrl.searchParams.append("transaction_param", transaction.id);
 
   return {
     paymentUrl: paymentUrl.toString(),
@@ -58,7 +56,6 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
 
 /**
  * Verifies the signature from a Click webhook request.
- * Logic adapted from the click-llc-click-integration-django/click/utils.py example.
  *
  * @param {object} c - The Hono context.
  * @param {object} data - The POST data from the Click webhook.
@@ -79,12 +76,13 @@ export const verifyWebhookSignature = (c, data) => {
     sign_string,
   } = data;
 
-  // Note: merchant_prepare_id is only present for the 'complete' action (action=1)
+  // FIX: The source string must include the secret key, as per Click's non-standard method.
   const signStringSource = `${click_trans_id}${service_id}${secretKey}${merchant_trans_id}${
     action === "1" ? merchant_prepare_id : ""
   }${amount}${action}${sign_time}`;
 
-  const generatedSignature = createHmac("md5", secretKey).update(signStringSource).digest("hex");
+  // FIX: Use createHash('md5') which correctly calculates the signature for this format.
+  const generatedSignature = createHash("md5").update(signStringSource).digest("hex");
 
   return generatedSignature === sign_string;
 };

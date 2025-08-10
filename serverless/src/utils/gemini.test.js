@@ -28,15 +28,14 @@ describe("Gemini Utility", () => {
   });
 
   describe("generateText", () => {
-    it("should call fetch and return text", async () => {
+    it("should call fetch and return text from OpenRouter format", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
-        json: () =>
-          Promise.resolve({ candidates: [{ content: { parts: [{ text: "response text" }] } }] }),
+        json: () => Promise.resolve({ choices: [{ message: { content: "response text" } }] }),
       });
       global.fetch = mockFetch;
 
-      const mockContext = { env: { GEMINI_API_KEY: "fake-key" } };
+      const mockContext = { env: { OPEN_ROUTER_API: "fake-key" } };
       const response = await generateText(mockContext, "prompt");
 
       expect(response).toBe("response text");
@@ -46,15 +45,15 @@ describe("Gemini Utility", () => {
     it("should throw error if API key is missing", async () => {
       const mockContext = { env: {} }; // No API key
       await expect(generateText(mockContext, "prompt")).rejects.toThrow(
-        "FATAL ERROR: GEMINI_API_KEY is not set"
+        "FATAL ERROR: OPEN_ROUTER_API is not set in wrangler.toml secrets."
       );
     });
 
     it("should throw error on fetch failure", async () => {
       global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, text: () => "error" });
-      const mockContext = { env: { GEMINI_API_KEY: "fake-key" } };
+      const mockContext = { env: { OPEN_ROUTER_API: "fake-key" } };
       await expect(generateText(mockContext, "prompt")).rejects.toThrow(
-        "Gemini API request failed with status 500"
+        "OpenRouter API request failed with status 500"
       );
     });
   });
