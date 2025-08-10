@@ -159,6 +159,11 @@ class SubscriptionViewModel @Inject constructor(
             .merchantUserId(params.merchantUserId!!)
             .amount(params.amount!!)
             .transactionParam(params.transactionParam!!)
+            // --- THIS IS THE FIX ---
+            // Pass the server-generated transaction ID as the request ID.
+            // This prevents the SDK from making a redundant initialization call.
+            .requestId(params.transactionParam!!)
+            // --- END OF FIX ---
             .locale("EN")
             .theme(ThemeOptions.LIGHT)
             .build()

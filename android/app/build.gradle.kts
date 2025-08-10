@@ -124,9 +124,7 @@ dependencies {
     implementation(libs.logging.interceptor)
     implementation(libs.okhttp.sse)
 
-    // MOSHI KOTLIN SUPPORT - ADD THESE FOR CLICK SDK COMPATIBILITY
-    implementation("io.reactivex.rxjava2:rxjava:2.2.19")
-    implementation("com.squareup.moshi:moshi-kotlin:1.15.0")
+
     // Secure Storage
     implementation(libs.androidx.security.crypto)
 
@@ -169,7 +167,8 @@ dependencies {
 
     // Swipe
     implementation(libs.swipeablecard)
-
+    implementation(libs.rxjava)
+    implementation(libs.moshi.kotlin)
     implementation(libs.vosk.android)
     implementation(libs.androidx.play.billing)
 
