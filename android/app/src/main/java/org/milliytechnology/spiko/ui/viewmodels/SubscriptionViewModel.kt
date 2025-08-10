@@ -1,8 +1,9 @@
+// android/app/src/main/java/org/milliytechnology/spiko/ui/viewmodels/SubscriptionViewModel.kt
+
 package org.milliytechnology.spiko.ui.viewmodels
 
 import android.app.Activity
 import android.util.Log
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.android.billingclient.api.ProductDetails
@@ -20,17 +21,14 @@ import org.milliytechnology.spiko.data.remote.models.RepositoryResult
 import org.milliytechnology.spiko.data.repositories.PaymentRepository
 import org.milliytechnology.spiko.data.repositories.SubscriptionRepository
 import org.milliytechnology.spiko.features.billing.BillingClientWrapperImpl
-import uz.click.mobilesdk.core.ClickMerchant
-import uz.click.mobilesdk.core.ClickMerchantConfig
-import uz.click.mobilesdk.core.callbacks.ClickMerchantListener
-import uz.click.mobilesdk.impl.paymentoptions.ThemeOptions
 import javax.inject.Inject
 
 data class SubscriptionUiState(
     val isLoading: Boolean = false,
     val productDetails: List<ProductDetails> = emptyList(),
     val purchaseSuccessMessage: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val paymentUrlToLaunch: String? = null // New state to hold the URL for the UI
 )
 
 @HiltViewModel
@@ -47,7 +45,6 @@ class SubscriptionViewModel @Inject constructor(
         billingClient.startConnection()
 
         // This coroutine waits for the connection to be ready before loading products.
-        // This is the correct, safe way to do it.
         viewModelScope.launch {
             billingClient.isReady.filter { it }.first()
             Log.d("SubscriptionVM", "BillingClient is ready. Loading products.")
@@ -118,24 +115,29 @@ class SubscriptionViewModel @Inject constructor(
         }
     }
 
-    fun createClickPayment(activity: FragmentActivity, planId: String) {
+    /**
+     * Creates a payment request to the backend and updates the UI state with the
+     * payment URL received, which will be launched in a custom tab.
+     */
+    fun createClickPayment(planId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = paymentRepository.createPayment("click", planId)) {
                 is RepositoryResult.Success -> {
-                    val params = result.data
-                    if (params.serviceId != null && params.merchantId != null && params.amount != null && params.transactionParam != null && params.merchantUserId != null) {
-                        _uiState.update { it.copy(isLoading = false) }
-                        launchClickSdk(activity, params)
-                    }
-                    // --- THIS IS THE FIX ---
-                    // The `else` block was inside the `when` but should be outside
-                    // to handle the case where the required params are null.
-                    else {
+                    val paymentUrl = result.data.paymentUrl
+                    if (!paymentUrl.isNullOrBlank()) {
+                        // Put the URL in the state for the UI to observe and launch.
                         _uiState.update {
                             it.copy(
                                 isLoading = false,
-                                error = "Failed to get payment details from server."
+                                paymentUrlToLaunch = paymentUrl
+                            )
+                        }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                error = "Failed to get payment URL from server."
                             )
                         }
                     }
@@ -148,47 +150,12 @@ class SubscriptionViewModel @Inject constructor(
         }
     }
 
-    private fun launchClickSdk(
-        activity: FragmentActivity,
-        params: org.milliytechnology.spiko.data.remote.models.CreatePaymentResponse
-    ) {
-        Log.d("ClickSDK", "Launching Click SDK with params: $params")
-        val config = ClickMerchantConfig.Builder()
-            .serviceId(params.serviceId!!)
-            .merchantId(params.merchantId!!)
-            .merchantUserId(params.merchantUserId!!)
-            .amount(params.amount!!)
-            .transactionParam(params.transactionParam!!)
-            // --- THIS IS THE FIX ---
-            // Pass the server-generated transaction ID as the request ID.
-            // This prevents the SDK from making a redundant initialization call.
-            .requestId(params.transactionParam!!)
-            // --- END OF FIX ---
-            .locale("EN")
-            .theme(ThemeOptions.LIGHT)
-            .build()
-
-        ClickMerchant.init(activity.supportFragmentManager, config, object : ClickMerchantListener {
-            override fun onReceiveRequestId(id: String) {
-                Log.d("ClickSDK", "Request ID received: $id")
-            }
-
-            override fun onSuccess(paymentId: Long) {
-                _uiState.update { it.copy(purchaseSuccessMessage = "Payment successful! Your subscription is being activated.") }
-            }
-
-            override fun onFailure() {
-                _uiState.update { it.copy(error = "Payment failed or was cancelled.") }
-            }
-
-            override fun onInvoiceCancelled() {
-                _uiState.update { it.copy(error = "Payment invoice was cancelled.") }
-            }
-
-            override fun closeDialog() {
-                ClickMerchant.dismiss()
-            }
-        })
+    /**
+     * Resets the paymentUrlToLaunch state to null after it has been used by the UI.
+     * This prevents the browser from being launched again on configuration changes.
+     */
+    fun clearPaymentUrl() {
+        _uiState.update { it.copy(paymentUrlToLaunch = null) }
     }
 
     fun clearMessages() {

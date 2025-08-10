@@ -2,6 +2,7 @@
 
 package org.milliytechnology.spiko.ui.screens.subscription
 
+import android.app.Activity
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -44,7 +45,6 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -53,8 +53,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.billingclient.api.ProductDetails
 import org.milliytechnology.spiko.R
 import org.milliytechnology.spiko.ui.viewmodels.SubscriptionViewModel
+import org.milliytechnology.spiko.utils.openUrlInCustomTab
 
-// This data class definition stores resource IDs (not @Composable calls)
 private data class SubscriptionPlan(
     val tierNameResId: Int,
     val productId: String,
@@ -69,12 +69,8 @@ fun SubscriptionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    // FIX: Cast to FragmentActivity, which is required by the Click SDK for its FragmentManager.
-    // Since MainActivity inherits from AppCompatActivity, this cast is safe.
-    val activity = LocalContext.current as FragmentActivity
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // Define subscription plans using resource IDs only (no @Composable calls here)
     val subscriptionPlans = remember {
         listOf(
             SubscriptionPlan(
@@ -98,16 +94,26 @@ fun SubscriptionScreen(
         )
     }
 
+    // This effect listens for when the app comes back to the foreground.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 Log.d("SubscriptionScreen", "App Resumed. Checking for pending web payments.")
-                // TODO: Logic to check for and verify pending web-based purchases
+                // TODO: Here you would add logic to check the status of a pending
+                // web payment with your backend if needed.
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // This effect will launch the browser when a payment URL is available.
+    LaunchedEffect(uiState.paymentUrlToLaunch) {
+        uiState.paymentUrlToLaunch?.let { url ->
+            openUrlInCustomTab(context, url)
+            viewModel.clearPaymentUrl() // Reset the state to prevent re-launching on config change
         }
     }
 
@@ -162,7 +168,11 @@ fun SubscriptionScreen(
                         productDetails = productDetails,
                         onPayWithGoogle = {
                             if (productDetails != null) {
-                                viewModel.launchGooglePlayPurchase(activity, productDetails)
+                                // The Activity is now correctly cast only where it's used
+                                viewModel.launchGooglePlayPurchase(
+                                    context as Activity,
+                                    productDetails
+                                )
                             } else {
                                 Toast.makeText(
                                     context,
@@ -172,8 +182,7 @@ fun SubscriptionScreen(
                             }
                         },
                         onPayWithClick = {
-                            // FIX: Call the correct ViewModel function for Click payments
-                            viewModel.createClickPayment(activity, plan.productId)
+                            viewModel.createClickPayment(plan.productId)
                         }
                     )
                 }
@@ -197,7 +206,6 @@ private fun SubscriptionTierCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(24.dp)) {
-            // Get tier name from string resource - this is fine because we're in @Composable context
             Text(
                 stringResource(plan.tierNameResId),
                 style = MaterialTheme.typography.headlineMedium
@@ -210,7 +218,7 @@ private fun SubscriptionTierCard(
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(16.dp))
-            // Render features using string resource IDs - this is fine because we're in @Composable context
+
             plan.featureResIds.forEach { featureResId ->
                 FeatureRow(text = stringResource(featureResId))
             }

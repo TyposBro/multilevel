@@ -27,8 +27,6 @@ app.use(
       "https://typosbro.github.io", // The live URL for your admin panel
       "https://milliytechnology.github.io", // The live URL for your main site
       "https://milliytechnology.org", // The live URL for your main site
-      // Keep this for your mobile app if it uses a custom domain
-      "https://your-production-frontend-app.com",
     ],
     allowHeaders: ["Authorization", "Content-Type"],
     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS"],

@@ -1,48 +1,58 @@
+// serverless/src/services/providers/clickService.js
+
 import { db } from "../../db/d1-client";
 import PLANS from "../../config/plans";
 import { createHmac } from "node:crypto";
 
 /**
- * Prepares the initial data needed by the Android SDK to start a Click payment.
- * This does NOT create a transaction with Click directly.
+ * Creates a Click payment URL for a web-based checkout flow.
  *
  * @param {object} c - The Hono context.
- * @param {object} plan - The plan object from config. * @param {string} planIdKey - The key for the plan in the PLANS object, for error logging.
+ * @param {object} plan - The plan object from config.
+ * @param {string} planIdKey - The key for the plan in the PLANS object.
  * @param {string} userId - The ID of the user.
- * @returns {Promise<object>} The parameters needed for the Click Android SDK.
+ * @returns {Promise<{paymentUrl: string, receiptId: string}>} The URL for redirection and our internal transaction ID.
  */
-export const prepareTransactionForMobile = async (c, plan, planIdKey, userId) => {
+export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
   const isProduction = c.env.ENVIRONMENT === "production";
   const merchantId = isProduction ? c.env.CLICK_MERCHANT_ID_LIVE : c.env.CLICK_MERCHANT_ID_TEST;
   const merchantUserId = isProduction
     ? c.env.CLICK_MERCHANT_USER_ID_LIVE
     : c.env.CLICK_MERCHANT_USER_ID_TEST;
 
-  // FIX: Get the service ID from the specific plan, not a global environment variable.
-  // This makes the system more flexible and less prone to configuration errors.
+  // Use the correct base URL for Click's web payments
+  const baseUrl = "https://my.click.uz/services/pay";
+
+  if (!merchantId || !merchantUserId) {
+    throw new Error(
+      "Click Merchant ID or Merchant User ID is not configured for the current environment."
+    );
+  }
+
   const serviceIdForPlan = plan.providerIds.click;
   if (!serviceIdForPlan) {
     throw new Error(`Click service ID is not configured for plan '${planIdKey}' in plans.js`);
   }
 
-  // Create a record in our database to track this payment attempt.
-  // The `transactionParam` is our internal ID for this transaction.
+  // 1. Create a transaction record in our database to track this payment attempt.
   const transaction = await db.createPaymentTransaction(c.env.DB, {
     userId,
-    // --- THIS IS THE FIX ---
-    // We were incorrectly storing the service_id here. We must store our internal planIdKey.
     planId: planIdKey,
-    // --- END OF FIX ---
     provider: "click",
-    amount: plan.prices.uzs, // Click works with Tiyin
+    amount: plan.prices.uzs, // Click uses Tiyin on the backend, but amount in URL is in UZS
   });
 
+  // 2. Construct the URL with query parameters.
+  const paymentUrl = new URL(baseUrl);
+  paymentUrl.searchParams.append("service_id", serviceIdForPlan);
+  paymentUrl.searchParams.append("merchant_id", merchantId);
+  paymentUrl.searchParams.append("merchant_user_id", merchantUserId);
+  paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString()); // Amount in UZS for URL
+  paymentUrl.searchParams.append("transaction_param", transaction.id); // Our internal ID
+
   return {
-    merchantId: parseInt(merchantId, 10),
-    serviceId: parseInt(serviceIdForPlan, 10), // Return the correct service ID
-    merchantUserId: parseInt(merchantUserId, 10),
-    amount: plan.prices.uzs / 100, // The SDK expects the amount in UZS, not tiyin
-    transactionParam: transaction.id, // This is our internal order ID
+    paymentUrl: paymentUrl.toString(),
+    receiptId: transaction.id,
   };
 };
 
