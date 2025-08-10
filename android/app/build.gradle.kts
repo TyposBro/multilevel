@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "org.milliytechnology.spiko"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "org.milliytechnology.spiko"
@@ -65,33 +65,6 @@ android {
     }
 }
 
-// --- THIS IS THE FIX ---
-// The old `com.wang.avi:library` is a transitive dependency brought in by another
-// library. It was hosted on the now-defunct JCenter and is known to cause
-// reflective serialization crashes with modern tools. We are forcing Gradle
-// to replace it with a modern, well-maintained alternative (`Android-SpinKit`).
-// Enhanced dependency resolution strategy
-configurations.all {
-    resolutionStrategy {
-        // Force specific Moshi versions to ensure compatibility
-        force("com.squareup.moshi:moshi:1.15.0")
-        force("com.squareup.moshi:moshi-kotlin:1.15.0")
-
-        // Original substitution for obsolete library
-        dependencySubstitution {
-            substitute(module("com.wang.avi:library:2.1.3"))
-                .using(module("com.github.ybq:Android-SpinKit:1.4.0"))
-                .because("The com.wang.avi:library is obsolete and causes reflective serialization crashes with the Click SDK's internal Moshi dependency.")
-        }
-
-        // Ensure Kotlin reflect is available for Moshi
-        eachDependency {
-            if (requested.group == "org.jetbrains.kotlin" && requested.name == "kotlin-reflect") {
-                useVersion("1.9.22") // Use your project's Kotlin version
-            }
-        }
-    }
-}
 dependencies {
     // Vosk STT Engine
     implementation(project(":models"))
