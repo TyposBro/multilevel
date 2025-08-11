@@ -9,7 +9,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -22,6 +21,8 @@ import org.milliytechnology.spiko.ui.screens.auth.LoginScreen
 import org.milliytechnology.spiko.ui.screens.practice.ExamScreen
 import org.milliytechnology.spiko.ui.screens.practice.ResultScreen
 import org.milliytechnology.spiko.ui.viewmodels.AuthViewModel
+import org.milliytechnology.spiko.ui.viewmodels.ProfileViewModel
+import org.milliytechnology.spiko.ui.viewmodels.SettingsViewModel
 
 // Define navigation routes
 object AppDestinations {
@@ -35,9 +36,11 @@ object AppDestinations {
 @RequiresApi(Build.VERSION_CODES.S)
 @Composable
 fun AppNavigation(
-    navController: NavHostController = rememberNavController()
+    authViewModel: AuthViewModel,
+    profileViewModel: ProfileViewModel,
+    settingsViewModel: SettingsViewModel,
+    navController: NavHostController = rememberNavController(),
 ) {
-    val authViewModel: AuthViewModel = hiltViewModel()
     val sessionManager: SessionManager = authViewModel.getSessionManager()
 
     val startDestination by remember {
@@ -72,16 +75,18 @@ fun AppNavigation(
         startDestination = startDestination
     ) {
         composable(AppDestinations.LOGIN_ROUTE) {
-            LoginScreen()
+            LoginScreen(authViewModel)
         }
 
 
         composable(AppDestinations.MAIN_HUB_ROUTE) {
             MainScreen(
+                authViewModel = authViewModel,
+                profileViewModel = profileViewModel,
+                settingsViewModel = settingsViewModel,
                 onNavigateToMultilevel = { practicePart ->
                     navController.navigate("multilevel_exam/$practicePart")
                 },
-
                 onNavigateToMultilevelResult = { resultId ->
                     navController.navigate("multilevel_result/$resultId")
                 }

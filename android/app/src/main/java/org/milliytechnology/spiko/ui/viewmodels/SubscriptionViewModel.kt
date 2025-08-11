@@ -114,7 +114,7 @@ class SubscriptionViewModel @Inject constructor(
             }
         }
     }
-
+    
     /**
      * Creates a payment request to the backend and updates the UI state with the
      * payment URL received, which will be launched in a custom tab.

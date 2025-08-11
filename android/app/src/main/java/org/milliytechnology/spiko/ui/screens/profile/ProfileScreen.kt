@@ -54,7 +54,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import org.milliytechnology.spiko.R
@@ -68,9 +67,9 @@ import org.milliytechnology.spiko.utils.openUrlInCustomTab
 @Composable
 fun ProfileScreen(
     onNavigateToSubscription: () -> Unit,
-    profileViewModel: ProfileViewModel = hiltViewModel(),
-    authViewModel: AuthViewModel = hiltViewModel(),
-    settingsViewModel: SettingsViewModel = hiltViewModel()
+    profileViewModel: ProfileViewModel,
+    authViewModel: AuthViewModel,
+    settingsViewModel: SettingsViewModel,
 ) {
     val uiState by profileViewModel.uiState.collectAsStateWithLifecycle()
     val userProfile = uiState.userProfile

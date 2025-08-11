@@ -41,6 +41,9 @@ import org.milliytechnology.spiko.ui.screens.wordbank.ExploreLevelScreen
 import org.milliytechnology.spiko.ui.screens.wordbank.ExploreTopicScreen
 import org.milliytechnology.spiko.ui.screens.wordbank.WordBankScreen
 import org.milliytechnology.spiko.ui.screens.wordbank.WordReviewScreen
+import org.milliytechnology.spiko.ui.viewmodels.AuthViewModel
+import org.milliytechnology.spiko.ui.viewmodels.ProfileViewModel
+import org.milliytechnology.spiko.ui.viewmodels.SettingsViewModel
 
 // --- Navigation Destinations & Items ---
 
@@ -92,6 +95,9 @@ object WordBankDestinations {
 fun MainScreen(
     onNavigateToMultilevel: (String) -> Unit,
     onNavigateToMultilevelResult: (resultId: String) -> Unit,
+    profileViewModel: ProfileViewModel,
+    authViewModel: AuthViewModel,
+    settingsViewModel: SettingsViewModel
 ) {
     val mainNavController = rememberNavController()
     Scaffold(
@@ -121,9 +127,13 @@ fun MainScreen(
                 )
             }
             composable(MainNavigationItem.Profile.route) {
-                ProfileScreen(onNavigateToSubscription = {
-                    mainNavController.navigate(MainDestinations.SUBSCRIPTION_ROUTE)
-                })
+                ProfileScreen(
+                    profileViewModel = profileViewModel,
+                    authViewModel = authViewModel,
+                    settingsViewModel = settingsViewModel,
+                    onNavigateToSubscription = {
+                        mainNavController.navigate(MainDestinations.SUBSCRIPTION_ROUTE)
+                    })
             }
             composable(MainDestinations.SUBSCRIPTION_ROUTE) {
                 SubscriptionScreen(onNavigateBack = { mainNavController.popBackStack() })

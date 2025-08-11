@@ -41,12 +41,17 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
     amount: plan.prices.uzs,
   });
 
+  // Define the deep link to redirect the user back to your app.
+  // We include the transaction ID so the app knows which payment was completed.
+  const returnUrl = `multilevelapp://login?payment_status=success&transaction_id=${transaction.id}`;
+
   const paymentUrl = new URL(baseUrl);
   paymentUrl.searchParams.append("service_id", serviceIdForPlan);
   paymentUrl.searchParams.append("merchant_id", merchantId);
   paymentUrl.searchParams.append("merchant_user_id", merchantUserId);
   paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString());
   paymentUrl.searchParams.append("transaction_param", transaction.id);
+  paymentUrl.searchParams.append("return_url", returnUrl);
 
   return {
     paymentUrl: paymentUrl.toString(),

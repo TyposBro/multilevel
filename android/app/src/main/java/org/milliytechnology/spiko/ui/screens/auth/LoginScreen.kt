@@ -38,7 +38,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.ApiException
@@ -51,7 +50,7 @@ import org.milliytechnology.spiko.ui.viewmodels.UiState
 
 @Composable
 fun LoginScreen(
-    authViewModel: AuthViewModel = hiltViewModel()
+    authViewModel: AuthViewModel
 ) {
     val googleSignInState by authViewModel.googleSignInState.collectAsState()
     val isLoading = googleSignInState is UiState.Loading
