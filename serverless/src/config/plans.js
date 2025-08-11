@@ -1,21 +1,22 @@
 // serverless/src/config/plans.js
 const PLANS = {
   // --- Monthly Recurring Subscriptions ---
-  // The key "silver_monthly" should exactly match your Product ID in the Google Play Console.
+  // The key "silver_monthly" should exactly match Product ID in the Google Play Console.
   silver_monthly: {
     tier: "silver",
     durationDays: 30,
     prices: {
-      uzs: 1500000, // 15,000 UZS in Tiyin
+      // uzs: 1500000, // 15,000 UZS in Tiyin
+      uzs: 100000, // 1,000 UZS in Tiyin
       usd: 149, // $1.49 in cents for Google Play
     },
     // providerIds are now only for providers who use different IDs than the main key
     providerIds: {
-      payme: "product_id_for_silver_monthly", // Your Payme product/receipt identifier
-      click: "80012", // Your Click service ID
+      payme: "product_id_for_silver_monthly", // Payme product/receipt identifier
+      click: "80012", // Click service ID
     },
   },
-  // The key "gold_monthly" should exactly match your Product ID in the Google Play Console.
+  // The key "gold_monthly" should exactly match Product ID in the Google Play Console.
   gold_monthly: {
     tier: "gold",
     durationDays: 30,
