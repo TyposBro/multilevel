@@ -16,34 +16,34 @@ const PLANS = {
       click: "80012", // Click service ID
     },
   },
-  // The key "gold_monthly" should exactly match Product ID in the Google Play Console.
-  gold_monthly: {
-    tier: "gold",
-    durationDays: 30,
-    prices: {
-      uzs: 5000000, // 50,000 UZS in Tiyin
-      usd: 499, // $4.99 in cents
-    },
-    providerIds: {
-      payme: "product_id_for_gold_monthly",
-      click: "80012",
-    },
-  },
+  // // The key "gold_monthly" should exactly match Product ID in the Google Play Console.
+  // gold_monthly: {
+  //   tier: "gold",
+  //   durationDays: 30,
+  //   prices: {
+  //     uzs: 5000000, // 50,000 UZS in Tiyin
+  //     usd: 499, // $4.99 in cents
+  //   },
+  //   providerIds: {
+  //     payme: "product_id_for_gold_monthly",
+  //     click: "80012",
+  //   },
+  // },
 
-  // --- One-Time Purchases (Non-Recurring) ---
-  // IMPORTANT: The key for this should be the "In-App Product" ID from Google Play.
-  gold_one_time_purchase_id: {
-    tier: "gold",
-    durationDays: 30,
-    prices: {
-      uzs: 5000000, // Same price, different product type
-      usd: 499,
-    },
-    providerIds: {
-      payme: "product_id_for_gold_one_time",
-      click: "80012",
-    },
-  },
+  // // --- One-Time Purchases (Non-Recurring) ---
+  // // IMPORTANT: The key for this should be the "In-App Product" ID from Google Play.
+  // gold_one_time_purchase_id: {
+  //   tier: "gold",
+  //   durationDays: 30,
+  //   prices: {
+  //     uzs: 5000000, // Same price, different product type
+  //     usd: 499,
+  //   },
+  //   providerIds: {
+  //     payme: "product_id_for_gold_one_time",
+  //     click: "80012",
+  //   },
+  // },
 };
 
 module.exports = PLANS;

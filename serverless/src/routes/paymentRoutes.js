@@ -12,6 +12,24 @@ const paymentRoutes = new Hono();
 
 // --- PUBLIC WEBHOOK FOR CLICK ---
 // This route must NOT be protected by user auth middleware.
+// Add this to your paymentRoutes.js
+
+// Test endpoint to verify webhook is accessible
+paymentRoutes.get("/click/webhook", (c) => {
+  console.log("=== WEBHOOK TEST ENDPOINT HIT ===");
+  console.log("Method:", c.req.method);
+  console.log("URL:", c.req.url);
+  console.log("Headers:", Object.fromEntries(c.req.headers.entries()));
+  console.log("Query params:", c.req.query);
+
+  return c.json({
+    status: "success",
+    message: "Webhook endpoint is accessible",
+    timestamp: new Date().toISOString(),
+    environment: c.env.ENVIRONMENT || "not-set",
+  });
+});
+
 paymentRoutes.post("/click/webhook", handleСlickWebhook);
 
 // All other payment routes should be protected
