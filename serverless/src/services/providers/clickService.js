@@ -42,22 +42,35 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
     amount: plan.prices.uzs, // Store amount in tiyin
   });
 
+  console.log(
+    `Created transaction: ${transaction.id} with Click ID: ${transaction.providerTransactionId}`
+  );
+
   // Define the deep link to redirect the user back to your mobile app after payment.
   // This helps the app confirm which transaction was completed.
   const returnUrl = `multilevelapp://login?payment_status=success&transaction_id=${transaction.id}`;
 
   const paymentUrl = new URL(baseUrl);
   paymentUrl.searchParams.append("service_id", serviceIdForPlan);
-  paymentUrl.searchParams.append("merchant_id", merchantId);
-  paymentUrl.searchParams.append("merchant_user_id", merchantUserId);
+  // paymentUrl.searchParams.append("merchant_id", 49952866);
+  paymentUrl.searchParams.append("merchant_id", merchantUserId);
   // Click expects the amount in the URL to be in Sums, not Tiyin.
   paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString());
-  paymentUrl.searchParams.append("transaction_param", transaction.id);
+  paymentUrl.searchParams.append("transaction_param", transaction.providerTransactionId); // Use the external ID
   paymentUrl.searchParams.append("return_url", returnUrl);
+
+  console.log("Generated Click payment URL:", paymentUrl.toString());
+  console.log("Payment parameters:");
+  console.log("- service_id:", serviceIdForPlan);
+  // console.log("- merchant_id:", 49952866);
+  console.log("- merchant_id:", merchantUserId);
+  console.log("- amount:", (plan.prices.uzs / 100).toString());
+  console.log("- transaction_param:", transaction.providerTransactionId);
 
   return {
     paymentUrl: paymentUrl.toString(),
-    receiptId: transaction.id,
+    receiptId: transaction.id, // Still return the full transaction ID for our internal use
+    clickTransactionId: transaction.providerTransactionId, // Also return the Click transaction ID
   };
 };
 

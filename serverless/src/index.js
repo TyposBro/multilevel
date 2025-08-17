@@ -27,8 +27,13 @@ app.use(
       "https://typosbro.github.io", // The live URL for your admin panel
       "https://milliytechnology.github.io", // The live URL for your main site
       "https://milliytechnology.org", // The live URL for your main site
+      // Click domains for webhook calls
+      "https://my.click.uz",
+      "https://click.uz",
+      "https://api.click.uz",
+      "*", // Allow all origins for webhook testing (temporary)
     ],
-    allowHeaders: ["Authorization", "Content-Type"],
+    allowHeaders: ["Authorization", "Content-Type", "X-Requested-With"],
     allowMethods: ["POST", "GET", "PUT", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
     maxAge: 600,

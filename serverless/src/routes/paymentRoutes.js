@@ -16,17 +16,41 @@ const paymentRoutes = new Hono();
 
 // Test endpoint to verify webhook is accessible
 paymentRoutes.get("/click/webhook", (c) => {
-  console.log("=== WEBHOOK TEST ENDPOINT HIT ===");
+  console.log("=== WEBHOOK GET ENDPOINT HIT ===");
   console.log("Method:", c.req.method);
   console.log("URL:", c.req.url);
-  console.log("Headers:", Object.fromEntries(c.req.headers.entries()));
-  console.log("Query params:", c.req.query);
+  console.log("Timestamp:", new Date().toISOString());
 
   return c.json({
     status: "success",
     message: "Webhook endpoint is accessible",
     timestamp: new Date().toISOString(),
-    environment: c.env.ENVIRONMENT || "not-set",
+    environment: c.env.ENVIRONMENT || "not-set"
+  });
+});
+
+// Simple POST endpoint that accepts anything
+paymentRoutes.post("/click/webhook-simple", async (c) => {
+  console.log("=== SIMPLE WEBHOOK POST ===");
+  console.log("Method:", c.req.method);
+  console.log("URL:", c.req.url);
+  console.log("Timestamp:", new Date().toISOString());
+  
+  let body = '';
+  try {
+    body = await c.req.text();
+    console.log("Raw body:", body);
+  } catch (e) {
+    console.log("Could not read body:", e.message);
+  }
+
+  // Always return success for testing
+  return c.json({
+    error: 0,
+    error_note: "Success",
+    click_trans_id: 12345,
+    merchant_trans_id: "test",
+    merchant_prepare_id: "test"
   });
 });
 

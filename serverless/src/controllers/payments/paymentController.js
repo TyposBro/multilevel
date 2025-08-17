@@ -20,6 +20,20 @@ export const createPayment = async (c) => {
     }
 
     const result = await paymentService.initiatePayment(c, provider, planId, user.id);
+    
+    // For Click redirect flow, return the payment URL for frontend redirection
+    if (provider.toLowerCase() === 'click') {
+      return c.json({
+        success: true,
+        provider: 'click',
+        paymentUrl: result.paymentUrl,
+        transactionId: result.receiptId,
+        clickTransactionId: result.clickTransactionId,
+        message: 'Redirect to Click payment page'
+      }, 201);
+    }
+    
+    // For other providers, return the original result
     return c.json(result, 201);
   } catch (error) {
     console.error("Error in createPayment controller:", error);
@@ -64,7 +78,6 @@ export const handleСlickWebhook = async (c) => {
   console.log("=== CLICK WEBHOOK RECEIVED ===");
   console.log("Method:", c.req.method);
   console.log("URL:", c.req.url);
-  // console.log("Headers:", Object.fromEntries(c.req.headers.entries()));
 
   let data;
   try {
@@ -109,6 +122,18 @@ export const handleСlickWebhook = async (c) => {
   }
   console.log("Signature verification PASSED");
 
+  // 2. Handle Click validation/test requests first
+  if (!merchant_trans_id || merchant_trans_id === 'test' || merchant_trans_id === '0' || click_trans_id === 0) {
+    console.log("=== HANDLING CLICK VALIDATION REQUEST ===");
+    return c.json({
+      click_trans_id: click_trans_id,
+      merchant_trans_id: merchant_trans_id || 'test',
+      merchant_prepare_id: merchant_trans_id || 'test',
+      error: 0,
+      error_note: "Success"
+    });
+  }
+
   // 2. Check for external errors reported by Click
   console.log("=== ERROR CHECK ===");
   if (error < 0) {
@@ -145,6 +170,19 @@ export const handleСlickWebhook = async (c) => {
 
   if (!transaction) {
     console.log("Transaction not found in database");
+    
+    // For development/testing, create a mock response if it's a test transaction
+    if (c.env.ENVIRONMENT === 'development' && merchant_trans_id.includes('test')) {
+      console.log("Creating mock response for development testing");
+      return c.json({
+        click_trans_id: click_trans_id,
+        merchant_trans_id: merchant_trans_id,
+        merchant_prepare_id: merchant_trans_id,
+        error: 0,
+        error_note: "Success (Development Mode)"
+      });
+    }
+    
     return c.json({ error: -5, error_note: "User does not exist" });
   }
 

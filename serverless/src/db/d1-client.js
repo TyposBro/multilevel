@@ -358,23 +358,54 @@ export const db = {
   async createPaymentTransaction(d1, { userId, planId, provider, amount }) {
     const transactionId = crypto.randomUUID();
     const now = new Date().toISOString();
+    
+    // For Click, create a shorter numeric transaction ID for external use
+    let externalTransactionId = transactionId;
+    if (provider === 'click') {
+      // Create numeric only ID: timestamp + random 3 digits
+      externalTransactionId = `${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
+    }
+    
     try {
-      return await d1
+      const stmt = d1
         .prepare(
-          `INSERT INTO payment_transactions (id, userId, planId, provider, amount, createdAt, updatedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
+          `INSERT INTO payment_transactions 
+           (id, userId, planId, provider, amount, status, providerTransactionId, createdAt, updatedAt) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) 
+           RETURNING *`
         )
-        .bind(transactionId, userId, planId, provider, amount, now, now)
-        .first();
+        .bind(
+          transactionId,
+          userId,
+          planId,
+          provider,
+          amount,
+          "PENDING",
+          externalTransactionId, // Store the external ID that Click will use
+          now,
+          now
+        );
+      
+      const result = await stmt.first();
+      console.log(`Created payment transaction: internal=${transactionId}, external=${externalTransactionId}`);
+      return result;
     } catch (e) {
       console.error("D1 createPaymentTransaction Error:", e.message);
-      throw new Error("Failed to create payment transaction record.");
+      throw new Error("Failed to create payment transaction.");
     }
   },
 
   async getPaymentTransaction(d1, id) {
     try {
-      return await d1.prepare("SELECT * FROM payment_transactions WHERE id = ?").bind(id).first();
+      // First try to find by internal ID
+      let result = await d1.prepare("SELECT * FROM payment_transactions WHERE id = ?").bind(id).first();
+      
+      // If not found, try to find by external ID (for Click webhooks)
+      if (!result) {
+        result = await d1.prepare("SELECT * FROM payment_transactions WHERE providerTransactionId = ?").bind(id).first();
+      }
+      
+      return result;
     } catch (e) {
       console.error("D1 getPaymentTransaction Error:", e.message);
       return null;

@@ -19,3 +19,7 @@ npm-debug.log
 
 # Temp files
 *.tmp
+
+# env
+.env
+.dev.vars
