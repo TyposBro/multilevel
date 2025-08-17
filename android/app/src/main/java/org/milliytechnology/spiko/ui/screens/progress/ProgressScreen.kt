@@ -72,7 +72,7 @@ fun ProgressScreen(
     val statistics = viewModel.getStatistics()
 
     val multilevelMaxScores =
-        mapOf("FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 12.0, "P2" to 24.0, "P3" to 24.0)
+        mapOf("FULL" to 72.0, "P1_1" to 12.0, "P1_2" to 22.0, "P2" to 18.0, "P3" to 20.0)
     val yMaxForChart = multilevelMaxScores[uiState.selectedMultilevelPart] ?: 72.0
 
     Scaffold(

@@ -271,18 +271,18 @@ private fun PaymentButtons(
             Spacer(Modifier.size(ButtonDefaults.IconSpacing))
             Text(stringResource(R.string.subscription_google_play_button))
         }
-        Button(
-            onClick = onPayWithClick,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_click_logo),
-                contentDescription = null, // Decorative
-                modifier = Modifier.size(ButtonDefaults.IconSize),
-                tint = Color.Unspecified
-            )
-            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-            Text(stringResource(R.string.subscription_click_button))
-        }
+//        Button(
+//            onClick = onPayWithClick,
+//            modifier = Modifier.fillMaxWidth(),
+//        ) {
+//            Icon(
+//                painter = painterResource(id = R.drawable.ic_click_logo),
+//                contentDescription = null, // Decorative
+//                modifier = Modifier.size(ButtonDefaults.IconSize),
+//                tint = Color.Unspecified
+//            )
+//            Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+//            Text(stringResource(R.string.subscription_click_button))
+//        }
     }
 }

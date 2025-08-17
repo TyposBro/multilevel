@@ -103,7 +103,7 @@
     <string name="profile_item_help">Помощь</string>
     <string name="profile_item_privacy">Политика конфиденциальности</string>
     <string name="profile_item_about">О приложении</string>
-    <string name="about_title">О многоуровневом приложении</string>
+    <string name="about_title">О приложении Spiko</string>
     <string name="about_subtitle">Многоуровневое приложение для изучения и практики английского языка.</string>
     <string name="about_version">Версия: %s</string>
     <string name="profile_section_title_action">Действия</string>

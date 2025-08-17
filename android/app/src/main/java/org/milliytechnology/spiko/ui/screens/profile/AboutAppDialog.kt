@@ -35,7 +35,7 @@ fun AboutAppDialog(
         // A size of 40.dp provides good visual balance.
         icon = {
             Image(
-                painter = painterResource(id = R.mipmap.ic_launcher_round),
+                painter = painterResource(id = R.drawable.ic_launcher_round),
                 contentDescription = stringResource(id = R.string.logo_app),
                 modifier = Modifier.size(40.dp)
             )

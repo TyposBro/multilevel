@@ -87,6 +87,11 @@ fun ProfileScreen(
     val privacyPolicyUrl = stringResource(R.string.url_privacy_policy)
     val faqUrl = stringResource(R.string.url_faq)
 
+    LaunchedEffect(Unit) {
+        // Initial fetch of user profile when the screen is first composed
+        profileViewModel.fetchUserProfile()
+    }
+
     LaunchedEffect(uiState.deleteState) {
         if (uiState.deleteState is UiState.Success) {
             coroutineScope.launch {

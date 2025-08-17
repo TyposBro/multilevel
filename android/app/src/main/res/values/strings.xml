@@ -109,7 +109,7 @@
     <string name="profile_item_help">Help</string>
     <string name="profile_item_privacy">Privacy Policy</string>
     <string name="profile_item_about">About This App</string>
-    <string name="about_title">About Multilevel</string>
+    <string name="about_title">About Spiko</string>
     <string name="about_subtitle">A multi-level English learning and practice application.</string>
     <string name="about_version">Version: %s</string>
     <string name="profile_section_title_action">Actions</string>

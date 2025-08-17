@@ -104,8 +104,8 @@
     <string name="profile_item_help">Yordam</string>
     <string name="profile_item_privacy">Maxfiylik siyosati</string>
     <string name="profile_item_about">Bu ilova haqida</string>
-    <string name="about_title">Ko\'p darajali ilova haqida</string>
-    <string name="about_subtitle">Ko\'p darajali ingliz tilini o\'rganish va mashq qilish ilovasi.</string>
+    <string name="about_title">Spiko ilovasi haqida</string>
+    <string name="about_subtitle">Multilevel imtihoni uchun ingliz tilini o\'rganish va mashq qilish ilovasi.</string>
     <string name="about_version">Versiya: %s</string>
     <string name="profile_section_title_action">Harakatlar</string>
     <string name="profile_item_delete">Hisobni o\'chirish</string>
