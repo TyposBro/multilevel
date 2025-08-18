@@ -50,7 +50,7 @@ app.route("/api/telegram/webhook", telegramWebhookRoutes);
 app.route("/api/payment", paymentRoutes);
 
 // --- Root and Error Handling ---
-app.get("/", (c) => c.text("API is running..."));
+app.get("/live", (c) => c.text("API is running..."));
 
 app.notFound((c) => {
   return c.json({ message: `Not Found - ${c.req.method} ${c.req.url}` }, 404);
