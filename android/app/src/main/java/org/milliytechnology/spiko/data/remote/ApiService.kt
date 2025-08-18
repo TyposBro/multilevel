@@ -10,6 +10,7 @@ import org.milliytechnology.spiko.data.remote.models.GenericSuccessResponse
 import org.milliytechnology.spiko.data.remote.models.GoogleSignInRequest
 import org.milliytechnology.spiko.data.remote.models.MultilevelExamResponse
 import org.milliytechnology.spiko.data.remote.models.OneTimeTokenRequest
+import org.milliytechnology.spiko.data.remote.models.PaymentStatusResponse
 import org.milliytechnology.spiko.data.remote.models.ReviewerLoginRequest
 import org.milliytechnology.spiko.data.remote.models.SubscriptionResponse
 import org.milliytechnology.spiko.data.remote.models.UserProfileResponse
@@ -19,6 +20,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 
@@ -68,4 +70,7 @@ interface ApiService {
 
     @POST("payment/create")
     suspend fun createPayment(@Body request: CreatePaymentRequest): Response<CreatePaymentResponse>
+    
+    @GET("payment/status/{transactionId}")
+    suspend fun getPaymentStatus(@Path("transactionId") transactionId: String): Response<PaymentStatusResponse>
 }
