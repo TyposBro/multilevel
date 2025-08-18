@@ -52,8 +52,8 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
 
   const paymentUrl = new URL(baseUrl);
   paymentUrl.searchParams.append("service_id", serviceIdForPlan);
-  // paymentUrl.searchParams.append("merchant_id", 49952866);
-  paymentUrl.searchParams.append("merchant_id", merchantUserId);
+  paymentUrl.searchParams.append("merchant_id", 44439);
+  // paymentUrl.searchParams.append("merchant_id", merchantUserId);
   // Click expects the amount in the URL to be in Sums, not Tiyin.
   paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString());
   paymentUrl.searchParams.append("transaction_param", transaction.providerTransactionId); // Use the external ID
@@ -63,7 +63,7 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
   console.log("Payment parameters:");
   console.log("- service_id:", serviceIdForPlan);
   // console.log("- merchant_id:", 49952866);
-  console.log("- merchant_id:", merchantUserId);
+  console.log("- merchant_id:", 44439);
   console.log("- amount:", (plan.prices.uzs / 100).toString());
   console.log("- transaction_param:", transaction.providerTransactionId);
 
