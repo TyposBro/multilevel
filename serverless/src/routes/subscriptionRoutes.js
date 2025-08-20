@@ -4,7 +4,13 @@ import { Hono } from "hono";
 import { protectAndLoadUser } from "../middleware/authMiddleware";
 // --- 1. IMPORT THE MIDDLEWARE ---
 import { checkSubscriptionStatus } from "../middleware/subscriptionMiddleware";
-import { verifyAndGrantAccess, startGoldTrial } from "../controllers/subscriptionController";
+import { 
+  verifyAndGrantAccess, 
+  startGoldTrial,
+  verifyGooglePlaySubscription,
+  verifyGooglePlayProduct,
+  getGooglePlaySubscriptionStatus
+} from "../controllers/subscriptionController";
 
 const subscriptionRoutes = new Hono();
 
@@ -13,5 +19,10 @@ subscriptionRoutes.use("/*", protectAndLoadUser, checkSubscriptionStatus);
 
 subscriptionRoutes.post("/verify-purchase", verifyAndGrantAccess);
 subscriptionRoutes.post("/start-trial", startGoldTrial);
+
+// Google Play specific routes
+subscriptionRoutes.post("/verify-google-play", verifyGooglePlaySubscription);
+subscriptionRoutes.post("/verify-google-play-product", verifyGooglePlayProduct);
+subscriptionRoutes.get("/google-play-status", getGooglePlaySubscriptionStatus);
 
 export default subscriptionRoutes;

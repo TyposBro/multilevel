@@ -11,6 +11,7 @@ import wordBankRoutes from "./routes/wordBankRoutes";
 import adminRoutes from "./routes/adminRoutes";
 import telegramWebhookRoutes from "./routes/telegramWebhookRoutes";
 import paymentRoutes from "./routes/paymentRoutes";
+import webhooks from "./routes/webhooks.js";
 
 const app = new Hono();
 
@@ -48,6 +49,7 @@ app.route("/api/wordbank", wordBankRoutes);
 app.route("/api/admin", adminRoutes);
 app.route("/api/telegram/webhook", telegramWebhookRoutes);
 app.route("/api/payment", paymentRoutes);
+app.route("/webhooks", webhooks);
 
 // --- Root and Error Handling ---
 app.get("/live", (c) => c.text("API is running..."));
