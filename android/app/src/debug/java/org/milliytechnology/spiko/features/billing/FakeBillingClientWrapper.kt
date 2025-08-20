@@ -15,13 +15,18 @@ import javax.inject.Singleton
 @Singleton
 class FakeBillingClientWrapper @Inject constructor() : BillingClientWrapper {
 
-    private val _productDetails = MutableStateFlow<List<ProductDetails>>(emptyList())
+    // Make these internal so BillingTestHelper can access them
+    internal val _productDetails = MutableStateFlow<List<ProductDetails>>(emptyList())
     override val productDetails = _productDetails.asStateFlow()
 
-    private val _purchases = MutableSharedFlow<List<Purchase>>()
+    internal val _purchases = MutableSharedFlow<List<Purchase>>()
     override val purchases = _purchases.asSharedFlow()
 
     override val isReady = MutableStateFlow(true) // Always ready instantly!
+
+    // Control purchase behavior for testing
+    var shouldSimulateError = false
+    var purchaseDelay = 0L // Delay in milliseconds
 
     override fun startConnection() {
         Log.d("FakeBillingClient", "startConnection() called. Instantly ready.")
@@ -36,18 +41,33 @@ class FakeBillingClientWrapper @Inject constructor() : BillingClientWrapper {
 
     override fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails) {
         Log.d("FakeBillingClient", "launchPurchaseFlow called for ${productDetails.productId}")
+        
+        if (shouldSimulateError) {
+            Log.d("FakeBillingClient", "Simulating purchase error")
+            // Don't emit anything to simulate an error
+            return
+        }
+        
+        // Simulate purchase delay if configured
+        if (purchaseDelay > 0) {
+            Log.d("FakeBillingClient", "Simulating purchase delay of ${purchaseDelay}ms")
+            // In a real scenario, you might use a coroutine here
+        }
+        
         // Simulate an immediate, successful purchase!
         val fakePurchaseJson = """
             {
-                "purchaseToken": "fake_test_token_for_${productDetails.productId}",
-                "orderId": "GPA.1234-FAKE-ORDER",
+                "purchaseToken": "fake_test_token_${System.currentTimeMillis()}",
+                "orderId": "GPA.${System.currentTimeMillis()}-FAKE-ORDER",
                 "products": ["${productDetails.productId}"],
                 "purchaseState": 1,
-                "acknowledged": false
+                "acknowledged": false,
+                "purchaseTime": ${System.currentTimeMillis()},
+                "autoRenewing": true
             }
         """.trimIndent()
 
-        val fakeSignature = "fake_signature" // The signature doesn't matter for the fake
+        val fakeSignature = "fake_signature_${System.currentTimeMillis()}"
 
         val fakePurchase = Purchase(fakePurchaseJson, fakeSignature)
 

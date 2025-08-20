@@ -121,6 +121,16 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
+    // Hilt Testing
+    testImplementation("com.google.dagger:hilt-android-testing:2.57")
+    kspTest("com.google.dagger:hilt-compiler:2.57")
+    androidTestImplementation("com.google.dagger:hilt-android-testing:2.57")
+    kspAndroidTest("com.google.dagger:hilt-compiler:2.57")
+    
+    // Coroutines Testing
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+
     // Firebase Analytics
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
@@ -146,4 +156,35 @@ dependencies {
     implementation(libs.androidx.play.billing)
 
     implementation(libs.android.msdk)
+}
+
+// Custom tasks for Google Play Billing testing
+tasks.register("testBilling") {
+    group = "verification"
+    description = "Run all billing-related unit tests"
+    dependsOn("testDebugUnitTest")
+    doLast {
+        println("✅ Billing unit tests completed")
+    }
+}
+
+tasks.register("testBillingIntegration") {
+    group = "verification"
+    description = "Run billing integration tests on connected device"
+    dependsOn("connectedDebugAndroidTest")
+    doLast {
+        println("✅ Billing integration tests completed")
+    }
+}
+
+tasks.register("testBillingFull") {
+    group = "verification"
+    description = "Run complete billing test suite (unit + integration)"
+    dependsOn("testBilling", "testBillingIntegration")
+    doLast {
+        println("✅ Complete billing test suite finished")
+        println("📱 Remember to test on both debug and release builds")
+        println("🔧 Debug builds use FakeBillingClient for testing")
+        println("💰 Release builds use real Google Play Billing")
+    }
 }
