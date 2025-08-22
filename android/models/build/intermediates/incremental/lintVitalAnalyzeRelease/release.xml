@@ -4,9 +4,9 @@
     minSdkVersion="21"
     targetSdkVersion="33"
     mergedManifest="build/intermediates/merged_manifest/release/processReleaseManifest/AndroidManifest.xml"
-    proguardFiles="build/intermediates/default_proguard_files/global/proguard-android.txt-8.12.0"
+    proguardFiles="build/intermediates/default_proguard_files/global/proguard-android.txt-8.12.1"
     partialResultsDir="build/intermediates/lint_vital_partial_results/release/lintVitalAnalyzeRelease/out"
-    desugaredMethodsFiles="/home/ched54/.gradle/caches/8.13/transforms/c5df2f9a696bbe0f2e511ccca87308c0/transformed/D8BackportedDesugaredMethods.txt">
+    desugaredMethodsFiles="/home/ched54/.gradle/caches/8.13/transforms/cb84ded1351472824dccd95727da8c29/transformed/D8BackportedDesugaredMethods.txt">
   <buildFeatures
       namespacing="REQUIRED"/>
   <sourceProviders>
@@ -26,6 +26,6 @@
       applicationId="org.vosk.models"
       generatedSourceFolders="build/generated/ap_generated_sources/release/out"
       generatedResourceFolders="build/generated/res/resValues/release"
-      desugaredMethodsFiles="/home/ched54/.gradle/caches/8.13/transforms/c5df2f9a696bbe0f2e511ccca87308c0/transformed/D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="/home/ched54/.gradle/caches/8.13/transforms/cb84ded1351472824dccd95727da8c29/transformed/D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>
