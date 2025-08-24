@@ -23,6 +23,7 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
 
   const baseUrl = "https://my.click.uz/services/pay";
   // https://my.click.uz/services/pay/?service_id=14567&merchant_id=1000&amount=10000.00&transaction_param=53638&merchant_user_id=14144&return_url=https%3A%2F%2Fbilling.airnet.uz%2F
+  // https://my.click.uz/services/pay/?service_id=80012&merchant_id=44439&amount=1000.00&transaction_param=53638&merchant_user_id=61733&return_url=https%3A%2F%2Fgoogle.com%2F
 
   if (!merchantId || !merchantUserId) {
     throw new Error(
@@ -57,8 +58,8 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
   paymentUrl.searchParams.append("merchant_user_id", "61733"); // Your actual merchant account from dashboard
 
   // Click expects the amount in the URL to be in Sums, not Tiyin.
-  paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString() + ".00");
-  paymentUrl.searchParams.append("transaction_param", 12345); // Use the external ID
+  paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString());
+  paymentUrl.searchParams.append("transaction_param", transaction.providerTransactionId); // Use the external ID
   // paymentUrl.searchParams.append("return_url", returnUrl);
 
   console.log("Generated Click payment URL:", paymentUrl.toString());
@@ -66,13 +67,13 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
   console.log("- service_id:", serviceIdForPlan);
   console.log("- merchant_id:", "44439");
   console.log("- merchant_user_id:", "61733");
-  console.log("- amount:", (plan.prices.uzs / 100).toString() + ".00");
-  console.log("- transaction_param:", 12345);
+  console.log("- amount:", (plan.prices.uzs / 100).toString());
+  console.log("- transaction_param:", transaction.providerTransactionId);
 
   return {
     paymentUrl: paymentUrl.toString(),
     receiptId: transaction.id, // Still return the full transaction ID for our internal use
-    clickTransactionId: 123, // Also return the Click transaction ID
+    clickTransactionId: transaction.providerTransactionId, // Also return the Click transaction ID
   };
 };
 
