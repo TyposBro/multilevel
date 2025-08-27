@@ -14,12 +14,12 @@ const OFFERINGS = {
     historyRetentionDays: 180, // ~6 months
     monthlyFullExams: 5,
   },
-  // gold: {
-  //   dailyPartPractices: Infinity,
-  //   dailyFullExams: Infinity,
-  //   historyRetentionDays: Infinity, // Represents unlimited
-  //   monthlyFullExams: Infinity,
-  // },
+  gold: {
+    dailyPartPractices: Infinity,
+    dailyFullExams: Infinity,
+    historyRetentionDays: Infinity, // Represents unlimited
+    monthlyFullExams: Infinity,
+  },
 };
 
 // We use `Infinity` for checks. It's cleaner than checking for null/undefined/-1.
