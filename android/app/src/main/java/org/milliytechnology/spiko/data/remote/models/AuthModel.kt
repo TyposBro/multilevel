@@ -25,5 +25,7 @@ data class UserProfileResponse(
     @SerializedName("telegramId") val telegramId: Long?,
     @SerializedName("username") val username: String?, // Telegram username
     @SerializedName("authProvider") val authProvider: String,
-    @SerializedName("createdAt") val createdAt: String
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("subscription_tier") val subscriptionTier: String?,
+    @SerializedName("subscription_expiresAt") val subscriptionExpiresAt: String?
 )

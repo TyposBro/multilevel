@@ -53,6 +53,8 @@ export const getUserProfile = async (c) => {
       username: user.username,
       authProvider: user.authProvider,
       createdAt: user.createdAt,
+      subscription_tier: user.subscription_tier,
+      subscription_expiresAt: user.subscription_expiresAt,
     });
   } else {
     return c.json({ message: "User not found in context" }, 404);

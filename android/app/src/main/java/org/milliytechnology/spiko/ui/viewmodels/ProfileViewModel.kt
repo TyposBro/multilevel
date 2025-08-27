@@ -12,15 +12,18 @@ import org.milliytechnology.spiko.data.remote.models.RepositoryResult
 import org.milliytechnology.spiko.data.remote.models.UserProfileResponse
 import org.milliytechnology.spiko.data.repositories.AuthRepository
 import java.text.SimpleDateFormat
+import java.util.Date // Import Date for comparison
 import java.util.Locale
 import javax.inject.Inject
 
+// --- CHANGE #1: Add subscriptionTier to the view data ---
 data class UserProfileViewData(
     val id: String,
     val displayName: String,
     val primaryIdentifier: String,
     val registeredDate: String,
     val authProvider: String,
+    val subscriptionTier: String? // <-- ADD THIS FIELD
 )
 
 data class ProfileUiState(
@@ -85,23 +88,21 @@ class ProfileViewModel @Inject constructor(
     }
 }
 
-// Helper extension function to format the data for the UI
+// --- CHANGE #2: Update this function to process subscription data ---
 private fun UserProfileResponse.toViewData(): UserProfileViewData {
-    val parser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
-    val formatter = SimpleDateFormat("dd MMMM yyyy", Locale.getDefault())
-    val date = try {
-        parser.parse(this.createdAt)
+    val dateParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
+    val dateFormatter = SimpleDateFormat("dd MMMM yyyy", Locale.getDefault())
+
+    val registeredDate = try {
+        dateParser.parse(this.createdAt)
     } catch (e: Exception) {
         null
     }
 
-    // --- THIS IS THE CORRECTED LOGIC ---
-    // We use the safe call operator (?.) to prevent a crash if authProvider is null.
-    // The Elvis operator (?:) provides a default value ("unknown") in that case.
     val displayName = when (this.authProvider?.lowercase()) {
         "google" -> this.firstName ?: this.email ?: "Google User"
         "telegram" -> this.firstName ?: this.username?.let { "@$it" } ?: "Telegram User"
-        else -> "User" // Default for unknown or null providers
+        else -> "User"
     }
 
     val primaryIdentifier = this.email ?: this.telegramId?.toString() ?: "No identifier"
@@ -109,13 +110,13 @@ private fun UserProfileResponse.toViewData(): UserProfileViewData {
     val providerName = this.authProvider?.replaceFirstChar {
         if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
     } ?: "Unknown"
-    // --- END OF CORRECTION ---
 
     return UserProfileViewData(
         id = this.id,
         displayName = displayName,
         primaryIdentifier = primaryIdentifier,
-        registeredDate = date?.let { formatter.format(it) } ?: "N/A",
-        authProvider = providerName
+        registeredDate = registeredDate?.let { dateFormatter.format(it) } ?: "N/A",
+        authProvider = providerName,
+        subscriptionTier = this.subscriptionTier
     )
 }

@@ -193,7 +193,7 @@ fun ProfileScreen(
                 SettingsItem(
                     icon = Icons.Default.WorkspacePremium,
                     title = stringResource(id = R.string.profile_item_subscription),
-                    subtitle = stringResource(id = R.string.tier_free),
+                    subtitle = userProfile?.subscriptionTier?.replaceFirstChar { it.uppercase() } ?: stringResource(id = R.string.tier_free),
                     onClick = onNavigateToSubscription
                 )
             }
