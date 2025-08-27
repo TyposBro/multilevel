@@ -12,18 +12,23 @@ import org.milliytechnology.spiko.data.remote.models.RepositoryResult
 import org.milliytechnology.spiko.data.remote.models.UserProfileResponse
 import org.milliytechnology.spiko.data.repositories.AuthRepository
 import java.text.SimpleDateFormat
-import java.util.Date // Import Date for comparison
+import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-// --- CHANGE #1: Add subscriptionTier to the view data ---
+/**
+ * Data class for UI state, now includes detailed subscription info.
+ */
 data class UserProfileViewData(
     val id: String,
     val displayName: String,
     val primaryIdentifier: String,
     val registeredDate: String,
     val authProvider: String,
-    val subscriptionTier: String? // <-- ADD THIS FIELD
+    val subscriptionTier: String?,
+    val subscriptionExpiresAt: Date?, // The actual expiration date
+    val isRenewalAllowed: Boolean    // Flag to control the UI button
 )
 
 data class ProfileUiState(
@@ -88,13 +93,15 @@ class ProfileViewModel @Inject constructor(
     }
 }
 
-// --- CHANGE #2: Update this function to process subscription data ---
-private fun UserProfileResponse.toViewData(): UserProfileViewData {
+/**
+ * Helper extension function to format the API response into rich UI data.
+ */
+ fun UserProfileResponse.toViewData(): UserProfileViewData {
     val dateParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.getDefault())
     val dateFormatter = SimpleDateFormat("dd MMMM yyyy", Locale.getDefault())
 
     val registeredDate = try {
-        dateParser.parse(this.createdAt)
+        this.createdAt?.let { dateParser.parse(it) }
     } catch (e: Exception) {
         null
     }
@@ -111,12 +118,36 @@ private fun UserProfileResponse.toViewData(): UserProfileViewData {
         if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
     } ?: "Unknown"
 
+    // --- Expanded logic to calculate tier, date, and renewal flag ---
+    val expiresAtDate: Date? = this.subscriptionExpiresAt?.let {
+        try {
+            dateParser.parse(it)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    val now = Date()
+    val isExpired = expiresAtDate == null || expiresAtDate.before(now)
+
+
+    val daysUntilExpiry = if (expiresAtDate != null && !isExpired) {
+        TimeUnit.MILLISECONDS.toDays(expiresAtDate.time - now.time)
+    } else {
+        -1L // Represents expired or no subscription
+    }
+
+    // Renewal is allowed if the subscription is active and expires within 7 days.
+    val isRenewalAllowed = daysUntilExpiry in 0..7
+
     return UserProfileViewData(
         id = this.id,
         displayName = displayName,
         primaryIdentifier = primaryIdentifier,
         registeredDate = registeredDate?.let { dateFormatter.format(it) } ?: "N/A",
         authProvider = providerName,
-        subscriptionTier = this.subscriptionTier
+        subscriptionTier = this.subscriptionTier,
+        subscriptionExpiresAt = if (isExpired) null else expiresAtDate, // Only pass date if not expired
+        isRenewalAllowed = isRenewalAllowed
     )
 }

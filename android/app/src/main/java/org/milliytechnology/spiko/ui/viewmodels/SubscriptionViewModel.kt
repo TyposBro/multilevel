@@ -1,5 +1,3 @@
-// android/app/src/main/java/org/milliytechnology/spiko/ui/viewmodels/SubscriptionViewModel.kt
-
 package org.milliytechnology.spiko.ui.viewmodels
 
 import android.app.Activity
@@ -18,6 +16,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.milliytechnology.spiko.data.remote.models.RepositoryResult
+import org.milliytechnology.spiko.data.repositories.AuthRepository
 import org.milliytechnology.spiko.data.repositories.PaymentRepository
 import org.milliytechnology.spiko.data.repositories.SubscriptionRepository
 import org.milliytechnology.spiko.features.billing.BillingClientWrapperImpl
@@ -28,32 +27,40 @@ data class SubscriptionUiState(
     val productDetails: List<ProductDetails> = emptyList(),
     val purchaseSuccessMessage: String? = null,
     val error: String? = null,
-    val paymentUrlToLaunch: String? = null // New state to hold the URL for the UI
+    val paymentUrlToLaunch: String? = null,
+    val userProfile: UserProfileViewData? = null
 )
 
 @HiltViewModel
 class SubscriptionViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
     private val paymentRepository: PaymentRepository,
-    private val billingClient: BillingClientWrapperImpl
+    private val billingClient: BillingClientWrapperImpl,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SubscriptionUiState())
     val uiState = _uiState.asStateFlow()
 
     init {
-        billingClient.startConnection()
-
-        // This coroutine waits for the connection to be ready before loading products.
+        // This coroutine now manages the entire loading lifecycle.
         viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true) }
+
+            fetchUserProfile()
+
+            billingClient.startConnection()
             billingClient.isReady.filter { it }.first()
-            Log.d("SubscriptionVM", "BillingClient is ready. Loading products.")
-            loadProducts()
+            loadProducts() // This will now correctly turn off isLoading at the end.
         }
 
+        // --- THIS IS THE FIX FOR THE LOADING BUG ---
+        // This observer's ONLY job is to update the productDetails list.
+        // It no longer touches the `isLoading` flag.
         billingClient.productDetails.onEach { products ->
-            _uiState.update { it.copy(isLoading = false, productDetails = products) }
+            _uiState.update { it.copy(productDetails = products) }
         }.launchIn(viewModelScope)
+        // --- END OF FIX ---
 
         billingClient.purchases.onEach { purchases ->
             purchases.forEach { purchase ->
@@ -75,12 +82,27 @@ class SubscriptionViewModel @Inject constructor(
         }.launchIn(viewModelScope)
     }
 
+    private fun fetchUserProfile() {
+        viewModelScope.launch {
+            when (val result = authRepository.getUserProfile()) {
+                is RepositoryResult.Success -> {
+                    _uiState.update {
+                        it.copy(userProfile = result.data.toViewData())
+                    }
+                }
+                is RepositoryResult.Error -> {
+                    _uiState.update { it.copy(error = result.message) }
+                }
+            }
+        }
+    }
+
     private fun loadProducts() {
-        if (_uiState.value.productDetails.isNotEmpty()) return
-        _uiState.update { it.copy(isLoading = true) }
         viewModelScope.launch {
             val productIds = listOf("silver_monthly", "gold_monthly")
             billingClient.queryProductDetails(productIds)
+            // Now that everything has been fetched, we can safely turn off the loading indicator.
+            _uiState.update { it.copy(isLoading = false) }
         }
     }
 
@@ -98,27 +120,19 @@ class SubscriptionViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
             when (val result = subscriptionRepository.verifyPurchase(provider, token, planId)) {
                 is RepositoryResult.Success -> {
-                    Log.d(
-                        "SubscriptionVM",
-                        "Backend verification successful. Acknowledging purchase."
-                    )
+                    Log.d("SubscriptionVM", "Backend verification successful. Acknowledging purchase.")
                     billingClient.acknowledgePurchase(purchase)
                     _uiState.update {
                         it.copy(isLoading = false, purchaseSuccessMessage = result.data.message)
                     }
                 }
-
                 is RepositoryResult.Error -> {
                     _uiState.update { it.copy(isLoading = false, error = result.message) }
                 }
             }
         }
     }
-    
-    /**
-     * Creates a payment request to the backend and updates the UI state with the
-     * payment URL received, which will be launched in a custom tab.
-     */
+
     fun createClickPayment(planId: String) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
@@ -126,23 +140,15 @@ class SubscriptionViewModel @Inject constructor(
                 is RepositoryResult.Success -> {
                     val paymentUrl = result.data.paymentUrl
                     if (!paymentUrl.isNullOrBlank()) {
-                        // Put the URL in the state for the UI to observe and launch.
                         _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                paymentUrlToLaunch = paymentUrl
-                            )
+                            it.copy(isLoading = false, paymentUrlToLaunch = paymentUrl)
                         }
                     } else {
                         _uiState.update {
-                            it.copy(
-                                isLoading = false,
-                                error = "Failed to get payment URL from server."
-                            )
+                            it.copy(isLoading = false, error = "Failed to get payment URL from server.")
                         }
                     }
                 }
-
                 is RepositoryResult.Error -> {
                     _uiState.update { it.copy(isLoading = false, error = result.message) }
                 }
@@ -150,10 +156,10 @@ class SubscriptionViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Resets the paymentUrlToLaunch state to null after it has been used by the UI.
-     * This prevents the browser from being launched again on configuration changes.
-     */
+    fun onPurchaseCompleted() {
+        fetchUserProfile()
+    }
+
     fun clearPaymentUrl() {
         _uiState.update { it.copy(paymentUrlToLaunch = null) }
     }
@@ -164,6 +170,6 @@ class SubscriptionViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        billingClient.endConnection()
+//        billingClient.endConnection()
     }
 }
