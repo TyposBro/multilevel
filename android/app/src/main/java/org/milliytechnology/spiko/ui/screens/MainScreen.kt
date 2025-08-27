@@ -45,8 +45,6 @@ import org.milliytechnology.spiko.ui.viewmodels.AuthViewModel
 import org.milliytechnology.spiko.ui.viewmodels.ProfileViewModel
 import org.milliytechnology.spiko.ui.viewmodels.SettingsViewModel
 
-// --- Navigation Destinations & Items ---
-
 /**
  * A sealed class to define the primary navigation items in the bottom bar.
  * This provides better type safety and readability than using Triple or Pair.
@@ -88,9 +86,6 @@ object WordBankDestinations {
     const val EXPLORE_TOPIC_ROUTE = "wordbank_explore_topic/{level}"
 }
 
-
-// --- Main Screen Composable ---
-
 @Composable
 fun MainScreen(
     onNavigateToMultilevel: (String) -> Unit,
@@ -112,8 +107,13 @@ fun MainScreen(
         ) {
             composable(MainNavigationItem.Practice.route) {
                 PracticeHubScreen(
-                    onPartSelected = { practicePart ->
+                    onNavigateToExam = { practicePart ->
                         onNavigateToMultilevel(practicePart.name)
+                    },
+                    // Pass the navigation action down to the hub screen. This allows
+                    // the PracticeHub's paywall dialog to trigger navigation.
+                    onNavigateToSubscription = {
+                        mainNavController.navigate(MainDestinations.SUBSCRIPTION_ROUTE)
                     }
                 )
             }
@@ -141,8 +141,6 @@ fun MainScreen(
         }
     }
 }
-
-// --- Navigation Graph Builders ---
 
 /**
  * Encapsulates the WordBank feature's navigation logic into a modular graph.
@@ -179,8 +177,6 @@ private fun NavGraphBuilder.wordBankNavGraph(navController: NavHostController) {
     }
 }
 
-// --- UI Components ---
-
 @Composable
 fun BottomNavigationBar(navController: NavHostController) {
     val items = listOf(
@@ -199,7 +195,6 @@ fun BottomNavigationBar(navController: NavHostController) {
             val label = stringResource(item.labelResId)
             NavigationBarItem(
                 icon = {
-                    // Use filled icon when selected, outlined otherwise
                     val icon = if (isSelected) item.selectedIcon else item.unselectedIcon
                     Icon(icon, contentDescription = label)
                 },
@@ -207,16 +202,10 @@ fun BottomNavigationBar(navController: NavHostController) {
                 selected = isSelected,
                 onClick = {
                     navController.navigate(item.route) {
-                        // Pop up to the start destination of the graph to
-                        // avoid building up a large stack of destinations
-                        // on the back stack as users select items
                         popUpTo(navController.graph.findStartDestination().id) {
                             saveState = true
                         }
-                        // Avoid multiple copies of the same destination when
-                        // re-selecting the same item
                         launchSingleTop = true
-                        // Restore state when re-selecting a previously selected item
                         restoreState = true
                     }
                 }

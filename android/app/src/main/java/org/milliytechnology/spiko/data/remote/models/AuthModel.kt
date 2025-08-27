@@ -27,5 +27,7 @@ data class UserProfileResponse(
     @SerializedName("authProvider") val authProvider: String,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("subscription_tier") val subscriptionTier: String?,
-    @SerializedName("subscription_expiresAt") val subscriptionExpiresAt: String?
+    @SerializedName("subscription_expiresAt") val subscriptionExpiresAt: String?,
+    @SerializedName("dailyUsage_fullExams_count") val dailyUsageFullExamsCount: Int?,
+    @SerializedName("dailyUsage_partPractices_count") val dailyUsagePartPracticesCount: Int?
 )

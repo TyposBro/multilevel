@@ -27,8 +27,10 @@ data class UserProfileViewData(
     val registeredDate: String,
     val authProvider: String,
     val subscriptionTier: String?,
-    val subscriptionExpiresAt: Date?, // The actual expiration date
-    val isRenewalAllowed: Boolean    // Flag to control the UI button
+    val subscriptionExpiresAt: Date?,
+    val isRenewalAllowed: Boolean,
+    val fullExamsUsedToday: Int,
+    val partPracticesUsedToday: Int,
 )
 
 data class ProfileUiState(
@@ -139,6 +141,8 @@ class ProfileViewModel @Inject constructor(
 
     // Renewal is allowed if the subscription is active and expires within 7 days.
     val isRenewalAllowed = daysUntilExpiry in 0..7
+    val fullExamsUsed = this.dailyUsageFullExamsCount ?: 0
+    val partPracticesUsed = this.dailyUsagePartPracticesCount ?: 0
 
     return UserProfileViewData(
         id = this.id,
@@ -148,6 +152,8 @@ class ProfileViewModel @Inject constructor(
         authProvider = providerName,
         subscriptionTier = this.subscriptionTier,
         subscriptionExpiresAt = if (isExpired) null else expiresAtDate, // Only pass date if not expired
-        isRenewalAllowed = isRenewalAllowed
+        isRenewalAllowed = isRenewalAllowed,
+        fullExamsUsedToday = fullExamsUsed,
+        partPracticesUsedToday = partPracticesUsed
     )
 }

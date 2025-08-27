@@ -159,4 +159,7 @@
     <string name="logo_google_description">Google logo</string>
     <string name="logo_app">App logo</string>
 
+    <string name="free_limit_reached_title">Free Limit Reached</string>
+    <string name="button_upgrade">Upgrade</string>
+
 </resources>

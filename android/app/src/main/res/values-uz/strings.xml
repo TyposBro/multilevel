@@ -46,13 +46,6 @@
     <string name="practice_p3_description">Berilgan mavzuni muhokama qiling va bahslashing.</string>
 
 
-    <string name="PART1_HEADER" translatable="false">1-qism</string>
-    <string name="PART1_1_INTRO" translatable="false">Bu qismda men sizga o\'zingiz va qiziqishlaringiz haqida uchta qisqa savol beraman. Keyin, siz bir nechta fotosuratni ko\'rasiz va ular haqida savollarga javob berasiz. Har bir savolga javob berish uchun 30 soniyangiz bor. Ushbu tovushni eshitganingizda gapira boshlang.</string>
-    <string name="PART1_2_INTRO" translatable="false">Endi men sizdan ikkita rasmni solishtirishingizni so\'rayman va ular haqida ikkita savol beraman</string>
-    <string name="PART2_HEADER" translatable="false">2-qism</string>
-    <string name="PART2_INTRO" translatable="false">Bu qismda men sizga rasm ko\'rsataman va 3 ta savol beraman. Gapirishni boshlashdan oldin javoblaringiz haqida o\'ylash uchun bir daqiqangiz bor. Uchta savolga ham javob berish uchun ikki daqiqangiz bor. Ushbu tovushni eshitganingizda gapira boshlang.</string>
-    <string name="PART3_HEADER" translatable="false">3-qism</string>
-    <string name="PART3_INTRO" translatable="false">Bu qismda siz ikki daqiqa davomida mavzu bo\'yicha gapirasiz. Ekranda mavzu va mavzu bilan bog\'liq ikki xil fikrlar ro\'yxatini (yaxshi va yomon tomonlari) ko\'rishingiz mumkin. Har bir ro\'yxatdan ikkita elementni tanlang va mavzuning ikkala tomonini ham aks ettiruvchi muvozanatli argument bering. Argumentingizni tayyorlash uchun bir daqiqangiz bor. Keyin gapirish uchun ikki daqiqangiz bor. Ushbu tovushni eshitganingizda gapira boshlang.</string>
     <string name="notice_english_only">⚠️ E\'tibor bering: Barcha imtihon ko\'rsatmalari va savollari rasmiy nutq testidagi kabi ingliz tilida bo\'ladi.</string>
 
     <string name="exam_result_title">Imtihon natijasi</string>

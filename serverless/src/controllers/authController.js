@@ -55,6 +55,10 @@ export const getUserProfile = async (c) => {
       createdAt: user.createdAt,
       subscription_tier: user.subscription_tier,
       subscription_expiresAt: user.subscription_expiresAt,
+      dailyUsage_fullExams_count: user.dailyUsage_fullExams_count,
+      dailyUsage_fullExams_lastReset: user.dailyUsage_fullExams_lastReset,
+      dailyUsage_partPractices_count: user.dailyUsage_partPractices_count,
+      dailyUsage_partPractices_lastReset: user.dailyUsage_partPractices_lastReset,
     });
   } else {
     return c.json({ message: "User not found in context" }, 404);
