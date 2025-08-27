@@ -31,7 +31,7 @@ export const createTransactionUrl = async (c, plan, planIdKey, userId, transacti
     `Using transaction: ${transactionToUse.id} with shortId: ${transactionToUse.shortId}`
   );
 
-  const returnUrl = `https://api.milliytechnology.org/payment_success`;
+  const returnUrl = `multilevelapp://login?payment_status=success&transaction_id=${transaction.id}`;
   const paymentUrl = new URL(baseUrl);
 
   paymentUrl.searchParams.append("service_id", serviceIdForPlan);
