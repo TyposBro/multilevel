@@ -94,25 +94,77 @@ export const handlePrepare = async (c) => {
 export const handleComplete = async (c) => {
   try {
     const data = await c.req.json();
-    const { merchant_prepare_id, click_trans_id } = data;
+    const { merchant_prepare_id, click_trans_id, error: clickError } = data;
 
+    // --- Early Exit for Failed Payments from Click ---
+    // If Click reports an error, we just mark our transaction as failed and stop.
+    if (clickError && parseInt(clickError) < 0) {
+      console.log(
+        `COMPLETE: Click reported failure (${clickError}). Marking transaction ${merchant_prepare_id} as FAILED.`
+      );
+      await db.updatePaymentTransaction(c.env.DB, merchant_prepare_id, {
+        status: "FAILED",
+        providerTransactionId: click_trans_id.toString(),
+      });
+      // Acknowledge the cancellation to Click
+      return c.json({ error: -9, error_note: "Transaction cancelled" });
+    }
+
+    // --- Find Transaction ---
     const transaction = await db.getPaymentTransaction(c.env.DB, merchant_prepare_id);
     if (!transaction) {
       return c.json({ error: -6, error_note: "Transaction does not exist" }, 404);
     }
 
-    if (transaction.status === "COMPLETED") {
-      return c.json({ error: -4, error_note: "Already paid" }, 409);
+    // --- Idempotency Check (Most Important) ---
+    // If the transaction is anything other than PENDING, it has already been processed or is being processed.
+    if (transaction.status !== "PENDING") {
+      console.log(
+        `COMPLETE: Transaction ${transaction.id} already processed. Status: ${transaction.status}. Ignoring duplicate webhook.`
+      );
+      // Return a success response so Click stops sending retries.
+      return c.json({
+        merchant_confirm_id: transaction.id,
+        error: 0,
+        error_note: "Success (Already Confirmed)",
+      });
     }
 
+    // --- THE CRITICAL FIX: ATOMIC STATE CHANGE ---
+    // Immediately update the transaction status. This prevents the race condition.
+    // We now consider this transaction "locked" for processing.
+    await db.updatePaymentTransaction(c.env.DB, transaction.id, {
+      status: "COMPLETED", // Mark as completed right away
+      providerTransactionId: click_trans_id.toString(),
+    });
+    console.log(`COMPLETE: Locked and updated transaction ${transaction.id} to COMPLETED.`);
+
+    // --- Now, safely perform the business logic ---
     const plan = PLANS[transaction.planId];
     if (!plan) {
-      console.error(`FATAL: Plan ${transaction.planId} not found for completed transaction.`);
-      return c.json({ error: -7, error_note: "Failed to perform transaction" }, 500);
+      console.error(
+        `FATAL: Plan ${transaction.planId} not found for completed transaction ${transaction.id}.`
+      );
+      // The payment is complete, but we have a server error. Still return success to Click.
+      return c.json(
+        { error: -7, error_note: "Failed to perform transaction (Plan not found)" },
+        500
+      );
     }
 
     // --- Grant Subscription ---
     const user = await db.getUserById(c.env.DB, transaction.userId);
+    if (!user) {
+      console.error(
+        `FATAL: User ${transaction.userId} not found for completed transaction ${transaction.id}.`
+      );
+      // User doesn't exist, but payment is done. Return success to Click.
+      return c.json(
+        { error: -7, error_note: "Failed to perform transaction (User not found)" },
+        500
+      );
+    }
+
     const now = new Date();
     const startDate =
       user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
@@ -126,20 +178,23 @@ export const handleComplete = async (c) => {
       tier: plan.tier,
       expiresAt: newExpiresAt.toISOString(),
     });
+    console.log(
+      `COMPLETE: Subscription for user ${user.id} updated. Expires: ${newExpiresAt.toISOString()}`
+    );
 
-    // --- Update Transaction Record ---
-    await db.updatePaymentTransaction(c.env.DB, transaction.id, {
-      status: "COMPLETED",
-      providerTransactionId: click_trans_id.toString(),
-    });
-
+    // --- Final Success Response to Click ---
     return c.json({
       merchant_confirm_id: transaction.id,
       error: 0,
       error_note: "Success",
     });
   } catch (error) {
-    console.error("Error in handleComplete:", error);
-    return c.json({ error: -7, error_note: "Failed to perform transaction" }, 500);
+    console.error("CRITICAL ERROR in handleComplete:", error);
+    // Even if our server has an error, we might need to tell Click we received it,
+    // but a 500 error will cause them to retry, which is often desired.
+    return c.json(
+      { error: -7, error_note: "Failed to perform transaction (Internal Server Error)" },
+      500
+    );
   }
 };
