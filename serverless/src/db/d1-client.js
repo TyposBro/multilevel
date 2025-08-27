@@ -358,21 +358,24 @@ export const db = {
   async createPaymentTransaction(d1, { userId, planId, provider, amount }) {
     const transactionId = crypto.randomUUID();
     const now = new Date().toISOString();
-    
-    // For Click, create a shorter numeric transaction ID for external use
-    let externalTransactionId = transactionId;
-    if (provider === 'click') {
-      // Create numeric only ID: timestamp + random 3 digits
-      externalTransactionId = `${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`;
-    }
-    
+    // This long ID is for internal webhook matching, which we are not using for shortId.
+    // We'll keep it as a backup or for other providers.
+    const externalTransactionId = `${Date.now()}${Math.floor(Math.random() * 1000)
+      .toString()
+      .padStart(3, "0")}`;
+
+    // --- THIS IS THE CHANGE ---
+    // The old formula was Math.floor(100000 + Math.random() * 900000) for 6 digits.
+    // This new formula generates a number between 10000 and 99999.
+    const shortId = Math.floor(10000 + Math.random() * 90000).toString();
+
     try {
       const stmt = d1
         .prepare(
           `INSERT INTO payment_transactions 
-           (id, userId, planId, provider, amount, status, providerTransactionId, createdAt, updatedAt) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) 
-           RETURNING *`
+         (id, userId, planId, provider, amount, status, providerTransactionId, shortId, createdAt, updatedAt) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) 
+         RETURNING *`
         )
         .bind(
           transactionId,
@@ -381,13 +384,16 @@ export const db = {
           provider,
           amount,
           "PENDING",
-          externalTransactionId, // Store the external ID that Click will use
+          externalTransactionId,
+          shortId, // Save the new 5-digit shortId
           now,
           now
         );
-      
+
       const result = await stmt.first();
-      console.log(`Created payment transaction: internal=${transactionId}, external=${externalTransactionId}`);
+      console.log(
+        `Created payment transaction: id=${transactionId}, providerTransactionId=${externalTransactionId}, shortId=${shortId}`
+      );
       return result;
     } catch (e) {
       console.error("D1 createPaymentTransaction Error:", e.message);
@@ -398,16 +404,50 @@ export const db = {
   async getPaymentTransaction(d1, id) {
     try {
       // First try to find by internal ID
-      let result = await d1.prepare("SELECT * FROM payment_transactions WHERE id = ?").bind(id).first();
-      
+      let result = await d1
+        .prepare("SELECT * FROM payment_transactions WHERE id = ?")
+        .bind(id)
+        .first();
+
       // If not found, try to find by external ID (for Click webhooks)
       if (!result) {
-        result = await d1.prepare("SELECT * FROM payment_transactions WHERE providerTransactionId = ?").bind(id).first();
+        result = await d1
+          .prepare("SELECT * FROM payment_transactions WHERE providerTransactionId = ?")
+          .bind(id)
+          .first();
       }
-      
+
       return result;
     } catch (e) {
       console.error("D1 getPaymentTransaction Error:", e.message);
+      return null;
+    }
+  },
+
+  async getTransactionByShortId(d1, shortId) {
+    try {
+      return await d1
+        .prepare("SELECT * FROM payment_transactions WHERE shortId = ?")
+        .bind(shortId)
+        .first();
+    } catch (e) {
+      console.error("D1 getTransactionByShortId Error:", e.message);
+      return null;
+    }
+  },
+
+  // Add this function inside the `db` object in serverless/src/db/d1-client.js
+
+  async findPendingTransaction(d1, userId, planId) {
+    try {
+      return await d1
+        .prepare(
+          "SELECT * FROM payment_transactions WHERE userId = ? AND planId = ? AND status = 'PENDING' LIMIT 1"
+        )
+        .bind(userId, planId)
+        .first();
+    } catch (e) {
+      console.error("D1 findPendingTransaction Error:", e.message);
       return null;
     }
   },

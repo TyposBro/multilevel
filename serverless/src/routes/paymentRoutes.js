@@ -2,68 +2,25 @@
 
 import { Hono } from "hono";
 import { protectAndLoadUser } from "../middleware/authMiddleware";
-import {
-  createPayment,
-  verifyPayment,
-  handleСlickWebhook,
-} from "../controllers/payments/paymentController";
+import { proxyAuth } from "../middleware/proxyAuthMiddleware"; // <--- IMPORT MIDDLEWARE
+import { createPayment, verifyPayment } from "../controllers/payments/paymentController"; // Assuming original createPayment is still needed
+import { handlePrepare, handleComplete } from "../controllers/payments/clickProxyController"; // <--- IMPORT NEW CONTROLLER
 
 const paymentRoutes = new Hono();
 
-// --- PUBLIC WEBHOOK FOR CLICK ---
-// This route must NOT be protected by user auth middleware.
-// Add this to your paymentRoutes.js
+// --- PUBLIC WEBHOOKS FOR CLICK (now handled by PHP proxy) ---
+// It's good practice to leave a note or remove these old routes.
+// paymentRoutes.post("/click/webhook", handleСlickWebhook);
 
-// Test endpoint to verify webhook is accessible
-paymentRoutes.get("/click/webhook", (c) => {
-  console.log("=== WEBHOOK GET ENDPOINT HIT ===");
-  console.log("Method:", c.req.method);
-  console.log("URL:", c.req.url);
-  console.log("Timestamp:", new Date().toISOString());
+// --- NEW SECURE PROXY ENDPOINTS FOR PHP ---
+paymentRoutes.post("/click/prepare", proxyAuth, handlePrepare);
+paymentRoutes.post("/click/complete", proxyAuth, handleComplete);
 
-  return c.json({
-    status: "success",
-    message: "Webhook endpoint is accessible",
-    timestamp: new Date().toISOString(),
-    environment: c.env.ENVIRONMENT || "not-set"
-  });
-});
-
-// Simple POST endpoint that accepts anything
-paymentRoutes.post("/click/webhook-simple", async (c) => {
-  console.log("=== SIMPLE WEBHOOK POST ===");
-  console.log("Method:", c.req.method);
-  console.log("URL:", c.req.url);
-  console.log("Timestamp:", new Date().toISOString());
-  
-  let body = '';
-  try {
-    body = await c.req.text();
-    console.log("Raw body:", body);
-  } catch (e) {
-    console.log("Could not read body:", e.message);
-  }
-
-  // Always return success for testing
-  return c.json({
-    error: 0,
-    error_note: "Success",
-    click_trans_id: 12345,
-    merchant_trans_id: "test",
-    merchant_prepare_id: "test"
-  });
-});
-
-paymentRoutes.post("/click/webhook", handleСlickWebhook);
-
-// All other payment routes should be protected
+// --- PROTECTED ROUTES FOR YOUR APP'S FRONTEND ---
 paymentRoutes.use("/create", protectAndLoadUser);
 paymentRoutes.use("/verify", protectAndLoadUser);
 
-// Route to create the payment and get the URL/params
 paymentRoutes.post("/create", createPayment);
-
-// Route to verify the payment after user returns from providers
 paymentRoutes.post("/verify", verifyPayment);
 
 export default paymentRoutes;

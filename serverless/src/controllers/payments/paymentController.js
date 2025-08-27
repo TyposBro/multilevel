@@ -10,6 +10,7 @@ import PLANS from "../../config/plans";
  * @route   POST /api/payment/create
  * @access  Private
  */
+
 export const createPayment = async (c) => {
   try {
     const { provider, planId } = await c.req.json();
@@ -19,21 +20,56 @@ export const createPayment = async (c) => {
       return c.json({ message: "Provider and planId are required." }, 400);
     }
 
-    const result = await paymentService.initiatePayment(c, provider, planId, user.id);
-    
-    // For Click redirect flow, return the payment URL for frontend redirection
-    if (provider.toLowerCase() === 'click') {
-      return c.json({
-        success: true,
-        provider: 'click',
-        paymentUrl: result.paymentUrl,
-        transactionId: result.receiptId,
-        clickTransactionId: result.clickTransactionId,
-        message: 'Redirect to Click payment page'
-      }, 201);
+    // 1. Check if a pending transaction already exists for this user and plan.
+    const existingTransaction = await db.findPendingTransaction(c.env.DB, user.id, planId);
+
+    let transactionToUse;
+
+    if (existingTransaction) {
+      // 2a. If a pending transaction is found, use that one.
+      console.log(`Found existing PENDING transaction: ${existingTransaction.id}. Reusing it.`);
+      transactionToUse = existingTransaction;
+    } else {
+      // 2b. If no pending transaction exists, create a new one.
+      console.log(
+        `No pending transaction found for user ${user.id} and plan ${planId}. Creating a new one.`
+      );
+      const plan = PLANS[planId];
+      if (!plan) {
+        throw new Error("Plan not found");
+      }
+      transactionToUse = await db.createPaymentTransaction(c.env.DB, {
+        userId: user.id,
+        planId: planId,
+        provider: provider,
+        amount: plan.prices.uzs,
+      });
     }
-    
-    // For other providers, return the original result
+
+    // The rest of the function now uses the 'transactionToUse' object,
+    // which is either the old one or the newly created one.
+    const result = await paymentService.initiatePayment(
+      c,
+      provider,
+      planId,
+      user.id,
+      transactionToUse
+    );
+
+    if (provider.toLowerCase() === "click") {
+      return c.json(
+        {
+          success: true,
+          provider: "click",
+          paymentUrl: result.paymentUrl,
+          transactionId: transactionToUse.id, // Use the ID from our chosen transaction
+          clickTransactionId: transactionToUse.providerTransactionId, // Use the external ID
+          message: "Redirect to Click payment page",
+        },
+        201
+      );
+    }
+
     return c.json(result, 201);
   } catch (error) {
     console.error("Error in createPayment controller:", error);
@@ -123,14 +159,19 @@ export const handleСlickWebhook = async (c) => {
   console.log("Signature verification PASSED");
 
   // 2. Handle Click validation/test requests first
-  if (!merchant_trans_id || merchant_trans_id === 'test' || merchant_trans_id === '0' || click_trans_id === 0) {
+  if (
+    !merchant_trans_id ||
+    merchant_trans_id === "test" ||
+    merchant_trans_id === "0" ||
+    click_trans_id === 0
+  ) {
     console.log("=== HANDLING CLICK VALIDATION REQUEST ===");
     return c.json({
       click_trans_id: click_trans_id,
-      merchant_trans_id: merchant_trans_id || 'test',
-      merchant_prepare_id: merchant_trans_id || 'test',
+      merchant_trans_id: merchant_trans_id || "test",
+      merchant_prepare_id: merchant_trans_id || "test",
       error: 0,
-      error_note: "Success"
+      error_note: "Success",
     });
   }
 
@@ -170,19 +211,19 @@ export const handleСlickWebhook = async (c) => {
 
   if (!transaction) {
     console.log("Transaction not found in database");
-    
+
     // For development/testing, create a mock response if it's a test transaction
-    if (c.env.ENVIRONMENT === 'development' && merchant_trans_id.includes('test')) {
+    if (c.env.ENVIRONMENT === "development" && merchant_trans_id.includes("test")) {
       console.log("Creating mock response for development testing");
       return c.json({
         click_trans_id: click_trans_id,
         merchant_trans_id: merchant_trans_id,
         merchant_prepare_id: merchant_trans_id,
         error: 0,
-        error_note: "Success (Development Mode)"
+        error_note: "Success (Development Mode)",
       });
     }
-    
+
     return c.json({ error: -5, error_note: "User does not exist" });
   }
 

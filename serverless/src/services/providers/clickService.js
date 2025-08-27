@@ -6,80 +6,59 @@ import { createHash } from "node:crypto";
 
 /**
  * Creates a Click payment URL for a web-based checkout flow.
- * This function is called when a user initiates a payment from the front-end.
+ *
+ * IMPORTANT: This function no longer creates a database record. It expects a transaction
+ * object to be passed in, which was either newly created or fetched by the controller.
+ * Its only job is to generate the correct payment URL.
  *
  * @param {object} c - The Hono context, used to access environment variables.
  * @param {object} plan - The plan object from the configuration file.
- * @param {string} planIdKey - The key for the plan in the PLANS object (e.g., "premium_1_month").
+ * @param {string} planIdKey - The key for the plan in the PLANS object (e.g., "silver_monthly").
  * @param {string} userId - The ID of the user initiating the payment.
- * @returns {Promise<{paymentUrl: string, receiptId: string}>} An object containing the URL for redirection and the internal transaction ID.
+ * @param {object} transaction - The database transaction object (either new or an existing pending one).
+ * @returns {Promise<{paymentUrl: string, receiptId: string, clickTransactionId: string}>} An object containing the URL for redirection and the internal transaction ID.
  */
-export const createTransactionUrl = async (c, plan, planIdKey, userId) => {
-  const isProduction = c.env.ENVIRONMENT === "production";
-  const merchantId = isProduction ? c.env.CLICK_MERCHANT_ID_LIVE : c.env.CLICK_MERCHANT_ID_TEST;
-  const merchantUserId = isProduction
-    ? c.env.CLICK_MERCHANT_USER_ID_LIVE
-    : c.env.CLICK_MERCHANT_USER_ID_TEST;
-
+export const createTransactionUrl = async (c, plan, planIdKey, userId, transaction) => {
   const baseUrl = "https://my.click.uz/services/pay";
-  // https://my.click.uz/services/pay/?service_id=14567&merchant_id=1000&amount=10000.00&transaction_param=53638&merchant_user_id=14144&return_url=https%3A%2F%2Fbilling.airnet.uz%2F
-  // https://my.click.uz/services/pay/?service_id=80012&merchant_id=44439&amount=1000.00&transaction_param=53638&merchant_user_id=61733&return_url=https%3A%2F%2Fgoogle.com%2F
-
-  if (!merchantId || !merchantUserId) {
-    throw new Error(
-      "Click Merchant ID or Merchant User ID is not configured for the current environment."
-    );
-  }
 
   const serviceIdForPlan = plan.providerIds.click;
   if (!serviceIdForPlan) {
     throw new Error(`Click service ID is not configured for plan '${planIdKey}' in plans.js`);
   }
 
-  // Create a record of this transaction attempt in our database.
-  const transaction = await db.createPaymentTransaction(c.env.DB, {
-    userId,
-    planId: planIdKey,
-    provider: "click",
-    amount: plan.prices.uzs, // Store amount in tiyin
-  });
-
+  const transactionToUse = transaction;
   console.log(
-    `Created transaction: ${transaction.id} with Click ID: ${transaction.providerTransactionId}`
+    `Using transaction: ${transactionToUse.id} with shortId: ${transactionToUse.shortId}`
   );
 
-  // Define the deep link to redirect the user back to your mobile app after payment.
-  // This helps the app confirm which transaction was completed.
-  const returnUrl = `multilevelapp://login?payment_status=success&transaction_id=${transaction.id}`;
-
+  const returnUrl = `https://api.milliytechnology.org/payment_success`;
   const paymentUrl = new URL(baseUrl);
-  paymentUrl.searchParams.append("service_id", serviceIdForPlan);
-  paymentUrl.searchParams.append("merchant_id", "44439"); // Your actual merchant account from dashboard
-  paymentUrl.searchParams.append("merchant_user_id", "61733"); // Your actual merchant account from dashboard
 
-  // Click expects the amount in the URL to be in Sums, not Tiyin.
-  paymentUrl.searchParams.append("amount", (plan.prices.uzs / 100).toString());
-  paymentUrl.searchParams.append("transaction_param", transaction.providerTransactionId); // Use the external ID
-  // paymentUrl.searchParams.append("return_url", returnUrl);
+  paymentUrl.searchParams.append("service_id", serviceIdForPlan);
+  paymentUrl.searchParams.append("merchant_id", "44439");
+  paymentUrl.searchParams.append("merchant_user_id", "61733");
+
+  const amountInUzs = (plan.prices.uzs / 100).toFixed(2);
+  paymentUrl.searchParams.append("amount", amountInUzs);
+
+  // --- THE CRITICAL CHANGE ---
+  // We now use the short, user-friendly ID for the payment page.
+  paymentUrl.searchParams.append("transaction_param", transactionToUse.shortId);
+
+  paymentUrl.searchParams.append("return_url", returnUrl);
 
   console.log("Generated Click payment URL:", paymentUrl.toString());
-  console.log("Payment parameters:");
-  console.log("- service_id:", serviceIdForPlan);
-  console.log("- merchant_id:", "44439");
-  console.log("- merchant_user_id:", "61733");
-  console.log("- amount:", (plan.prices.uzs / 100).toString());
-  console.log("- transaction_param:", transaction.providerTransactionId);
 
   return {
     paymentUrl: paymentUrl.toString(),
-    receiptId: transaction.id, // Still return the full transaction ID for our internal use
-    clickTransactionId: transaction.providerTransactionId, // Also return the Click transaction ID
+    receiptId: transactionToUse.id,
+    clickTransactionId: transactionToUse.providerTransactionId,
   };
 };
 
 /**
  * Verifies the signature from a Click webhook request.
- * This is the critical function for handling server-to-server communication from Click.
+ * This function remains unchanged as its logic is correct.
  *
  * @param {object} c - The Hono context, used to access environment variables.
  * @param {object} data - The POST data from the Click webhook.
@@ -92,12 +71,8 @@ export const verifyWebhookSignature = (c, data) => {
   console.log("Environment:", isProduction ? "PRODUCTION" : "TEST");
 
   const secretKey = isProduction ? c.env.CLICK_SECRET_KEY_LIVE : c.env.CLICK_SECRET_KEY_TEST;
-  console.log("Secret key available:", !!secretKey);
-  console.log("Secret key length:", secretKey ? secretKey.length : 0);
-  console.log(
-    "Secret key first 4 chars:",
-    secretKey ? secretKey.substring(0, 4) + "..." : "NOT SET"
-  );
+
+  // ... (the rest of this function is unchanged) ...
 
   const {
     click_trans_id,
@@ -110,45 +85,13 @@ export const verifyWebhookSignature = (c, data) => {
     sign_string,
   } = data;
 
-  console.log("Signature verification parameters:");
-  console.log("- click_trans_id:", click_trans_id);
-  console.log("- service_id:", service_id);
-  console.log("- merchant_trans_id:", merchant_trans_id);
-  console.log("- merchant_prepare_id:", merchant_prepare_id);
-  console.log("- amount (raw):", amount);
-  console.log("- action:", action);
-  console.log("- sign_time:", sign_time);
-  console.log("- sign_string (received):", sign_string);
-
-  // --- BUG FIX ---
-  // Click generates its signature using the 'amount' formatted as a string with two decimal places.
-  // We must replicate this exactly. e.g., if amount is 10, it must become "10.00".
   const formattedAmount = Number(amount).toFixed(2);
-
-  // The 'merchant_prepare_id' is only included in the signature string for the 'Complete' action (action=1).
   const prepareIdPart = action == "1" ? merchant_prepare_id : "";
-
-  // Construct the source string for the MD5 hash in the exact order specified by Click's documentation.
   const signStringSource = `${click_trans_id}${service_id}${secretKey}${merchant_trans_id}${prepareIdPart}${formattedAmount}${action}${sign_time}`;
-
-  console.log("Sign string source components:");
-  console.log("- click_trans_id:", click_trans_id);
-  console.log("- service_id:", service_id);
-  console.log("- secret_key:", secretKey ? "[HIDDEN]" : "NOT SET");
-  console.log("- merchant_trans_id:", merchant_trans_id);
-  console.log("- prepare_id_part:", `"${prepareIdPart}"`, "(only for action=1)");
-  console.log("- amount (formatted for hash):", `"${formattedAmount}"`);
-  console.log("- action:", action);
-  console.log("- sign_time:", `"${sign_time}"`);
-  console.log("Full sign string source:", signStringSource.replace(secretKey, "[SECRET]"));
-
-  // Generate the MD5 hash from our constructed source string.
   const generatedSignature = createHash("md5").update(signStringSource).digest("hex");
+
   console.log("Generated signature:", generatedSignature);
   console.log("Received signature: ", sign_string);
 
-  const signaturesMatch = generatedSignature === sign_string;
-  console.log("Signatures match:", signaturesMatch);
-
-  return signaturesMatch;
+  return generatedSignature === sign_string;
 };

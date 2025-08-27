@@ -4,9 +4,8 @@ import { db } from "../db/d1-client";
 import PLANS from "../config/plans";
 import * as paymeService from "./providers/paymeService";
 import * as googlePlayService from "./providers/googlePlayService";
-import * as clickService from "./providers/clickService"; // Import the new service
-
-export const initiatePayment = async (c, provider, planId, userId) => {
+import * as clickService from "./providers/clickService";
+export const initiatePayment = async (c, provider, planId, userId, transaction) => {
   const plan = PLANS[planId];
   if (!plan) {
     throw new Error("Plan not found");
@@ -14,10 +13,11 @@ export const initiatePayment = async (c, provider, planId, userId) => {
 
   switch (provider.toLowerCase()) {
     case "payme":
+      // Payme logic might need similar adjustments if it creates a transaction internally
       return paymeService.createTransaction(c, plan, userId);
     case "click":
-      // THIS IS THE CHANGE: Call the new URL function
-      return clickService.createTransactionUrl(c, plan, planId, userId);
+      // Pass the transaction object to the Click service
+      return clickService.createTransactionUrl(c, plan, planId, userId, transaction);
     default:
       throw new Error(`Unsupported payment provider for creation: ${provider}`);
   }
