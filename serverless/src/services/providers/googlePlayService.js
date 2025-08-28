@@ -176,7 +176,9 @@ export const handleGooglePlayWebhook = async (c, notification) => {
 
   if (!transaction) {
     console.error(
-      `CRITICAL: RTDN received for an unknown purchaseToken: ...${purchaseToken.slice(-12)}`
+      `CRITICAL: RTDN received for an unknown purchaseToken: ...${purchaseToken.slice(
+        -12
+      )} for subscriptionId: ${subscriptionId}`
     );
     return; // Cannot proceed without a link to a user.
   }

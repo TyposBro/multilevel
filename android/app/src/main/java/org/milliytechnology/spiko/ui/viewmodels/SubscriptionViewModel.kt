@@ -19,7 +19,7 @@ import org.milliytechnology.spiko.data.remote.models.RepositoryResult
 import org.milliytechnology.spiko.data.repositories.AuthRepository
 import org.milliytechnology.spiko.data.repositories.PaymentRepository
 import org.milliytechnology.spiko.data.repositories.SubscriptionRepository
-import org.milliytechnology.spiko.features.billing.BillingClientWrapperImpl
+import org.milliytechnology.spiko.features.billing.BillingClientWrapper
 import javax.inject.Inject
 
 data class SubscriptionUiState(
@@ -28,14 +28,15 @@ data class SubscriptionUiState(
     val purchaseSuccessMessage: String? = null,
     val error: String? = null,
     val paymentUrlToLaunch: String? = null,
-    val userProfile: UserProfileViewData? = null
+    val userProfile: UserProfileViewData? = null,
+    val pendingPurchasePlanId: String? = null // <-- ADD THIS LINE
 )
 
 @HiltViewModel
 class SubscriptionViewModel @Inject constructor(
     private val subscriptionRepository: SubscriptionRepository,
     private val paymentRepository: PaymentRepository,
-    private val billingClient: BillingClientWrapperImpl,
+    private val billingClient: BillingClientWrapper,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
@@ -54,41 +55,44 @@ class SubscriptionViewModel @Inject constructor(
             loadProducts() // This will now correctly turn off isLoading at the end.
         }
 
-        // --- THIS IS THE FIX FOR THE LOADING BUG ---
         // This observer's ONLY job is to update the productDetails list.
         // It no longer touches the `isLoading` flag.
         billingClient.productDetails.onEach { products ->
             _uiState.update { it.copy(productDetails = products) }
         }.launchIn(viewModelScope)
-        // --- END OF FIX ---
 
         billingClient.purchases.onEach { purchases ->
-            Log.d("BillingTest", "--- New Purchase Update Detected ---")
-            Log.d("BillingTest", "Found ${purchases.size} purchases in the update.")
-
             purchases.forEach { purchase ->
-                Log.d("BillingTest", "Processing Purchase. Products: ${purchase.products}, State: ${purchase.purchaseState}, Acknowledged: ${purchase.isAcknowledged}")
-
                 if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
-                    val planId = purchase.products.firstOrNull()
+
+                    // --- THE CORE FIX ---
+                    // 1. Try to get planId from the purchase object first.
+                    var planId = purchase.products.firstOrNull()
+
+                    // 2. If it's null, use our fallback from the UI state.
+                    if (planId == null) {
+                        planId = _uiState.value.pendingPurchasePlanId
+                        Log.w("BillingFix", "planId was missing in Purchase object. Using pending planId from state: $planId")
+                    }
+
                     if (planId != null) {
                         Log.d("BillingTest", "Purchase is PURCHASED and NOT acknowledged. Verifying with backend for planId: $planId")
-                        // This is the function we need to add more logging to
                         verifyAndAcknowledgePurchase(
                             provider = "google",
                             token = purchase.purchaseToken,
                             planId = planId,
                             purchase = purchase
                         )
+                        // 3. Clear the pending ID after using it.
+                        _uiState.update { it.copy(pendingPurchasePlanId = null) }
                     } else {
-                        Log.e("BillingTest", "FATAL: Purchase is missing product ID. Cannot verify.")
+                        Log.e("BillingTest", "FATAL: Purchase is missing product ID and no pending ID was found. Cannot verify.")
                         _uiState.update { it.copy(error = "Purchase verification failed: Missing Product ID.") }
                     }
                 } else {
                     Log.d("BillingTest", "Purchase does not meet criteria for verification. Skipping.")
                 }
             }
-            Log.d("BillingTest", "--- Finished Processing Purchase Update ---")
         }.launchIn(viewModelScope)
     }
 
@@ -117,6 +121,8 @@ class SubscriptionViewModel @Inject constructor(
     }
 
     fun launchGooglePlayPurchase(activity: Activity, productDetails: ProductDetails) {
+        // --- FIX: Store the planId before launching the flow ---
+        _uiState.update { it.copy(pendingPurchasePlanId = productDetails.productId) }
         billingClient.launchPurchaseFlow(activity, productDetails)
     }
 
