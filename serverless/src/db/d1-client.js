@@ -369,19 +369,32 @@ export const db = {
 
   // --- Payment Transaction Functions ---
 
-  async createPaymentTransaction(d1, { userId, planId, provider, amount }) {
+  async createPaymentTransaction(
+    d1,
+    {
+      userId,
+      planId,
+      provider,
+      amount,
+      status = "PENDING",
+      providerTransactionId = null,
+      shortId = null,
+    }
+  ) {
     const transactionId = crypto.randomUUID();
     const now = new Date().toISOString();
-    // This long ID is for internal webhook matching, which we are not using for shortId.
-    // We'll keep it as a backup or for other providers.
-    const externalTransactionId = `${Date.now()}${Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0")}`;
 
-    // --- THIS IS THE CHANGE ---
-    // The old formula was Math.floor(100000 + Math.random() * 900000) for 6 digits.
-    // This new formula generates a number between 10000 and 99999.
-    const shortId = Math.floor(10000 + Math.random() * 90000).toString();
+    // If no providerTransactionId supplied (e.g. Click initial creation), generate an internal one.
+    if (!providerTransactionId) {
+      providerTransactionId = `${Date.now()}${Math.floor(Math.random() * 1000)
+        .toString()
+        .padStart(3, "0")}`;
+    }
+
+    // Generate a 5‑digit shortId only when not provided (used for Click UX). Keep null for providers that don't need it.
+    if (!shortId && provider.toLowerCase() === "click") {
+      shortId = Math.floor(10000 + Math.random() * 90000).toString();
+    }
 
     try {
       const stmt = d1
@@ -397,16 +410,16 @@ export const db = {
           planId,
           provider,
           amount,
-          "PENDING",
-          externalTransactionId,
-          shortId, // Save the new 5-digit shortId
+          status,
+          providerTransactionId,
+          shortId,
           now,
           now
         );
 
       const result = await stmt.first();
       console.log(
-        `Created payment transaction: id=${transactionId}, providerTransactionId=${externalTransactionId}, shortId=${shortId}`
+        `Created payment transaction: id=${transactionId}, providerTransactionId=${providerTransactionId}, shortId=${shortId}`
       );
       return result;
     } catch (e) {

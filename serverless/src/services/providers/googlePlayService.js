@@ -1,6 +1,7 @@
 // serverless/src/services/providers/googlePlayService.js
 
-import { sign } from "hono/jwt";
+// NOTE: We are NOT using hono/jwt for RS256 because we encountered Invalid JWT Signature from Google.
+// Implement a custom RS256 signer using WebCrypto to ensure proper handling of the PEM private key.
 import PLANS from "../../config/plans";
 import { db } from "../../db/d1-client";
 
@@ -11,10 +12,34 @@ const GOOGLE_PLAY_API_BASE = "https://androidpublisher.googleapis.com/androidpub
 const tokenCache = new Map();
 const TOKEN_CACHE_DURATION = 3000 * 1000; // 50 minutes
 
-// Helper to create JWT for Google Auth
-const createGoogleAuthJwt = async (c, serviceAccount) => {
+// Helper: base64url encode
+const b64url = (input) =>
+  btoa(String.fromCharCode(...new Uint8Array(input instanceof ArrayBuffer ? input : new TextEncoder().encode(input))))
+    .replace(/=+/g, "")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_");
+
+// Helper: import PEM RSA private key
+const importRsaPrivateKey = async (pem) => {
+  const cleaned = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\s+/g, "");
+  const binaryDer = Uint8Array.from(atob(cleaned), (c) => c.charCodeAt(0));
+  return crypto.subtle.importKey(
+    "pkcs8",
+    binaryDer.buffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+};
+
+// Helper to create JWT for Google Auth using RS256
+const createGoogleAuthJwt = async (_c, serviceAccount) => {
   const iat = Math.floor(Date.now() / 1000);
-  const exp = iat + 3600;
+  const exp = iat + 3600; // 1 hour
+  const header = { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: serviceAccount.client_email,
     scope: GOOGLE_API_SCOPES.join(" "),
@@ -22,7 +47,22 @@ const createGoogleAuthJwt = async (c, serviceAccount) => {
     exp,
     iat,
   };
-  return await sign(payload, serviceAccount.private_key, "RS256");
+
+  // Fix escaped newlines if secret stored with \n
+  const privateKeyPem = serviceAccount.private_key.replace(/\\n/g, "\n");
+
+  const encodedHeader = b64url(JSON.stringify(header));
+  const encodedPayload = b64url(JSON.stringify(payload));
+  const data = `${encodedHeader}.${encodedPayload}`;
+
+  const key = await importRsaPrivateKey(privateKeyPem);
+  const sigBuf = await crypto.subtle.sign(
+    { name: "RSASSA-PKCS1-v1_5" },
+    key,
+    new TextEncoder().encode(data)
+  );
+  const signature = b64url(sigBuf);
+  return `${data}.${signature}`;
 };
 
 // Helper to get Google API Access Token with caching
@@ -172,15 +212,31 @@ export const handleGooglePlayWebhook = async (c, notification) => {
   console.log(`RTDN Received: Type ${notificationType} for subscription ${subscriptionId}`);
 
   // Find the user associated with this purchase token. This is the critical link.
-  const transaction = await db.getPaymentTransactionByProviderId(c.env.DB, "google", purchaseToken);
+  let transaction = await db.getPaymentTransactionByProviderId(
+    c.env.DB,
+    "google",
+    purchaseToken
+  );
 
   if (!transaction) {
     console.error(
       `CRITICAL: RTDN received for an unknown purchaseToken: ...${purchaseToken.slice(
         -12
-      )} for subscriptionId: ${subscriptionId}`
+      )} for subscriptionId: ${subscriptionId}. Attempting backfill via Google API.`
     );
-    return; // Cannot proceed without a link to a user.
+    // Try to fetch subscription details directly to recover (user may have purchased on another device before verification endpoint hit).
+    const details = await getSubscriptionDetails(c, purchaseToken, subscriptionId);
+    if (details.success) {
+      const sub = details.subscription;
+      const linkedUserId = null; // We don't know user yet.
+      // Without mapping purchaseToken -> user, we cannot apply benefits. Log and exit.
+      console.error(
+        `Unable to backfill transaction for token ...${purchaseToken.slice(
+          -12
+        )} because no user mapping exists. Ensure client calls /payment/verify after purchase to register token.`
+      );
+    }
+    return;
   }
 
   const userId = transaction.userId;
@@ -199,19 +255,26 @@ export const handleGooglePlayWebhook = async (c, notification) => {
 
   // Process the notification based on its type
   switch (notificationType) {
+    case 4: // SUBSCRIPTION_PURCHASED (initial purchase)
     case 2: // SUBSCRIPTION_RENEWED
     case 1: // SUBSCRIPTION_RECOVERED (e.g., user fixed a declined card)
       console.log(`Renewing/Recovering subscription for user: ${userId}`);
 
-      const now = new Date();
-      // Start the new period from the later of now or the current expiry date to handle early renewals.
-      const startDate =
-        user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
-          ? new Date(user.subscription_expiresAt)
-          : now;
-
-      const newExpiryDate = new Date(startDate);
-      newExpiryDate.setDate(newExpiryDate.getDate() + plan.durationDays);
+      // Prefer Google's authoritative expiry time when available to prevent drift.
+      let newExpiryDate;
+      const live = await getSubscriptionDetails(c, purchaseToken, subscriptionId);
+      if (live.success && live.subscription.expiryTimeMillis) {
+        newExpiryDate = new Date(parseInt(live.subscription.expiryTimeMillis, 10));
+      } else {
+        // Fallback: extend locally.
+        const now = new Date();
+        const startDate =
+          user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
+            ? new Date(user.subscription_expiresAt)
+            : now;
+        newExpiryDate = new Date(startDate);
+        newExpiryDate.setDate(newExpiryDate.getDate() + plan.durationDays);
+      }
 
       await db.updateUserSubscription(c.env.DB, userId, {
         tier: plan.tier,

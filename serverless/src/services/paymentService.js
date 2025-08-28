@@ -132,10 +132,10 @@ export const verifyPurchase = async (c, provider, verificationToken, user, planI
         userId: user.id,
         planId: verifiedPlanId,
         provider: "google",
-        amount: verifiedPlan.prices.usd, // Storing price in cents for consistency
+        amount: verifiedPlan.prices.usd,
         status: "COMPLETED",
-        // THIS IS THE CRITICAL LINK: Store the purchaseToken from Google.
         providerTransactionId: verificationToken,
+        shortId: null, // Not needed for Google
       });
       console.log(`Recorded new Google Play transaction for user ${user.id}`);
     } else {
