@@ -81,6 +81,20 @@ export const db = {
     }
   },
 
+  async getPaymentTransactionByProviderId(d1, provider, providerId) {
+    try {
+      return await d1
+        .prepare(
+          "SELECT * FROM payment_transactions WHERE provider = ? AND providerTransactionId = ? ORDER BY createdAt DESC"
+        )
+        .bind(provider, providerId)
+        .first();
+    } catch (e) {
+      console.error("D1 getPaymentTransactionByProviderId Error:", e.message);
+      return null;
+    }
+  },
+
   async updateUserSubscription(d1, userId, subData) {
     const { tier, expiresAt, providerSubscriptionId, hasUsedGoldTrial } = subData;
     const now = new Date().toISOString();
