@@ -11,8 +11,7 @@ const GOOGLE_PLAY_API_BASE = "https://androidpublisher.googleapis.com/androidpub
 const tokenCache = new Map();
 const TOKEN_CACHE_DURATION = 3000 * 1000; // 50 minutes
 
-// --- Helper Functions (Boilerplate for Google Auth) ---
-
+// Helper to create JWT for Google Auth
 const createGoogleAuthJwt = async (c, serviceAccount) => {
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + 3600;
@@ -23,9 +22,10 @@ const createGoogleAuthJwt = async (c, serviceAccount) => {
     exp,
     iat,
   };
-  return await sign(payload, serviceAccount.private_key, "RS26");
+  return await sign(payload, serviceAccount.private_key, "RS256");
 };
 
+// Helper to get Google API Access Token with caching
 const getGoogleAccessToken = async (c, signedJwt) => {
   const cached = tokenCache.get("google_access_token");
   if (cached && Date.now() < cached.expires) {
@@ -50,8 +50,6 @@ const getGoogleAccessToken = async (c, signedJwt) => {
   });
   return data.access_token;
 };
-
-// --- Exported Functions ---
 
 /**
  * Verifies a Google Play subscription purchase token from the client app.
@@ -91,8 +89,7 @@ export const verifyGooglePurchase = async (c, purchaseToken, subscriptionId) => 
 };
 
 /**
- * Verifies a one-time product purchase (for non-subscription items).
- * THIS IS ONE OF THE MISSING FUNCTIONS.
+ * Verifies a one-time product purchase.
  */
 export const verifyGoogleProductPurchase = async (c, purchaseToken, productId) => {
   try {
@@ -105,7 +102,6 @@ export const verifyGoogleProductPurchase = async (c, purchaseToken, productId) =
     const signedJwt = await createGoogleAuthJwt(c, serviceAccount);
     const accessToken = await getGoogleAccessToken(c, signedJwt);
 
-    // Note the different endpoint: /purchases/products/
     const url = `${GOOGLE_PLAY_API_BASE}/applications/${packageName}/purchases/products/${productId}/tokens/${purchaseToken}`;
     const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
 
@@ -116,7 +112,6 @@ export const verifyGoogleProductPurchase = async (c, purchaseToken, productId) =
     }
 
     const data = await response.json();
-    // For products: 0 = PURCHASED, 1 = CANCELED. Consumption state 0 means not yet consumed.
     if (data.purchaseState === 0 && data.consumptionState === 0) {
       return { success: true, planId: productId };
     }
@@ -132,7 +127,6 @@ export const verifyGoogleProductPurchase = async (c, purchaseToken, productId) =
 
 /**
  * Gets live subscription details from Google's servers.
- * THIS IS THE OTHER MISSING FUNCTION.
  */
 export const getSubscriptionDetails = async (c, purchaseToken, subscriptionId) => {
   try {
@@ -177,13 +171,14 @@ export const handleGooglePlayWebhook = async (c, notification) => {
   const { notificationType, purchaseToken, subscriptionId } = subscriptionNotification;
   console.log(`RTDN Received: Type ${notificationType} for subscription ${subscriptionId}`);
 
+  // Find the user associated with this purchase token. This is the critical link.
   const transaction = await db.getPaymentTransactionByProviderId(c.env.DB, "google", purchaseToken);
 
   if (!transaction) {
     console.error(
       `CRITICAL: RTDN received for an unknown purchaseToken: ...${purchaseToken.slice(-12)}`
     );
-    return;
+    return; // Cannot proceed without a link to a user.
   }
 
   const userId = transaction.userId;
@@ -200,17 +195,22 @@ export const handleGooglePlayWebhook = async (c, notification) => {
     return;
   }
 
+  // Process the notification based on its type
   switch (notificationType) {
     case 2: // SUBSCRIPTION_RENEWED
-    case 1: // SUBSCRIPTION_RECOVERED
+    case 1: // SUBSCRIPTION_RECOVERED (e.g., user fixed a declined card)
       console.log(`Renewing/Recovering subscription for user: ${userId}`);
+
       const now = new Date();
+      // Start the new period from the later of now or the current expiry date to handle early renewals.
       const startDate =
         user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
           ? new Date(user.subscription_expiresAt)
           : now;
+
       const newExpiryDate = new Date(startDate);
       newExpiryDate.setDate(newExpiryDate.getDate() + plan.durationDays);
+
       await db.updateUserSubscription(c.env.DB, userId, {
         tier: plan.tier,
         expiresAt: newExpiryDate.toISOString(),
@@ -222,20 +222,24 @@ export const handleGooglePlayWebhook = async (c, notification) => {
       console.log(
         `User ${userId} cancelled their subscription. Access remains valid until expiry.`
       );
+      // No change to expiry date is needed. The subscription will expire naturally.
+      // You could optionally set a flag in your DB to change the UI for this user (e.g., show "Resubscribe").
       break;
 
-    case 12: // SUBSCRIPTION_REVOKED
+    case 12: // SUBSCRIPTION_REVOKED (e.g., due to a payment chargeback)
     case 13: // SUBSCRIPTION_EXPIRED
       console.log(`Subscription expired/revoked for user: ${userId}. Reverting to 'free' tier.`);
       await db.updateUserSubscription(c.env.DB, userId, {
         tier: "free",
-        expiresAt: null,
+        expiresAt: null, // Clear the expiration date
       });
       break;
 
-    case 5: // SUBSCRIPTION_ON_HOLD
+    case 5: // SUBSCRIPTION_ON_HOLD (Enters account hold due to payment issue)
     case 6: // SUBSCRIPTION_IN_GRACE_PERIOD
       console.log(`Subscription for user ${userId} is on hold or in grace period.`);
+      // The user still has access during a grace period.
+      // You could update a status field for the user to show a "Please update your payment method" message in the app.
       break;
 
     default:

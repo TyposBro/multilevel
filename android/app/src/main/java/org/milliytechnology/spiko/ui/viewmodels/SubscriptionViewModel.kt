@@ -63,10 +63,17 @@ class SubscriptionViewModel @Inject constructor(
         // --- END OF FIX ---
 
         billingClient.purchases.onEach { purchases ->
+            Log.d("BillingTest", "--- New Purchase Update Detected ---")
+            Log.d("BillingTest", "Found ${purchases.size} purchases in the update.")
+
             purchases.forEach { purchase ->
+                Log.d("BillingTest", "Processing Purchase. Products: ${purchase.products}, State: ${purchase.purchaseState}, Acknowledged: ${purchase.isAcknowledged}")
+
                 if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
                     val planId = purchase.products.firstOrNull()
                     if (planId != null) {
+                        Log.d("BillingTest", "Purchase is PURCHASED and NOT acknowledged. Verifying with backend for planId: $planId")
+                        // This is the function we need to add more logging to
                         verifyAndAcknowledgePurchase(
                             provider = "google",
                             token = purchase.purchaseToken,
@@ -74,11 +81,14 @@ class SubscriptionViewModel @Inject constructor(
                             purchase = purchase
                         )
                     } else {
-                        Log.e("SubscriptionVM", "Purchase is missing product ID. Cannot verify.")
+                        Log.e("BillingTest", "FATAL: Purchase is missing product ID. Cannot verify.")
                         _uiState.update { it.copy(error = "Purchase verification failed: Missing Product ID.") }
                     }
+                } else {
+                    Log.d("BillingTest", "Purchase does not meet criteria for verification. Skipping.")
                 }
             }
+            Log.d("BillingTest", "--- Finished Processing Purchase Update ---")
         }.launchIn(viewModelScope)
     }
 
@@ -117,16 +127,23 @@ class SubscriptionViewModel @Inject constructor(
         purchase: Purchase
     ) {
         viewModelScope.launch {
+            Log.d("BillingTest", "verifyAndAcknowledgePurchase: Sending token ...${token.takeLast(12)} for plan '$planId' to backend.")
             _uiState.update { it.copy(isLoading = true, error = null) }
+
             when (val result = subscriptionRepository.verifyPurchase(provider, token, planId)) {
                 is RepositoryResult.Success -> {
-                    Log.d("SubscriptionVM", "Backend verification successful. Acknowledging purchase.")
+                    Log.d("BillingTest", "Backend verification SUCCESSFUL for token ...${token.takeLast(12)}. Now acknowledging with Google Play.")
+
+                    // Acknowledge the purchase with Google
                     billingClient.acknowledgePurchase(purchase)
+
+                    Log.d("BillingTest", "Google Play acknowledgement call has been made.")
                     _uiState.update {
                         it.copy(isLoading = false, purchaseSuccessMessage = result.data.message)
                     }
                 }
                 is RepositoryResult.Error -> {
+                    Log.e("BillingTest", "Backend verification FAILED for token ...${token.takeLast(12)}. Error: ${result.message}. WILL NOT acknowledge purchase.")
                     _uiState.update { it.copy(isLoading = false, error = result.message) }
                 }
             }

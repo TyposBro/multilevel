@@ -121,7 +121,7 @@ export const verifyPurchase = async (c, provider, verificationToken, user, planI
 
   // Step 4: Record the successful transaction for history and RTDN linking.
   if (provider.toLowerCase() === "google") {
-    // Check if a transaction for this token already exists to avoid duplicates.
+    // Check if a transaction for this token already exists to avoid duplicates from retries.
     const existingTransaction = await db.getPaymentTransactionByProviderId(
       c.env.DB,
       "google",
