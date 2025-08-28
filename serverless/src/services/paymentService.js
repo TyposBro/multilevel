@@ -46,6 +46,14 @@ export const initiatePayment = async (c, provider, planId, userId, transaction) 
  */
 export const verifyPurchase = async (c, provider, verificationToken, user, planId) => {
   let verificationResult;
+  const trace = {
+    scope: "purchase.verify",
+    provider: provider.toLowerCase(),
+    tokenSuffix: verificationToken.slice(-8),
+    userId: user.id,
+    planId,
+  };
+  console.log(JSON.stringify({ ...trace, event: "start" }));
 
   // Step 1: Dispatch to the correct provider-specific verification service.
   switch (provider.toLowerCase()) {
@@ -57,6 +65,15 @@ export const verifyPurchase = async (c, provider, verificationToken, user, planI
         c,
         verificationToken,
         planId
+      );
+      console.log(
+        JSON.stringify({
+          ...trace,
+          event: "provider_result",
+          success: verificationResult?.success,
+          purchaseState: verificationResult?.purchaseState,
+          expiry: verificationResult?.expiryTimeMillis,
+        })
       );
       break;
 
@@ -90,6 +107,9 @@ export const verifyPurchase = async (c, provider, verificationToken, user, planI
 
   // Step 2: Handle provider-level verification failures.
   if (!verificationResult || !verificationResult.success) {
+    console.warn(
+      JSON.stringify({ ...trace, event: "provider_failed", error: verificationResult?.error })
+    );
     return {
       success: false,
       message: verificationResult?.error || "Purchase verification failed.",
@@ -104,15 +124,19 @@ export const verifyPurchase = async (c, provider, verificationToken, user, planI
   }
 
   // Step 3: Grant the subscription entitlement to the user.
-  const now = new Date();
-  // If the user already has an active subscription, extend it. Otherwise, start from now.
-  const startDate =
-    user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
-      ? new Date(user.subscription_expiresAt)
-      : now;
-
-  const newExpiresAt = new Date(startDate);
-  newExpiresAt.setDate(newExpiresAt.getDate() + verifiedPlan.durationDays);
+  // Prefer authoritative expiry from provider (Google) when available
+  let newExpiresAt;
+  if (provider.toLowerCase() === "google" && verificationResult.expiryTimeMillis) {
+    newExpiresAt = new Date(parseInt(verificationResult.expiryTimeMillis, 10));
+  } else {
+    const now = new Date();
+    const startDate =
+      user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
+        ? new Date(user.subscription_expiresAt)
+        : now;
+    newExpiresAt = new Date(startDate);
+    newExpiresAt.setDate(newExpiresAt.getDate() + verifiedPlan.durationDays);
+  }
 
   const updatedUser = await db.updateUserSubscription(c.env.DB, user.id, {
     tier: verifiedPlan.tier,
@@ -137,24 +161,29 @@ export const verifyPurchase = async (c, provider, verificationToken, user, planI
         providerTransactionId: verificationToken,
         shortId: null, // Not needed for Google
       });
-      console.log(`Recorded new Google Play transaction for user ${user.id}`);
+      console.log(JSON.stringify({ ...trace, event: "transaction_recorded" }));
     } else {
       console.log(
-        `Transaction for token ...${verificationToken.slice(
-          -12
-        )} already exists. Skipping record creation.`
+        JSON.stringify({
+          ...trace,
+          event: "transaction_exists",
+          existingTransactionId: existingTransaction.id,
+        })
       );
     }
   }
 
   console.log(
-    `User ${user.id} successfully upgraded to ${
-      verifiedPlan.tier
-    } until ${newExpiresAt.toISOString()}`
+    JSON.stringify({
+      ...trace,
+      event: "grant_success",
+      tier: verifiedPlan.tier,
+      expiresAt: newExpiresAt.toISOString(),
+    })
   );
 
   // Step 5: Return a success message and the new subscription details to the client.
-  return {
+  const response = {
     success: true,
     message: `Successfully upgraded to ${verifiedPlan.tier}!`,
     subscription: {
@@ -162,4 +191,6 @@ export const verifyPurchase = async (c, provider, verificationToken, user, planI
       expiresAt: updatedUser.subscription_expiresAt,
     },
   };
+  console.log(JSON.stringify({ ...trace, event: "end", success: true }));
+  return response;
 };

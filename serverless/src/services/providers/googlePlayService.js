@@ -14,7 +14,11 @@ const TOKEN_CACHE_DURATION = 3000 * 1000; // 50 minutes
 
 // Helper: base64url encode
 const b64url = (input) =>
-  btoa(String.fromCharCode(...new Uint8Array(input instanceof ArrayBuffer ? input : new TextEncoder().encode(input))))
+  btoa(
+    String.fromCharCode(
+      ...new Uint8Array(input instanceof ArrayBuffer ? input : new TextEncoder().encode(input))
+    )
+  )
     .replace(/=+/g, "")
     .replace(/\+/g, "-")
     .replace(/\//g, "_");
@@ -36,10 +40,11 @@ const importRsaPrivateKey = async (pem) => {
 };
 
 // Helper to create JWT for Google Auth using RS256
-const createGoogleAuthJwt = async (_c, serviceAccount) => {
+const createGoogleAuthJwt = async (c, serviceAccount) => {
+  const t0 = Date.now();
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + 3600; // 1 hour
-  const header = { alg: "RS256", typ: "JWT" };
+  const header = { alg: "RS256", typ: "JWT", kid: serviceAccount.private_key_id };
   const payload = {
     iss: serviceAccount.client_email,
     scope: GOOGLE_API_SCOPES.join(" "),
@@ -48,8 +53,8 @@ const createGoogleAuthJwt = async (_c, serviceAccount) => {
     iat,
   };
 
-  // Fix escaped newlines if secret stored with \n
-  const privateKeyPem = serviceAccount.private_key.replace(/\\n/g, "\n");
+  // Fix escaped newlines if secret stored with \n and remove CR chars / extra spaces
+  const privateKeyPem = serviceAccount.private_key.replace(/\\n/g, "\n").replace(/\r/g, "").trim();
 
   const encodedHeader = b64url(JSON.stringify(header));
   const encodedPayload = b64url(JSON.stringify(payload));
@@ -62,15 +67,37 @@ const createGoogleAuthJwt = async (_c, serviceAccount) => {
     new TextEncoder().encode(data)
   );
   const signature = b64url(sigBuf);
-  return `${data}.${signature}`;
+  const jwt = `${data}.${signature}`;
+  c?.executionCtx &&
+    console.log(
+      JSON.stringify({
+        scope: "gplay.auth.jwt",
+        event: "jwt_created",
+        kid: serviceAccount.private_key_id,
+        iss: serviceAccount.client_email,
+        elapsedMs: Date.now() - t0,
+        headerB64Len: encodedHeader.length,
+        payloadB64Len: encodedPayload.length,
+        sigLen: signature.length,
+      })
+    );
+  return jwt;
 };
 
 // Helper to get Google API Access Token with caching
 const getGoogleAccessToken = async (c, signedJwt) => {
   const cached = tokenCache.get("google_access_token");
   if (cached && Date.now() < cached.expires) {
+    console.log(
+      JSON.stringify({
+        scope: "gplay.auth",
+        event: "cache_hit",
+        expiresInMs: cached.expires - Date.now(),
+      })
+    );
     return cached.token;
   }
+  const t0 = Date.now();
   const response = await fetch(GOOGLE_AUTH_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -81,6 +108,14 @@ const getGoogleAccessToken = async (c, signedJwt) => {
   });
   if (!response.ok) {
     const errorBody = await response.text();
+    console.error(
+      JSON.stringify({
+        scope: "gplay.auth",
+        event: "auth_fail",
+        status: response.status,
+        body: errorBody.slice(0, 300),
+      })
+    );
     throw new Error(`Google auth failed: ${response.status} - ${errorBody}`);
   }
   const data = await response.json();
@@ -88,6 +123,9 @@ const getGoogleAccessToken = async (c, signedJwt) => {
     token: data.access_token,
     expires: Date.now() + TOKEN_CACHE_DURATION,
   });
+  console.log(
+    JSON.stringify({ scope: "gplay.auth", event: "auth_success", elapsedMs: Date.now() - t0 })
+  );
   return data.access_token;
 };
 
@@ -96,6 +134,7 @@ const getGoogleAccessToken = async (c, signedJwt) => {
  */
 export const verifyGooglePurchase = async (c, purchaseToken, subscriptionId) => {
   try {
+    const t0 = Date.now();
     const serviceAccountJson = c.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
     if (!serviceAccountJson)
       return { success: false, error: "Google Play verification is not configured." };
@@ -110,20 +149,49 @@ export const verifyGooglePurchase = async (c, purchaseToken, subscriptionId) => 
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Google Play API Error on verify:", errorText);
+      console.error(
+        JSON.stringify({
+          scope: "gplay.verify",
+          event: "http_error",
+          status: response.status,
+          body: errorText.slice(0, 300),
+          subscriptionId,
+          tokenSuffix: purchaseToken.slice(-8),
+        })
+      );
       return { success: false, error: "Purchase verification failed with Google." };
     }
 
     const data = await response.json();
+    console.log(
+      JSON.stringify({
+        scope: "gplay.verify",
+        event: "response",
+        purchaseState: data.purchaseState,
+        expiryTimeMillis: data.expiryTimeMillis,
+        subscriptionId,
+        tokenSuffix: purchaseToken.slice(-8),
+        elapsedMs: Date.now() - t0,
+      })
+    );
     if (data.purchaseState === 0) {
-      const isExpired =
-        data.expiryTimeMillis && new Date().getTime() > parseInt(data.expiryTimeMillis, 10);
-      if (!isExpired) return { success: true, planId: subscriptionId };
+      const expiryMs = data.expiryTimeMillis ? parseInt(data.expiryTimeMillis, 10) : null;
+      const isExpired = expiryMs && Date.now() > expiryMs;
+      if (!isExpired) {
+        return { success: true, planId: subscriptionId, expiryTimeMillis: data.expiryTimeMillis };
+      }
       return { success: false, error: "This subscription has already expired." };
     }
     return { success: false, error: "This subscription is not in an active state." };
   } catch (error) {
-    console.error("Internal error during Google Play verification:", error);
+    console.error(
+      JSON.stringify({
+        scope: "gplay.verify",
+        event: "exception",
+        message: error.message,
+        stack: (error.stack || "").split("\n").slice(0, 3).join(" | "),
+      })
+    );
     return { success: false, error: "An internal server error occurred." };
   }
 };
@@ -170,6 +238,7 @@ export const verifyGoogleProductPurchase = async (c, purchaseToken, productId) =
  */
 export const getSubscriptionDetails = async (c, purchaseToken, subscriptionId) => {
   try {
+    const t0 = Date.now();
     const serviceAccountJson = c.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
     if (!serviceAccountJson) return { success: false, error: "Google Play not configured" };
     const serviceAccount = JSON.parse(serviceAccountJson);
@@ -182,13 +251,35 @@ export const getSubscriptionDetails = async (c, purchaseToken, subscriptionId) =
     const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
 
     if (!response.ok) {
+      console.warn(
+        JSON.stringify({
+          scope: "gplay.details",
+          event: "http_error",
+          status: response.status,
+          subscriptionId,
+          tokenSuffix: purchaseToken.slice(-8),
+        })
+      );
       return { success: false, error: "Failed to get subscription details from Google." };
     }
 
     const data = await response.json();
+    console.log(
+      JSON.stringify({
+        scope: "gplay.details",
+        event: "response",
+        purchaseState: data.purchaseState,
+        expiryTimeMillis: data.expiryTimeMillis,
+        subscriptionId,
+        tokenSuffix: purchaseToken.slice(-8),
+        elapsedMs: Date.now() - t0,
+      })
+    );
     return { success: true, subscription: data };
   } catch (error) {
-    console.error("Error getting subscription details:", error.message);
+    console.error(
+      JSON.stringify({ scope: "gplay.details", event: "exception", message: error.message })
+    );
     return { success: false, error: "Failed to retrieve subscription details" };
   }
 };
@@ -210,19 +301,27 @@ export const handleGooglePlayWebhook = async (c, notification) => {
 
   const { notificationType, purchaseToken, subscriptionId } = subscriptionNotification;
   console.log(`RTDN Received: Type ${notificationType} for subscription ${subscriptionId}`);
+  console.log(
+    JSON.stringify({
+      scope: "gplay.rtdn",
+      event: "received",
+      notificationType,
+      subscriptionId,
+      tokenSuffix: purchaseToken?.slice(-8),
+    })
+  );
 
   // Find the user associated with this purchase token. This is the critical link.
-  let transaction = await db.getPaymentTransactionByProviderId(
-    c.env.DB,
-    "google",
-    purchaseToken
-  );
+  let transaction = await db.getPaymentTransactionByProviderId(c.env.DB, "google", purchaseToken);
 
   if (!transaction) {
     console.error(
-      `CRITICAL: RTDN received for an unknown purchaseToken: ...${purchaseToken.slice(
-        -12
-      )} for subscriptionId: ${subscriptionId}. Attempting backfill via Google API.`
+      JSON.stringify({
+        scope: "gplay.rtdn",
+        event: "unknown_token",
+        subscriptionId,
+        tokenSuffix: purchaseToken.slice(-8),
+      })
     );
     // Try to fetch subscription details directly to recover (user may have purchased on another device before verification endpoint hit).
     const details = await getSubscriptionDetails(c, purchaseToken, subscriptionId);
@@ -231,9 +330,12 @@ export const handleGooglePlayWebhook = async (c, notification) => {
       const linkedUserId = null; // We don't know user yet.
       // Without mapping purchaseToken -> user, we cannot apply benefits. Log and exit.
       console.error(
-        `Unable to backfill transaction for token ...${purchaseToken.slice(
-          -12
-        )} because no user mapping exists. Ensure client calls /payment/verify after purchase to register token.`
+        JSON.stringify({
+          scope: "gplay.rtdn",
+          event: "backfill_failed_no_mapping",
+          subscriptionId,
+          tokenSuffix: purchaseToken.slice(-8),
+        })
       );
     }
     return;

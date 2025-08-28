@@ -82,19 +82,19 @@ class BillingClientWrapperImpl @Inject constructor(
 
     override fun startConnection() {
         if (billingClient.isReady) {
-            Log.d("BillingClient", "Billing Client is already connected.")
+            Log.d("BillingTrace", "conn.already_ready=true")
             _isReady.value = true
             connectionRetryCount = 0 // Reset retry count on successful connection
             return
         }
 
-        Log.d("BillingClient", "Starting billing client connection (attempt ${connectionRetryCount + 1}/$maxRetryCount)")
+        Log.d("BillingTrace", "conn.start attempt=${connectionRetryCount + 1} max=$maxRetryCount")
 
         billingClient.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(billingResult: BillingResult) {
                 when (billingResult.responseCode) {
                     BillingClient.BillingResponseCode.OK -> {
-                        Log.d("BillingClient", "Billing Client connected successfully.")
+                        Log.d("BillingTrace", "conn.success retries=$connectionRetryCount")
                         _isReady.value = true
                         connectionRetryCount = 0 // Reset retry count on success
                         queryPurchases()
@@ -109,7 +109,7 @@ class BillingClientWrapperImpl @Inject constructor(
                         attemptRetryConnection()
                     }
                     else -> {
-                        Log.e("BillingClient", "Billing setup failed (${billingResult.responseCode}): ${billingResult.debugMessage}")
+                        Log.e("BillingTrace", "conn.fail code=${billingResult.responseCode} msg=${billingResult.debugMessage}")
                         _isReady.value = false
                         attemptRetryConnection()
                     }
@@ -117,7 +117,7 @@ class BillingClientWrapperImpl @Inject constructor(
             }
 
             override fun onBillingServiceDisconnected() {
-                Log.w("BillingClient", "Billing service disconnected")
+                Log.w("BillingTrace", "conn.disconnected")
                 _isReady.value = false
                 attemptRetryConnection()
             }
@@ -127,7 +127,7 @@ class BillingClientWrapperImpl @Inject constructor(
     private fun attemptRetryConnection() {
         if (connectionRetryCount < maxRetryCount) {
             connectionRetryCount++
-            Log.d("BillingClient", "Attempting to reconnect... (${connectionRetryCount}/$maxRetryCount)")
+            Log.d("BillingTrace", "conn.retry attempt=$connectionRetryCount")
             // Simple delay before retry (in a real app, you might want exponential backoff)
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 startConnection()
@@ -149,19 +149,17 @@ class BillingClientWrapperImpl @Inject constructor(
         val productDetailsResult = billingClient.queryProductDetails(params)
 
         if (productDetailsResult.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+            Log.d("BillingTrace", "products.query.success count=${productDetailsResult.productDetailsList?.size ?: 0}")
             _productDetails.value = productDetailsResult.productDetailsList ?: emptyList()
         } else {
-            Log.e(
-                "BillingClient",
-                "Failed to query products: ${productDetailsResult.billingResult.debugMessage}"
-            )
+            Log.e("BillingTrace", "products.query.fail code=${productDetailsResult.billingResult.responseCode} msg=${productDetailsResult.billingResult.debugMessage}")
         }
     }
 
-    override fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails) {
+    override fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails, obfuscatedAccountId: String?) {
         val offerToken = productDetails.subscriptionOfferDetails?.firstOrNull()?.offerToken
         if (offerToken == null) {
-            Log.e("BillingClient", "No offer token found for product: ${productDetails.productId}")
+            Log.e("BillingTrace", "purchase.launch.no_offer product=${productDetails.productId}")
             return
         }
 
@@ -171,11 +169,18 @@ class BillingClientWrapperImpl @Inject constructor(
                 .setOfferToken(offerToken)
                 .build()
         )
-        val billingFlowParams = BillingFlowParams.newBuilder()
+        val builder = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(productDetailsParamsList)
-            .build()
+        if (!obfuscatedAccountId.isNullOrBlank()) {
+            Log.d("BillingTrace", "purchase.launch.obfuscatedAccountId len=${obfuscatedAccountId.length}")
+            builder.setObfuscatedAccountId(obfuscatedAccountId.take(64)) // 64 char limit
+        } else {
+            Log.w("BillingTrace", "purchase.launch.no_obfuscated_account")
+        }
+        val billingFlowParams = builder.build()
 
-        billingClient.launchBillingFlow(activity, billingFlowParams)
+        val result = billingClient.launchBillingFlow(activity, billingFlowParams)
+        Log.d("BillingTrace", "purchase.launch.result code=${result.responseCode} msg=${result.debugMessage}")
     }
 
     override suspend fun acknowledgePurchase(purchase: Purchase) {
@@ -187,10 +192,7 @@ class BillingClientWrapperImpl @Inject constructor(
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                 Log.d("BillingClient", "Purchase acknowledged successfully.")
             } else {
-                Log.e(
-                    "BillingClient",
-                    "Failed to acknowledge purchase: ${billingResult.debugMessage}"
-                )
+                Log.e("BillingTrace", "ack.fail code=${billingResult.responseCode} msg=${billingResult.debugMessage}")
             }
         }
     }
@@ -202,14 +204,10 @@ class BillingClientWrapperImpl @Inject constructor(
 
         billingClient.queryPurchasesAsync(params) { billingResult, purchasesList ->
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                if (purchasesList.isNotEmpty()) {
-                    _purchases.tryEmit(purchasesList)
-                }
+                Log.d("BillingTrace", "purchases.query.success count=${purchasesList.size}")
+                if (purchasesList.isNotEmpty()) _purchases.tryEmit(purchasesList)
             } else {
-                Log.e(
-                    "BillingClient",
-                    "Failed to query existing purchases: ${billingResult.debugMessage}"
-                )
+                Log.e("BillingTrace", "purchases.query.fail code=${billingResult.responseCode} msg=${billingResult.debugMessage}")
             }
         }
     }
@@ -217,7 +215,7 @@ class BillingClientWrapperImpl @Inject constructor(
     override fun endConnection() {
         if (billingClient.isReady) {
             billingClient.endConnection()
-            Log.d("BillingClient", "Billing Client connection closed.")
+            Log.d("BillingTrace", "conn.closed")
         }
     }
 }

@@ -46,28 +46,33 @@ class SubscriptionViewModel @Inject constructor(
     init {
         // This coroutine now manages the entire loading lifecycle.
         viewModelScope.launch {
+            Log.d("BillingTraceVM", "init.start")
             _uiState.update { it.copy(isLoading = true) }
 
             fetchUserProfile()
 
             billingClient.startConnection()
             billingClient.isReady.filter { it }.first()
+            Log.d("BillingTraceVM", "billing.ready")
             loadProducts() // This will now correctly turn off isLoading at the end.
         }
 
         // This observer's ONLY job is to update the productDetails list.
         // It no longer touches the `isLoading` flag.
         billingClient.productDetails.onEach { products ->
+            Log.d("BillingTraceVM", "products.updated count=${products.size}")
             _uiState.update { it.copy(productDetails = products) }
         }.launchIn(viewModelScope)
 
         billingClient.purchases.onEach { purchases ->
+            Log.d("BillingTraceVM", "purchases.flow count=${purchases.size}")
             purchases.forEach { purchase ->
                 if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
 
                     // --- THE CORE FIX ---
                     // 1. Try to get planId from the purchase object first.
                     var planId = purchase.products.firstOrNull()
+                    Log.d("BillingTraceVM", "purchase.received tokenSuffix=${purchase.purchaseToken.takeLast(8)} rawPlan=$planId acknowledged=${purchase.isAcknowledged}")
 
                     // 2. If it's null, use our fallback from the UI state.
                     if (planId == null) {
@@ -76,7 +81,7 @@ class SubscriptionViewModel @Inject constructor(
                     }
 
                     if (planId != null) {
-                        Log.d("BillingTest", "Purchase is PURCHASED and NOT acknowledged. Verifying with backend for planId: $planId")
+                        Log.d("BillingTraceVM", "purchase.verify plan=$planId tokenSuffix=${purchase.purchaseToken.takeLast(8)}")
                         verifyAndAcknowledgePurchase(
                             provider = "google",
                             token = purchase.purchaseToken,
@@ -86,11 +91,11 @@ class SubscriptionViewModel @Inject constructor(
                         // 3. Clear the pending ID after using it.
                         _uiState.update { it.copy(pendingPurchasePlanId = null) }
                     } else {
-                        Log.e("BillingTest", "FATAL: Purchase is missing product ID and no pending ID was found. Cannot verify.")
+                        Log.e("BillingTraceVM", "purchase.fatal_missing_plan tokenSuffix=${purchase.purchaseToken.takeLast(8)}")
                         _uiState.update { it.copy(error = "Purchase verification failed: Missing Product ID.") }
                     }
                 } else {
-                    Log.d("BillingTest", "Purchase does not meet criteria for verification. Skipping.")
+                    Log.d("BillingTraceVM", "purchase.skip state=${purchase.purchaseState} acknowledged=${purchase.isAcknowledged}")
                 }
             }
         }.launchIn(viewModelScope)
@@ -98,13 +103,15 @@ class SubscriptionViewModel @Inject constructor(
 
     private fun fetchUserProfile() {
         viewModelScope.launch {
-            when (val result = authRepository.getUserProfile()) {
+        when (val result = authRepository.getUserProfile()) {
                 is RepositoryResult.Success -> {
+            Log.d("BillingTraceVM", "profile.success userId=${result.data.id}")
                     _uiState.update {
                         it.copy(userProfile = result.data.toViewData())
                     }
                 }
                 is RepositoryResult.Error -> {
+            Log.e("BillingTraceVM", "profile.error msg=${result.message}")
                     _uiState.update { it.copy(error = result.message) }
                 }
             }
@@ -114,6 +121,7 @@ class SubscriptionViewModel @Inject constructor(
     private fun loadProducts() {
         viewModelScope.launch {
             val productIds = listOf("silver_monthly", "gold_monthly")
+            Log.d("BillingTraceVM", "products.query start ids=${productIds}")
             billingClient.queryProductDetails(productIds)
             // Now that everything has been fetched, we can safely turn off the loading indicator.
             _uiState.update { it.copy(isLoading = false) }
@@ -122,8 +130,10 @@ class SubscriptionViewModel @Inject constructor(
 
     fun launchGooglePlayPurchase(activity: Activity, productDetails: ProductDetails) {
         // --- FIX: Store the planId before launching the flow ---
-        _uiState.update { it.copy(pendingPurchasePlanId = productDetails.productId) }
-        billingClient.launchPurchaseFlow(activity, productDetails)
+    Log.d("BillingTraceVM", "purchase.launch_ui product=${productDetails.productId}")
+    _uiState.update { it.copy(pendingPurchasePlanId = productDetails.productId) }
+        val userId = _uiState.value.userProfile?.id
+        billingClient.launchPurchaseFlow(activity, productDetails, obfuscatedAccountId = userId)
     }
 
     private fun verifyAndAcknowledgePurchase(
@@ -133,23 +143,23 @@ class SubscriptionViewModel @Inject constructor(
         purchase: Purchase
     ) {
         viewModelScope.launch {
-            Log.d("BillingTest", "verifyAndAcknowledgePurchase: Sending token ...${token.takeLast(12)} for plan '$planId' to backend.")
+        Log.d("BillingTraceVM", "verify.start plan=$planId tokenSuffix=${token.takeLast(8)}")
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             when (val result = subscriptionRepository.verifyPurchase(provider, token, planId)) {
                 is RepositoryResult.Success -> {
-                    Log.d("BillingTest", "Backend verification SUCCESSFUL for token ...${token.takeLast(12)}. Now acknowledging with Google Play.")
+            Log.d("BillingTraceVM", "verify.success tokenSuffix=${token.takeLast(8)} acknowledging=true")
 
                     // Acknowledge the purchase with Google
                     billingClient.acknowledgePurchase(purchase)
 
-                    Log.d("BillingTest", "Google Play acknowledgement call has been made.")
+            Log.d("BillingTraceVM", "ack.sent tokenSuffix=${token.takeLast(8)}")
                     _uiState.update {
                         it.copy(isLoading = false, purchaseSuccessMessage = result.data.message)
                     }
                 }
                 is RepositoryResult.Error -> {
-                    Log.e("BillingTest", "Backend verification FAILED for token ...${token.takeLast(12)}. Error: ${result.message}. WILL NOT acknowledge purchase.")
+            Log.e("BillingTraceVM", "verify.error tokenSuffix=${token.takeLast(8)} msg=${result.message}")
                     _uiState.update { it.copy(isLoading = false, error = result.message) }
                 }
             }

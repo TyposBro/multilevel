@@ -39,8 +39,11 @@ class FakeBillingClientWrapper @Inject constructor() : BillingClientWrapper {
         _productDetails.value = emptyList()
     }
 
-    override fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails) {
+    override fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails, obfuscatedAccountId: String?) {
         Log.d("FakeBillingClient", "launchPurchaseFlow called for ${productDetails.productId}")
+        if (!obfuscatedAccountId.isNullOrBlank()) {
+            Log.d("FakeBillingClient", "Received obfuscatedAccountId=$obfuscatedAccountId")
+        }
         
         if (shouldSimulateError) {
             Log.d("FakeBillingClient", "Simulating purchase error")

@@ -14,7 +14,7 @@ interface BillingClientWrapper {
 
     fun startConnection()
     suspend fun queryProductDetails(productIds: List<String>)
-    fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails)
+    fun launchPurchaseFlow(activity: Activity, productDetails: ProductDetails, obfuscatedAccountId: String? = null)
     suspend fun acknowledgePurchase(purchase: Purchase)
     fun endConnection()
 }
