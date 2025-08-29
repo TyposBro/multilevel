@@ -244,7 +244,8 @@ export const verifyGooglePlayProduct = async (c) => {
 
     // For products, you might want different logic than subscriptions
     // For example, granting permanent features or credits
-    const grantResult = await verifyPurchase(c, "google_play", purchaseToken, user, productId);
+    // Use canonical provider key 'google'
+    const grantResult = await verifyPurchase(c, "google", purchaseToken, user, productId);
 
     if (grantResult.success) {
       console.log(

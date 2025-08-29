@@ -13,15 +13,18 @@ const tokenCache = new Map();
 const TOKEN_CACHE_DURATION = 3000 * 1000; // 50 minutes
 
 // Helper: base64url encode
-const b64url = (input) =>
-  btoa(
-    String.fromCharCode(
-      ...new Uint8Array(input instanceof ArrayBuffer ? input : new TextEncoder().encode(input))
-    )
-  )
-    .replace(/=+/g, "")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_");
+const b64url = (input) => {
+  const buffer = input instanceof ArrayBuffer ? input : new TextEncoder().encode(input);
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  // This is a reliable way to convert a Uint8Array to a binary string for btoa.
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/=+/g, "").replace(/\+/g, "-").replace(/\//g, "_");
+};
+
+let loggedKeyFingerprint = false;
 
 // Helper: import PEM RSA private key
 const importRsaPrivateKey = async (pem) => {
@@ -30,21 +33,43 @@ const importRsaPrivateKey = async (pem) => {
     .replace(/-----END PRIVATE KEY-----/, "")
     .replace(/\s+/g, "");
   const binaryDer = Uint8Array.from(atob(cleaned), (c) => c.charCodeAt(0));
+  // Compute a stable fingerprint (sha256 of DER) for diagnostics (not secret)
+  if (!loggedKeyFingerprint) {
+    try {
+      const digest = await crypto.subtle.digest("SHA-256", binaryDer.buffer);
+      const hex = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+      console.log(
+        JSON.stringify({
+          scope: "gplay.auth.key",
+          event: "fingerprint",
+          sha256: hex.slice(0, 16), // shortened to avoid noise
+          derLength: binaryDer.length,
+        })
+      );
+    } catch (_) {}
+    loggedKeyFingerprint = true;
+  }
   return crypto.subtle.importKey(
     "pkcs8",
     binaryDer.buffer,
     { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false,
+    true, // extractable for debugging (can export public key if needed)
     ["sign"]
   );
 };
 
-// Helper to create JWT for Google Auth using RS256
-const createGoogleAuthJwt = async (c, serviceAccount) => {
+// Helper to create JWT for Google Auth using RS256. Optionally omit the `kid` header
+// because in some environments Google may reject a JWT if the provided private_key_id
+// does not match (e.g. key rotated but stale JSON in secret). We can fallback.
+const createGoogleAuthJwt = async (c, serviceAccount, { includeKid = true } = {}) => {
   const t0 = Date.now();
   const iat = Math.floor(Date.now() / 1000);
   const exp = iat + 3600; // 1 hour
-  const header = { alg: "RS256", typ: "JWT", kid: serviceAccount.private_key_id };
+  const header = includeKid
+    ? { alg: "RS256", typ: "JWT", kid: serviceAccount.private_key_id }
+    : { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: serviceAccount.client_email,
     scope: GOOGLE_API_SCOPES.join(" "),
@@ -67,25 +92,33 @@ const createGoogleAuthJwt = async (c, serviceAccount) => {
     new TextEncoder().encode(data)
   );
   const signature = b64url(sigBuf);
+  // Local self-verification (sanity): re-import as public key via spki derived from pkcs8 isn't trivial here.
+  // Instead, we trust subtle.sign output; we log first bytes hex for support.
+  const sigHex = Array.from(new Uint8Array(sigBuf))
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
   const jwt = `${data}.${signature}`;
   c?.executionCtx &&
     console.log(
       JSON.stringify({
         scope: "gplay.auth.jwt",
         event: "jwt_created",
-        kid: serviceAccount.private_key_id,
+        kid: includeKid ? serviceAccount.private_key_id : undefined,
+        includeKid,
         iss: serviceAccount.client_email,
         elapsedMs: Date.now() - t0,
         headerB64Len: encodedHeader.length,
         payloadB64Len: encodedPayload.length,
         sigLen: signature.length,
+        sigFirstBytes: sigHex,
       })
     );
   return jwt;
 };
 
-// Helper to get Google API Access Token with caching
-const getGoogleAccessToken = async (c, signedJwt) => {
+// Internal: exchange a single signed assertion for an access token
+const exchangeJwtForAccessToken = async (c, signedJwt, meta = {}) => {
   const cached = tokenCache.get("google_access_token");
   if (cached && Date.now() < cached.expires) {
     console.log(
@@ -108,12 +141,31 @@ const getGoogleAccessToken = async (c, signedJwt) => {
   });
   if (!response.ok) {
     const errorBody = await response.text();
+    let jwtParts;
+    try {
+      const parts = signedJwt.split(".");
+      if (parts.length === 3) {
+        const decode = (s) =>
+          JSON.parse(
+            new TextDecoder().decode(
+              Uint8Array.from(atob(s.replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0))
+            )
+          );
+        jwtParts = { header: decode(parts[0]), payload: decode(parts[1]) };
+      }
+    } catch (e) {
+      jwtParts = { decodeError: e.message };
+    }
     console.error(
       JSON.stringify({
         scope: "gplay.auth",
         event: "auth_fail",
         status: response.status,
         body: errorBody.slice(0, 300),
+        jwtHeader: jwtParts?.header,
+        jwtPayload: jwtParts?.payload,
+        jwtDecodeError: jwtParts?.decodeError,
+        includeKid: meta.includeKid,
       })
     );
     throw new Error(`Google auth failed: ${response.status} - ${errorBody}`);
@@ -129,6 +181,32 @@ const getGoogleAccessToken = async (c, signedJwt) => {
   return data.access_token;
 };
 
+// Helper to get Google API Access Token with retry (kid + no kid)
+const getGoogleAccessToken = async (c, serviceAccount) => {
+  // First attempt (with kid)
+  try {
+    const jwtWithKid = await createGoogleAuthJwt(c, serviceAccount, { includeKid: true });
+    return await exchangeJwtForAccessToken(c, jwtWithKid, { includeKid: true });
+  } catch (e) {
+    if (/(invalid_grant).*Invalid JWT Signature/i.test(e.message)) {
+      console.warn(
+        JSON.stringify({
+          scope: "gplay.auth",
+          event: "retry_without_kid",
+          message: "Retrying Google OAuth without kid header due to invalid signature.",
+        })
+      );
+      try {
+        const jwtNoKid = await createGoogleAuthJwt(c, serviceAccount, { includeKid: false });
+        return await exchangeJwtForAccessToken(c, jwtNoKid, { includeKid: false });
+      } catch (inner) {
+        throw inner; // propagate
+      }
+    }
+    throw e; // non-signature related failure
+  }
+};
+
 /**
  * Verifies a Google Play subscription purchase token from the client app.
  */
@@ -141,8 +219,7 @@ export const verifyGooglePurchase = async (c, purchaseToken, subscriptionId) => 
     const serviceAccount = JSON.parse(serviceAccountJson);
     const packageName = "org.milliytechnology.spiko";
 
-    const signedJwt = await createGoogleAuthJwt(c, serviceAccount);
-    const accessToken = await getGoogleAccessToken(c, signedJwt);
+    const accessToken = await getGoogleAccessToken(c, serviceAccount);
 
     const url = `${GOOGLE_PLAY_API_BASE}/applications/${packageName}/purchases/subscriptions/${subscriptionId}/tokens/${purchaseToken}`;
     const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
@@ -207,8 +284,7 @@ export const verifyGoogleProductPurchase = async (c, purchaseToken, productId) =
     const serviceAccount = JSON.parse(serviceAccountJson);
     const packageName = "org.milliytechnology.spiko";
 
-    const signedJwt = await createGoogleAuthJwt(c, serviceAccount);
-    const accessToken = await getGoogleAccessToken(c, signedJwt);
+    const accessToken = await getGoogleAccessToken(c, serviceAccount);
 
     const url = `${GOOGLE_PLAY_API_BASE}/applications/${packageName}/purchases/products/${productId}/tokens/${purchaseToken}`;
     const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
@@ -244,8 +320,7 @@ export const getSubscriptionDetails = async (c, purchaseToken, subscriptionId) =
     const serviceAccount = JSON.parse(serviceAccountJson);
     const packageName = "org.milliytechnology.spiko";
 
-    const signedJwt = await createGoogleAuthJwt(c, serviceAccount);
-    const accessToken = await getGoogleAccessToken(c, signedJwt);
+    const accessToken = await getGoogleAccessToken(c, serviceAccount);
 
     const url = `${GOOGLE_PLAY_API_BASE}/applications/${packageName}/purchases/subscriptions/${subscriptionId}/tokens/${purchaseToken}`;
     const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
