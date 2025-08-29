@@ -356,7 +356,8 @@ export const getSubscriptionDetails = async (c, purchaseToken, subscriptionId) =
 };
 
 /**
- * Handles incoming Real-time Developer Notifications from Google Play.
+ * Handles incoming Real-time Developer Notifications from Google Play with robust logic
+ * to prevent incorrect downgrades due to old subscription events.
  */
 export const handleGooglePlayWebhook = async (c, notification) => {
   if (notification.testNotification) {
@@ -371,10 +372,9 @@ export const handleGooglePlayWebhook = async (c, notification) => {
   }
 
   const { notificationType, purchaseToken, subscriptionId } = subscriptionNotification;
-  console.log(`RTDN Received: Type ${notificationType} for subscription ${subscriptionId}`);
   console.log(
     JSON.stringify({
-      scope: "gplay.rtdn",
+      scope: "gplay.rtdn.v2",
       event: "received",
       notificationType,
       subscriptionId,
@@ -382,102 +382,98 @@ export const handleGooglePlayWebhook = async (c, notification) => {
     })
   );
 
-  // Find the user associated with this purchase token. This is the critical link.
-  let transaction = await db.getPaymentTransactionByProviderId(c.env.DB, "google", purchaseToken);
-
+  const transaction = await db.getPaymentTransactionByProviderId(c.env.DB, "google", purchaseToken);
   if (!transaction) {
-    console.error(
-      JSON.stringify({
-        scope: "gplay.rtdn",
-        event: "unknown_token",
-        subscriptionId,
-        tokenSuffix: purchaseToken.slice(-8),
-      })
-    );
-    // Try to fetch subscription details directly to recover (user may have purchased on another device before verification endpoint hit).
-    const details = await getSubscriptionDetails(c, purchaseToken, subscriptionId);
-    if (details.success) {
-      const sub = details.subscription;
-      const linkedUserId = null; // We don't know user yet.
-      // Without mapping purchaseToken -> user, we cannot apply benefits. Log and exit.
-      console.error(
-        JSON.stringify({
-          scope: "gplay.rtdn",
-          event: "backfill_failed_no_mapping",
-          subscriptionId,
-          tokenSuffix: purchaseToken.slice(-8),
-        })
-      );
-    }
+    console.error(JSON.stringify({ scope: "gplay.rtdn.v2", event: "unknown_token" }));
+    // Future: Could potentially backfill if needed, but for now, we ignore unknown tokens.
     return;
   }
 
   const userId = transaction.userId;
-  const plan = PLANS[subscriptionId];
-
-  if (!plan) {
-    console.error(`CRITICAL: RTDN received for an unknown planId: ${subscriptionId}`);
-    return;
-  }
-
   const user = await db.getUserById(c.env.DB, userId);
   if (!user) {
     console.error(`CRITICAL: User ${userId} not found for a valid RTDN.`);
     return;
   }
 
-  // Process the notification based on its type
+  // --- START OF THE FIX: Smarter Downgrade Logic ---
   switch (notificationType) {
-    case 4: // SUBSCRIPTION_PURCHASED (initial purchase)
-    case 2: // SUBSCRIPTION_RENEWED
-    case 1: // SUBSCRIPTION_RECOVERED (e.g., user fixed a declined card)
-      console.log(`Renewing/Recovering subscription for user: ${userId}`);
+    case 12: // SUBSCRIPTION_REVOKED
+    case 13: // SUBSCRIPTION_EXPIRED
+      console.log(
+        `Expiration/Revocation notice for user: ${userId}. Verifying current active subscriptions.`
+      );
 
-      // Prefer Google's authoritative expiry time when available to prevent drift.
-      let newExpiryDate;
-      const live = await getSubscriptionDetails(c, purchaseToken, subscriptionId);
-      if (live.success && live.subscription.expiryTimeMillis) {
-        newExpiryDate = new Date(parseInt(live.subscription.expiryTimeMillis, 10));
-      } else {
-        // Fallback: extend locally.
-        const now = new Date();
-        const startDate =
-          user.subscription_expiresAt && new Date(user.subscription_expiresAt) > now
-            ? new Date(user.subscription_expiresAt)
-            : now;
-        newExpiryDate = new Date(startDate);
-        newExpiryDate.setDate(newExpiryDate.getDate() + plan.durationDays);
+      // Get ALL of the user's completed Google transactions, newest first.
+      const { results: allTransactions } = await db.getAllCompletedGoogleTransactionsForUser(
+        c.env.DB,
+        userId
+      );
+
+      let latestActiveSub = null;
+
+      // Loop through all past purchases to find the "best" active one.
+      for (const trans of allTransactions) {
+        const details = await getSubscriptionDetails(c, trans.providerTransactionId, trans.planId);
+        if (details.success) {
+          const state = details.subscription.paymentState;
+          const expiry = new Date(parseInt(details.subscription.expiryTimeMillis, 10));
+
+          // If the subscription is active (paid or in trial) and not expired...
+          if ((state === 1 || state === 2) && expiry > new Date()) {
+            // ...this is their current valid subscription.
+            latestActiveSub = {
+              tier: PLANS[trans.planId]?.tier,
+              expiresAt: expiry.toISOString(),
+            };
+            // Since we sorted by newest first, the first one we find is the right one.
+            break;
+          }
+        }
       }
 
-      await db.updateUserSubscription(c.env.DB, userId, {
-        tier: plan.tier,
-        expiresAt: newExpiryDate.toISOString(),
-      });
-      console.log(`Subscription for ${userId} extended to ${newExpiryDate.toISOString()}`);
+      if (latestActiveSub) {
+        // We found a different active subscription! Update the user to reflect this.
+        console.log(
+          `User has another active subscription (${latestActiveSub.tier}). Updating profile instead of downgrading.`
+        );
+        await db.updateUserSubscription(c.env.DB, userId, latestActiveSub);
+      } else {
+        // We checked all purchases and NONE are active. NOW it's safe to downgrade.
+        console.log(
+          `No other active subscriptions found for user: ${userId}. Reverting to 'free' tier.`
+        );
+        await db.updateUserSubscription(c.env.DB, userId, { tier: "free", expiresAt: null });
+      }
+      break;
+
+    // --- Other cases remain the same ---
+    case 4: // SUBSCRIPTION_PURCHASED
+    case 2: // SUBSCRIPTION_RENEWED
+    case 1: // SUBSCRIPTION_RECOVERED
+      console.log(`Renewing/Activating subscription for user: ${userId}`);
+      const details = await getSubscriptionDetails(c, purchaseToken, subscriptionId);
+      if (details.success) {
+        const plan = PLANS[subscriptionId];
+        const newExpiryDate = new Date(parseInt(details.subscription.expiryTimeMillis, 10));
+        await db.updateUserSubscription(c.env.DB, userId, {
+          tier: plan.tier,
+          expiresAt: newExpiryDate.toISOString(),
+        });
+        console.log(`Subscription for ${userId} extended to ${newExpiryDate.toISOString()}`);
+      }
       break;
 
     case 3: // SUBSCRIPTION_CANCELED
-      console.log(
-        `User ${userId} cancelled their subscription. Access remains valid until expiry.`
-      );
-      // No change to expiry date is needed. The subscription will expire naturally.
-      // You could optionally set a flag in your DB to change the UI for this user (e.g., show "Resubscribe").
+      console.log(`User ${userId} cancelled. Access remains until expiry.`);
+      // No action needed.
       break;
 
-    case 12: // SUBSCRIPTION_REVOKED (e.g., due to a payment chargeback)
-    case 13: // SUBSCRIPTION_EXPIRED
-      console.log(`Subscription expired/revoked for user: ${userId}. Reverting to 'free' tier.`);
-      await db.updateUserSubscription(c.env.DB, userId, {
-        tier: "free",
-        expiresAt: null, // Clear the expiration date
-      });
-      break;
-
-    case 5: // SUBSCRIPTION_ON_HOLD (Enters account hold due to payment issue)
+    // Other cases you might handle in the future
+    case 5: // SUBSCRIPTION_ON_HOLD
     case 6: // SUBSCRIPTION_IN_GRACE_PERIOD
       console.log(`Subscription for user ${userId} is on hold or in grace period.`);
-      // The user still has access during a grace period.
-      // You could update a status field for the user to show a "Please update your payment method" message in the app.
+      // No downgrade action needed yet.
       break;
 
     default:

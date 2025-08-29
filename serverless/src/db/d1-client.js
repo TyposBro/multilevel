@@ -64,6 +64,22 @@ export const db = {
     }
   },
 
+  async getAllCompletedGoogleTransactionsForUser(d1, userId) {
+    try {
+      return await d1
+        .prepare(
+          `SELECT * FROM payment_transactions 
+           WHERE userId = ? AND provider = 'google' AND status = 'COMPLETED'
+           ORDER BY createdAt DESC` // Newest first is important
+        )
+        .bind(userId)
+        .all();
+    } catch (e) {
+      console.error("D1 getAllCompletedGoogleTransactionsForUser Error:", e.message);
+      return { results: [] }; // Return an object with a results property to match D1's format
+    }
+  },
+
   async createUser(d1, userData) {
     const userId = crypto.randomUUID();
     const { email, authProvider, googleId, telegramId, firstName, username } = userData;
