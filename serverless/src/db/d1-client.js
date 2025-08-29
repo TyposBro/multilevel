@@ -48,6 +48,22 @@ export const db = {
     }
   },
 
+  async getLatestCompletedGoogleTransaction(d1, userId) {
+    try {
+      return await d1
+        .prepare(
+          `SELECT * FROM payment_transactions 
+           WHERE userId = ? AND provider = 'google' AND status = 'COMPLETED'
+           ORDER BY createdAt DESC LIMIT 1`
+        )
+        .bind(userId)
+        .first();
+    } catch (e) {
+      console.error("D1 getLatestCompletedGoogleTransaction Error:", e.message);
+      return null;
+    }
+  },
+
   async createUser(d1, userData) {
     const userId = crypto.randomUUID();
     const { email, authProvider, googleId, telegramId, firstName, username } = userData;

@@ -1,4 +1,5 @@
 // in: /app/src/main/java/org/milliytechnology/spiko/features/billing/BillingManager.kt
+
 package org.milliytechnology.spiko.features.billing
 
 import android.app.Activity
@@ -72,18 +73,18 @@ class BillingManager @Inject constructor(
         }
     }
 
-    // FIX 1: Correctly build PendingPurchasesParams for the builder.
     private val pendingPurchasesParams = PendingPurchasesParams.newBuilder()
         .enableOneTimeProducts()
         .build()
 
     private val billingClient = BillingClient.newBuilder(context)
         .setListener(purchasesUpdatedListener)
-        .enablePendingPurchases(pendingPurchasesParams) // Pass the built object
+        .enablePendingPurchases(pendingPurchasesParams)
         .build()
 
     /**
      * Starts the connection to Google Play Billing. Call this once when billing is needed.
+     * The connection status is reported through the public `isReady` StateFlow.
      */
     fun startConnection() {
         if (billingClient.isReady) {
@@ -132,8 +133,7 @@ class BillingManager @Inject constructor(
             }
             val params = QueryProductDetailsParams.newBuilder().setProductList(productList).build()
 
-            // FIX 2 & 3: Use the modern suspend function and handle its result.
-            val result: ProductDetailsResult = billingClient.queryProductDetails(params)
+            val result = billingClient.queryProductDetails(params)
 
             if (result.billingResult.responseCode == BillingResponseCode.OK) {
                 val detailsList = result.productDetailsList ?: emptyList()
@@ -186,7 +186,9 @@ class BillingManager @Inject constructor(
                     val planId = purchase.products.firstOrNull()
                     if (planId == null) {
                         Log.e(TAG, "Purchase failed: Product ID missing.")
-                        _errorEvent.value="Purchase verification failed: Missing product ID."
+                        withContext(Dispatchers.Main) {
+                            _errorEvent.value = "Purchase verification failed: Missing product ID."
+                        }
                         return@forEach
                     }
 
@@ -195,11 +197,15 @@ class BillingManager @Inject constructor(
                         is RepositoryResult.Success -> {
                             Log.d(TAG, "Backend verification successful. Acknowledging with Google.")
                             acknowledgePurchase(purchase)
-                            _purchaseSuccessEvent.value = result.data.message
+                            withContext(Dispatchers.Main) {
+                                _purchaseSuccessEvent.value = result.data.message
+                            }
                         }
                         is RepositoryResult.Error -> {
                             Log.e(TAG, "Backend verification failed: ${result.message}")
-                            _errorEvent.value= "Purchase could not be verified with our server. Please contact support."
+                            withContext(Dispatchers.Main) {
+                                _errorEvent.value = "Purchase could not be verified with our server. Please contact support."
+                            }
                         }
                     }
                 }
@@ -213,9 +219,8 @@ class BillingManager @Inject constructor(
         val params = AcknowledgePurchaseParams.newBuilder()
             .setPurchaseToken(purchase.purchaseToken)
             .build()
-        val result = withContext(Dispatchers.IO) {
-            billingClient.acknowledgePurchase(params)
-        }
+        val result = billingClient.acknowledgePurchase(params)
+
         if (result.responseCode == BillingResponseCode.OK) {
             Log.i(TAG, "Purchase acknowledged successfully with Google Play.")
         } else {
