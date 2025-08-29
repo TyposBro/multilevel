@@ -208,14 +208,15 @@ const getGoogleAccessToken = async (c, serviceAccount) => {
 };
 
 /**
- * Verifies a Google Play subscription purchase token from the client app.
+ * Verifies a Google Play subscription purchase token.
  */
 export const verifyGooglePurchase = async (c, purchaseToken, subscriptionId) => {
   try {
     const t0 = Date.now();
     const serviceAccountJson = c.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
-    if (!serviceAccountJson)
+    if (!serviceAccountJson) {
       return { success: false, error: "Google Play verification is not configured." };
+    }
     const serviceAccount = JSON.parse(serviceAccountJson);
     const packageName = "org.milliytechnology.spiko";
 
@@ -236,30 +237,25 @@ export const verifyGooglePurchase = async (c, purchaseToken, subscriptionId) => 
           tokenSuffix: purchaseToken.slice(-8),
         })
       );
-      return { success: false, error: "Purchase verification failed with Google." };
+      return { success: false, error: "Purchase token is invalid or already used." };
     }
 
-    const data = await response.json();
+    const purchaseData = await response.json();
     console.log(
       JSON.stringify({
         scope: "gplay.verify",
-        event: "response",
-        purchaseState: data.purchaseState,
-        expiryTimeMillis: data.expiryTimeMillis,
+        event: "response_success",
+        paymentState: purchaseData.paymentState, // <-- THE FIX: Log the correct field name.
+        expiryTimeMillis: purchaseData.expiryTimeMillis,
         subscriptionId,
         tokenSuffix: purchaseToken.slice(-8),
         elapsedMs: Date.now() - t0,
       })
     );
-    if (data.purchaseState === 0) {
-      const expiryMs = data.expiryTimeMillis ? parseInt(data.expiryTimeMillis, 10) : null;
-      const isExpired = expiryMs && Date.now() > expiryMs;
-      if (!isExpired) {
-        return { success: true, planId: subscriptionId, expiryTimeMillis: data.expiryTimeMillis };
-      }
-      return { success: false, error: "This subscription has already expired." };
-    }
-    return { success: false, error: "This subscription is not in an active state." };
+
+    // If the API call was successful, we consider the token valid.
+    // Return the full payload for the calling service to inspect.
+    return { success: true, purchaseInfo: purchaseData };
   } catch (error) {
     console.error(
       JSON.stringify({
@@ -269,7 +265,7 @@ export const verifyGooglePurchase = async (c, purchaseToken, subscriptionId) => 
         stack: (error.stack || "").split("\n").slice(0, 3).join(" | "),
       })
     );
-    return { success: false, error: "An internal server error occurred." };
+    return { success: false, error: "An internal server error occurred during verification." };
   }
 };
 

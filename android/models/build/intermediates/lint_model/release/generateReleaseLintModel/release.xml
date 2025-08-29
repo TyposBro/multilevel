@@ -26,6 +26,6 @@
       applicationId="org.vosk.models"
       generatedSourceFolders="build/generated/ap_generated_sources/release/out"
       generatedResourceFolders="build/generated/res/resValues/release"
-      desugaredMethodsFiles="/Users/typosbro/.gradle/caches/8.13/transforms/cb84ded1351472824dccd95727da8c29/transformed/D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="/home/ched54/.gradle/caches/8.13/transforms/cb84ded1351472824dccd95727da8c29/transformed/D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>
