@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -47,7 +48,7 @@ fun TelegramSignInButton(
             modifier = Modifier.size(24.dp),
             // The default tint (LocalContentColor) works perfectly here
             // as it will be MaterialTheme.colorScheme.onPrimary
-            tint = LocalContentColor.current
+            tint = Color.Unspecified
         )
         Spacer(modifier = Modifier.width(12.dp))
         Text(
