@@ -211,6 +211,7 @@ class ExamViewModel @Inject constructor(
     private suspend fun executePart1_1() {
         updateState("executePart1_1: Intro") { it.copy(stage = MultilevelExamStage.INTRO) }
         playInstructionAndWait(R.raw.multilevel_part1_intro)
+        playStartSpeakingSound()
         val content = _uiState.value.examContent?.part1_1 ?: return
         for ((index, question) in content.withIndex()) {
             if (!viewModelScope.isActive) return
@@ -264,6 +265,7 @@ class ExamViewModel @Inject constructor(
     private suspend fun executePart2() {
         updateState("executePart2: Intro") { it.copy(stage = MultilevelExamStage.PART2_INTRO) }
         playInstructionAndWait(R.raw.multilevel_part2_intro)
+        playStartSpeakingSound()
         val set = _uiState.value.examContent?.part2 ?: return
         val fullQuestionText = set.questions.joinToString("\n") { it.text }
         updateState("executePart2: Prep") {
@@ -287,6 +289,7 @@ class ExamViewModel @Inject constructor(
     private suspend fun executePart3() {
         updateState("executePart3: Intro") { it.copy(stage = MultilevelExamStage.PART3_INTRO) }
         playInstructionAndWait(R.raw.multilevel_part3_intro)
+        playStartSpeakingSound()
         val set = _uiState.value.examContent?.part3 ?: return
         val fullPrompt = buildString {
             appendLine(set.topic)
