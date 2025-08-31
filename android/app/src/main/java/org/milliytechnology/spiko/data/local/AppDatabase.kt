@@ -33,6 +33,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "app_database"
                 )
                     .fallbackToDestructiveMigration() // Simple migration strategy for this change
+                    .addCallback(DatabasePreprocessor(context))
                     .build()
                 INSTANCE = instance
                 instance

@@ -155,7 +155,6 @@ dependencies {
     implementation(libs.vosk.android)
     implementation(libs.androidx.play.billing)
 
-    implementation(libs.android.msdk)
 }
 
 // Custom tasks for Google Play Billing testing

@@ -42,7 +42,6 @@ benchmarkCommon = "1.4.0"
 playBilling = "8.0.0"
 
 [libraries]
-android-msdk = { module = "com.github.TyposBro:android-msdk", version.ref = "androidMsdk" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
