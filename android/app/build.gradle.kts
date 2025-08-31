@@ -16,8 +16,8 @@ android {
         applicationId = "org.milliytechnology.spiko"
         minSdk = 26
         targetSdk = 34
-        versionCode = 11
-        versionName = "2025.08.28"
+        versionCode = 12
+        versionName = "2025.08.31"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
