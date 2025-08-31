@@ -49,7 +49,7 @@ database_id = "b9cb6fe6-4dfa-4d42-9763-59327beb4f8c"
 [vars]
 # You can define different environments (e.g., [env.production], [env.staging])
 # For simplicity, we'll define them globally here.
-ENVIRONMENT = "development"                                        # Change to "production" for deployments
+ENVIRONMENT = "production"                                         # Change to "production" for deployments
 FRONTEND_ACCOUNT_URL = "https://milliytechnology.org/account.html"
 
 # --- General Config ---
