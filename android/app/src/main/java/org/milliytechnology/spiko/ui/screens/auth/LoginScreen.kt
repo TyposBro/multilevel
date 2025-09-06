@@ -150,6 +150,69 @@ fun LoginScreen(
                 }
             )
 
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Terms and Privacy links
+            val termsUrl = stringResource(id = R.string.url_terms)
+            val privacyUrl = stringResource(id = R.string.url_privacy_policy)
+            val termsLabel = stringResource(id = R.string.login_terms_label_terms)
+            val privacyLabel = stringResource(id = R.string.login_terms_label_privacy)
+            val termsTextTemplate = stringResource(id = R.string.login_terms_text)
+
+            val annotatedText = androidx.compose.ui.text.buildAnnotatedString {
+                val formatted = String.format(termsTextTemplate, termsLabel, privacyLabel)
+                append(formatted)
+                // find indices for labels and add url annotations
+                val termsStart = formatted.indexOf(termsLabel)
+                if (termsStart >= 0) {
+                    val termsEnd = termsStart + termsLabel.length
+                    addStyle(
+                        style = androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.primary),
+                        start = termsStart,
+                        end = termsEnd
+                    )
+                    addStringAnnotation(
+                        tag = "URL",
+                        annotation = termsUrl,
+                        start = termsStart,
+                        end = termsEnd
+                    )
+                }
+                val privacyStart = formatted.indexOf(privacyLabel)
+                if (privacyStart >= 0) {
+                    val privacyEnd = privacyStart + privacyLabel.length
+                    addStyle(
+                        style = androidx.compose.ui.text.SpanStyle(color = MaterialTheme.colorScheme.primary),
+                        start = privacyStart,
+                        end = privacyEnd
+                    )
+                    addStringAnnotation(
+                        tag = "URL",
+                        annotation = privacyUrl,
+                        start = privacyStart,
+                        end = privacyEnd
+                    )
+                }
+            }
+
+            androidx.compose.foundation.text.ClickableText(
+                text = annotatedText,
+                onClick = { offset ->
+                    val annotations = annotatedText.getStringAnnotations(tag = "URL", start = offset, end = offset)
+                    val url = annotations.firstOrNull()?.item
+                    if (url != null) {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+                            context.startActivity(intent)
+                        } catch (e: Exception) {
+                            Log.e("LoginScreen", "Failed to open link: $url", e)
+                        }
+                    }
+                },
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth()
+            )
+
             val errorMessage = (googleSignInState as? UiState.Error)?.message
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(24.dp))
