@@ -1,3 +1,6 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+
 // {PATH_TO_PROJECT}/app/build.gradle.kts
 plugins {
     alias(libs.plugins.android.application)
@@ -15,9 +18,9 @@ android {
     defaultConfig {
         applicationId = "org.milliytechnology.spiko"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 13
-        versionName = "2025.08.31"
+        targetSdk = 36
+        versionCode = 14
+        versionName = "2025.09.06"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -35,10 +38,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
-    }
-
-    kotlinOptions {
-        jvmTarget = "1.8"
     }
 
     buildFeatures {
@@ -155,6 +154,13 @@ dependencies {
     implementation(libs.vosk.android)
     implementation(libs.androidx.play.billing)
 
+}
+
+tasks.withType<KotlinJvmCompile>().configureEach {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_1_8)
+        freeCompilerArgs.add("-opt-in=kotlin.RequiresOptIn")
+    }
 }
 
 // Custom tasks for Google Play Billing testing
